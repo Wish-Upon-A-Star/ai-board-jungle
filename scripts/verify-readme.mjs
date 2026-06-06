@@ -45,6 +45,7 @@ const checklistRequired = [
   "npm run demo:screenshot",
   "npm run verify:hygiene",
   "npm run verify:text",
+  "npm run verify:frontend-helpers",
   "npm run verify:contract",
   "npm run verify:readme",
   "npm run verify:full:quick",

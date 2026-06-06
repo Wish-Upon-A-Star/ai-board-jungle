@@ -17,6 +17,7 @@ Run these checks before final submission or when the UI changes:
    ```powershell
    npm run verify:hygiene
    npm run verify:text
+   npm run verify:frontend-helpers
    npm run verify:readme
    ```
 
@@ -26,7 +27,7 @@ Run these checks before final submission or when the UI changes:
    npm run verify:full:quick
    ```
 
-   This includes `npm run verify:contract` after the managed FastAPI and React servers are available.
+   This includes `npm run verify:frontend-helpers` before the build and `npm run verify:contract` after the managed FastAPI and React servers are available.
 
 4. For live external writes, set real GitHub/Notion/Google Calendar/Figma credentials in `.env` and run:
 

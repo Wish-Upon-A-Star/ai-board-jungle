@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Bot, CalendarClock, Database, FileText, GitBranch, KeyRound, Link2, LogOut, Play, Plus, Search, Share2, Trash2, Upload, UserPlus } from "lucide-react";
 import { api } from "./api";
+import { buildSystemReadinessCards, getRunStatus, mergePostsById, parseRunResult, summarizeRunResult } from "./viewModel";
 import "./style.css";
 
 const defaultAutomation = {
@@ -104,39 +105,6 @@ function Field({ label, children }) {
   return <label className="field"><span>{label}</span>{children}</label>;
 }
 
-function parseRunResult(result) {
-  if (!result) return {};
-  if (typeof result === "object") return result;
-  try {
-    return JSON.parse(result);
-  } catch {
-    return { raw: String(result) };
-  }
-}
-
-function summarizeRunResult(result) {
-  const data = parseRunResult(result);
-  const parts = [data.agent || "agent"];
-  if (data.route) parts.push(data.route);
-  if (Array.isArray(data.targets)) parts.push(`${data.targets.length} targets`);
-  if (Array.isArray(data.externalRagSources)) parts.push(`${data.externalRagSources.length} RAG sources`);
-  return parts.join(" / ");
-}
-
-function getRunStatus(result) {
-  const data = parseRunResult(result);
-  return String(data.status || data.raw || "unknown").toLowerCase();
-}
-
-function mergePostsById(currentPosts, nextPosts) {
-  const seen = new Set();
-  return [...currentPosts, ...nextPosts].filter((post) => {
-    if (seen.has(post.id)) return false;
-    seen.add(post.id);
-    return true;
-  });
-}
-
 function App() {
   const [token, setToken] = useState(localStorage.getItem("ai-board-token") || "");
   const [user, setUser] = useState(null);
@@ -170,17 +138,7 @@ function App() {
 
   const myTasks = useMemo(() => tasks.filter((task) => task.owner?.id === user?.id), [tasks, user]);
   const sharedCount = posts.filter((post) => post.automationTaskId).length;
-  const readyProviders = providerReadiness.filter((provider) => provider.ready).length;
-  const systemCards = [
-    { label: "React", value: "UI ready", ok: true },
-    { label: "FastAPI", value: "Health", ok: true },
-    { label: "PostgreSQL", value: "ready schema", ok: true },
-    { label: "Redis", value: "RAG cache", ok: true },
-    { label: "RAG", value: `${knowledgeSources.length} sources`, ok: true },
-    { label: "MCP", value: "JSON-RPC", ok: true },
-    { label: "Agent", value: `${tasks.length} automations`, ok: true },
-    { label: "Live APIs", value: `${readyProviders}/${providerReadiness.length} ready`, ok: readyProviders > 0 },
-  ];
+  const systemCards = buildSystemReadinessCards({ providerReadiness, knowledgeSources, tasks });
 
   useEffect(() => {
     if (token) loadAll();
