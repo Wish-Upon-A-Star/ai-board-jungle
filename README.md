@@ -236,6 +236,7 @@ npm run smoke:http
 검증 내용:
 
 - `verify:hygiene`: `frontend/dist/`, DB, 로그, `.env` 추적 방지와 실토큰 패턴 스캔
+- `verify:text`: README, backend, frontend source, scripts, submission checklist의 깨진 한글/문자열 회귀 검사
 - `verify:readme`: 제출 README 구조, 체크리스트, PNG 스크린샷 무결성 확인
 - `verify:contract`: React UI가 의존하는 FastAPI 응답 계약 확인
 - `verify:full:quick`: hygiene, README, backend tests, frontend build, API contract, HTTP smoke, UI CDP smoke, MCP smoke

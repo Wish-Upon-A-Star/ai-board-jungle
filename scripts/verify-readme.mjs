@@ -36,7 +36,7 @@ const requiredSnippets = [
 const suspiciousPatterns = [
   /\uFFFD/,
   /\u00c2|\u00c3|\u00e2|\u00ec|\u00ed/,
-  /[寃蹂吏源移嫄釉]/,
+  /[\u5bc3\u8e42\uf9de\u6e90\u79fb\u5ac4\u91c9]/,
 ];
 
 const missing = requiredSnippets.filter((snippet) => !readme.includes(snippet));
@@ -44,6 +44,7 @@ const suspicious = suspiciousPatterns.filter((pattern) => pattern.test(readme)).
 const checklistRequired = [
   "npm run demo:screenshot",
   "npm run verify:hygiene",
+  "npm run verify:text",
   "npm run verify:contract",
   "npm run verify:readme",
   "npm run verify:full:quick",

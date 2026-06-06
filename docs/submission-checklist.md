@@ -16,6 +16,7 @@ Run these checks before final submission or when the UI changes:
 
    ```powershell
    npm run verify:hygiene
+   npm run verify:text
    npm run verify:readme
    ```
 
