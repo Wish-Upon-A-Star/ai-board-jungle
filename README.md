@@ -23,7 +23,7 @@ AI_BOARD_TOKEN_ENCRYPTION_SECRET="replace-with-a-separate-long-random-secret"
 
 ```env
 AI_BOARD_TOKEN_SECRET_PROVIDER="command"
-AI_BOARD_TOKEN_SECRET_COMMAND="python C:/secure/ai-board-secret-adapter.py"
+AI_BOARD_TOKEN_SECRET_COMMAND="python scripts/secret-adapter.sample.py"
 ```
 
 Command stdin:
@@ -39,6 +39,8 @@ Command stdout:
 ```
 
 `reveal` action은 저장된 reference를 다시 실제 API 토큰으로 복원해야 합니다. API 응답은 원문 토큰을 반환하지 않고 `hasToken`, `tokenPreview`, `tokenStorage`만 반환합니다. `tokenStorage` 값은 `encrypted`, `external`, `legacy`, `empty` 중 하나입니다.
+
+샘플 어댑터는 [scripts/secret-adapter.sample.py](scripts/secret-adapter.sample.py)에 있습니다. 기본 구현은 로컬 파일 저장소 데모이며, 운영에서는 `protect_value()`와 `reveal_value()` 내부를 Vault/KMS SDK 호출로 교체하십시오.
 
 React, FastAPI, PostgreSQL-ready SQLAlchemy, Redis 캐시를 기반으로 만든 AI 자동화 게시판입니다. 단순 게시판에 AI 버튼만 붙인 구조가 아니라, 사용자가 GitHub, Notion, Google Calendar, Figma뿐 아니라 Jira, Slack, Sheets, 사내 API 같은 임의의 외부 업무 흐름을 자동화 작업으로 등록하고 실행 결과를 게시판에 공유하는 방식으로 구성했습니다.
 

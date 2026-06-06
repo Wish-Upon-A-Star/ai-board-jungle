@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import os
+import json
+import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 os.environ["AI_BOARD_DATABASE_URL"] = "sqlite:///:memory:"
 
@@ -541,3 +544,33 @@ def test_command_secret_provider_stores_external_references(monkeypatch, tmp_pat
         monkeypatch.setenv("AI_BOARD_TOKEN_SECRET_PROVIDER", "local")
         monkeypatch.delenv("AI_BOARD_TOKEN_SECRET_COMMAND", raising=False)
         settings.cache_clear()
+
+
+def test_sample_secret_adapter_roundtrip(tmp_path):
+    adapter = Path("scripts/secret-adapter.sample.py")
+    store = tmp_path / "adapter-store.json"
+    env = {
+        **os.environ,
+        "AI_BOARD_SECRET_ADAPTER_STORE": str(store),
+        "AI_BOARD_SECRET_ADAPTER_MASTER_KEY": "test-master-key",
+    }
+    protected = subprocess.run(
+        [sys.executable, str(adapter)],
+        input=json.dumps({"action": "protect", "value": "sample_secret_value"}),
+        text=True,
+        capture_output=True,
+        env=env,
+        check=True,
+    )
+    reference = json.loads(protected.stdout)["value"]
+    assert reference.startswith("ai-board/")
+    assert "sample_secret_value" not in store.read_text(encoding="utf-8")
+    revealed = subprocess.run(
+        [sys.executable, str(adapter)],
+        input=json.dumps({"action": "reveal", "value": reference}),
+        text=True,
+        capture_output=True,
+        env=env,
+        check=True,
+    )
+    assert json.loads(revealed.stdout)["value"] == "sample_secret_value"
