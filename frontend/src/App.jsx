@@ -168,7 +168,7 @@ function prettyRunResult(result) {
   return JSON.stringify(data, null, 2);
 }
 
-function retryStateKey(taskId, runId) {
+function runRowStateKey(taskId, runId) {
   return `${taskId}:${runId}`;
 }
 
@@ -440,7 +440,7 @@ function App() {
   }
 
   async function retryTaskFromRun(task, run) {
-    const stateKey = retryStateKey(task.id, run.id);
+    const stateKey = runRowStateKey(task.id, run.id);
     setRetryRunState((current) => ({ ...current, [stateKey]: { status: "running", message: "Retrying..." } }));
     setError("");
     try {
@@ -744,7 +744,9 @@ function App() {
                           <span>{runHistory[task.id].runs.length} / {runHistory[task.id].total} · Updated {runHistory[task.id].loadedAt}</span>
                         </div>
                         {runHistory[task.id].runs.map((run) => {
-                          const retryState = retryRunState[retryStateKey(task.id, run.id)];
+                          const rowStateKey = runRowStateKey(task.id, run.id);
+                          const retryState = retryRunState[rowStateKey];
+                          const expanded = expandedRuns[rowStateKey];
                           return (
                             <div key={run.id} className="run-row">
                               <div className="run-row-main">
@@ -755,12 +757,12 @@ function App() {
                                 <button type="button" className="inline-link retry" disabled={retryState?.status === "running"} onClick={() => retryTaskFromRun(task, run)}>
                                   {retryState?.status === "running" ? "Retrying" : "Retry"}
                                 </button>
-                                <button type="button" className="inline-link" onClick={() => setExpandedRuns((current) => ({ ...current, [run.id]: !current[run.id] }))}>
-                                  {expandedRuns[run.id] ? "Hide details" : "Details"}
+                                <button type="button" className="inline-link" onClick={() => setExpandedRuns((current) => ({ ...current, [rowStateKey]: !current[rowStateKey] }))}>
+                                  {expanded ? "Hide details" : "Details"}
                                 </button>
                               </div>
                               {retryState?.message ? <div className={`run-retry-message ${retryState.status}`}>{retryState.message}</div> : null}
-                              {expandedRuns[run.id] ? <pre className="run-json">{prettyRunResult(run.result)}</pre> : null}
+                              {expanded ? <pre className="run-json">{prettyRunResult(run.result)}</pre> : null}
                             </div>
                           );
                         })}
