@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
@@ -229,7 +229,7 @@ async def extract_upload_text(upload: UploadFile | None) -> tuple[str, str, str]
     if mime_type.startswith("text/") or file_name.lower().endswith((".txt", ".md", ".csv", ".json", ".log")):
         text = raw[:20000].decode("utf-8", errors="ignore")
         return file_name, mime_type, text
-    return file_name, mime_type, f"[{mime_type or 'binary'} 파일: {file_name}] 파일 설명/작성 지침을 RAG 근거로 사용합니다."
+    return file_name, mime_type, f"[{mime_type or 'binary'} ?뚯씪: {file_name}] ?뚯씪 ?ㅻ챸/?묒꽦 吏移⑥쓣 RAG 洹쇨굅濡??ъ슜?⑸땲??"
 
 
 def serialize_post(post: Post) -> dict:
@@ -295,7 +295,7 @@ def health() -> dict:
 @app.post("/api/auth/register")
 def register(data: RegisterIn, db: Session = Depends(get_db)) -> dict:
     if db.query(User).filter(User.email == data.email).first():
-        raise HTTPException(status_code=409, detail="이미 가입된 이메일입니다.")
+        raise HTTPException(status_code=409, detail="?대? 媛?낅맂 ?대찓?쇱엯?덈떎.")
     user = User(email=data.email, name=data.name, password_hash=hash_password(data.password))
     db.add(user)
     db.commit()
@@ -307,7 +307,7 @@ def register(data: RegisterIn, db: Session = Depends(get_db)) -> dict:
 def login(data: LoginIn, db: Session = Depends(get_db)) -> dict:
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다.")
+        raise HTTPException(status_code=401, detail="?대찓???먮뒗 鍮꾨?踰덊샇媛 ?щ컮瑜댁? ?딆뒿?덈떎.")
     return {"token": create_token(user), "user": serialize_user(user)}
 
 
@@ -415,9 +415,9 @@ def create_integration_profile(data: IntegrationProfileIn, user: User = Depends(
 def delete_integration_profile(profile_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     profile = db.get(IntegrationProfile, profile_id)
     if not profile:
-        raise HTTPException(status_code=404, detail="연동 프로필을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="?곕룞 ?꾨줈?꾩쓣 李얠쓣 ???놁뒿?덈떎.")
     if profile.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 사용할 수 없습니다.")
+        raise HTTPException(status_code=403, detail="?ㅻⅨ ?ъ슜?먯쓽 ?곕룞 ?꾨줈?꾩? ?ъ슜?????놁뒿?덈떎.")
     db.delete(profile)
     db.commit()
     return {"ok": True}
@@ -427,9 +427,9 @@ def delete_integration_profile(profile_id: int, user: User = Depends(current_use
 def collect_integration_profile(profile_id: int, limit: int | None = None, pages: int | None = None, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     profile = db.get(IntegrationProfile, profile_id)
     if not profile:
-        raise HTTPException(status_code=404, detail="연동 프로필을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="?곕룞 ?꾨줈?꾩쓣 李얠쓣 ???놁뒿?덈떎.")
     if profile.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 수집할 수 없습니다.")
+        raise HTTPException(status_code=403, detail="?ㅻⅨ ?ъ슜?먯쓽 ?곕룞 ?꾨줈?꾩? ?섏쭛?????놁뒿?덈떎.")
     safe_limit = max(1, min(limit if limit is not None else profile.collect_limit, 100))
     safe_pages = max(1, min(pages if pages is not None else profile.collect_pages, 5))
     items, warnings = collect_profile_items(profile, limit=safe_limit, pages=safe_pages)
@@ -470,9 +470,9 @@ def collect_integration_profile(profile_id: int, limit: int | None = None, pages
 def write_integration_profile(profile_id: int, data: LiveWriteIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     profile = db.get(IntegrationProfile, profile_id)
     if not profile:
-        raise HTTPException(status_code=404, detail="연동 프로필을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="?곕룞 ?꾨줈?꾩쓣 李얠쓣 ???놁뒿?덈떎.")
     if profile.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 실행할 수 없습니다.")
+        raise HTTPException(status_code=403, detail="?ㅻⅨ ?ъ슜?먯쓽 ?곕룞 ?꾨줈?꾩? ?ㅽ뻾?????놁뒿?덈떎.")
     result = execute_profile_write(
         profile,
         title=data.title,
@@ -521,7 +521,7 @@ def create_post(data: PostIn, user: User = Depends(current_user), db: Session = 
 @app.post("/api/posts/{post_id}/comments")
 def add_comment(post_id: int, data: CommentIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     if not db.get(Post, post_id):
-        raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="寃뚯떆湲??李얠쓣 ???놁뒿?덈떎.")
     comment = Comment(post_id=post_id, author_id=user.id, content=data.content)
     db.add(comment)
     db.commit()
@@ -533,9 +533,9 @@ def add_comment(post_id: int, data: CommentIn, user: User = Depends(current_user
 def delete_post(post_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     post = db.get(Post, post_id)
     if not post:
-        raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="寃뚯떆湲??李얠쓣 ???놁뒿?덈떎.")
     if post.author_id != user.id and user.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="삭제 권한이 없습니다.")
+        raise HTTPException(status_code=403, detail="??젣 沅뚰븳???놁뒿?덈떎.")
     db.delete(post)
     db.commit()
     return {"ok": True}
@@ -596,9 +596,9 @@ async def upload_knowledge(
 def delete_knowledge(source_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     source = db.get(KnowledgeSource, source_id)
     if not source:
-        raise HTTPException(status_code=404, detail="지식자료를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="吏?앹옄猷뚮? 李얠쓣 ???놁뒿?덈떎.")
     if source.owner_id != user.id and user.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="삭제 권한이 없습니다.")
+        raise HTTPException(status_code=403, detail="??젣 沅뚰븳???놁뒿?덈떎.")
     db.delete(source)
     db.commit()
     return {"ok": True}
@@ -617,7 +617,7 @@ def list_automations(user: User = Depends(current_user), db: Session = Depends(g
 def create_automation(data: AutomationIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     selected_profile = db.get(IntegrationProfile, data.integration_profile_id) if data.integration_profile_id else None
     if selected_profile and selected_profile.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 자동화에 사용할 수 없습니다.")
+        raise HTTPException(status_code=403, detail="?ㅻⅨ ?ъ슜?먯쓽 ?곕룞 ?꾨줈?꾩? ?먮룞?붿뿉 ?ъ슜?????놁뒿?덈떎.")
     custom_connections = data.custom_connections
     custom_template = data.custom_template
     ai_provider = data.ai_provider
@@ -630,7 +630,7 @@ def create_automation(data: AutomationIn, user: User = Depends(current_user), db
         ai_model = selected_profile.ai_model
         ai_api_base = selected_profile.ai_api_base
         api_provider = selected_profile.api_provider
-        api_key_strategy = f"사용자별 연동 프로필 '{selected_profile.name}'의 {selected_profile.token_name or '토큰'} 사용"
+        api_key_strategy = f"?ъ슜?먮퀎 ?곕룞 ?꾨줈??'{selected_profile.name}'??{selected_profile.token_name or '?좏겙'} ?ъ슜"
         custom_template = selected_profile.custom_template or custom_template
         profile_connections = parse_connections(selected_profile.custom_connections)
         if profile_connections:
@@ -694,7 +694,33 @@ def task_due(task: AutomationTask, now: datetime | None = None) -> bool:
     return last_run + timedelta(minutes=max(task.interval_minutes, 1)) <= current_time
 
 
-def execute_scheduled_task(db: Session, task: AutomationTask, actor: User) -> dict:
+WATCHED_AUTOMATION_FIELDS = [
+    "source",
+    "integration_profile_id",
+    "destination",
+    "instruction",
+    "template",
+    "api_provider",
+    "ai_agent",
+    "github_repo_url",
+    "github_project_url",
+    "notion_database_url",
+    "figma_file_url",
+    "calendar_id",
+    "ai_provider",
+    "ai_model",
+    "ai_api_base",
+    "request_template",
+    "github_issue_template",
+    "notion_template",
+    "figma_template",
+    "template_preset",
+    "custom_template",
+    "custom_connections",
+]
+
+
+def execute_automation_task(db: Session, task: AutomationTask, actor: User, scheduled: bool = False) -> dict:
     current_hash = automation_fingerprint(task)
     if task.last_input_hash == current_hash:
         result = {
@@ -702,7 +728,8 @@ def execute_scheduled_task(db: Session, task: AutomationTask, actor: User) -> di
             "status": "skipped",
             "reason": "Watched automation input did not change since the previous run.",
             "changeHash": current_hash,
-            "scheduled": True,
+            "scheduled": scheduled,
+            "watchedFields": WATCHED_AUTOMATION_FIELDS,
         }
         task.last_result = result_to_text(result)
         task.last_run_at = datetime.now(timezone.utc)
@@ -713,7 +740,7 @@ def execute_scheduled_task(db: Session, task: AutomationTask, actor: User) -> di
             task.api_provider,
             "skipped",
             f"Skipped automation {task.name}: no watched input changes",
-            {"taskId": task.id, "changeHash": current_hash, "scheduled": True},
+            {"taskId": task.id, "changeHash": current_hash, "scheduled": scheduled},
             task_id=task.id,
             profile_id=task.integration_profile_id,
         )
@@ -722,7 +749,7 @@ def execute_scheduled_task(db: Session, task: AutomationTask, actor: User) -> di
     result = automation_plan(task)
     result["status"] = "changed"
     result["changeHash"] = current_hash
-    result["scheduled"] = True
+    result["scheduled"] = scheduled
     task.last_result = result_to_text(result)
     task.last_input_hash = current_hash
     task.last_run_at = datetime.now(timezone.utc)
@@ -735,7 +762,7 @@ def execute_scheduled_task(db: Session, task: AutomationTask, actor: User) -> di
         task.api_provider,
         "changed",
         f"Ran automation {task.name}",
-        {"taskId": task.id, "changeHash": current_hash, "targets": result.get("targets", []), "scheduled": True},
+        {"taskId": task.id, "changeHash": current_hash, "targets": result.get("targets", []), "scheduled": scheduled},
         task_id=task.id,
         profile_id=task.integration_profile_id,
     )
@@ -748,78 +775,10 @@ def execute_scheduled_task(db: Session, task: AutomationTask, actor: User) -> di
 def run_automation(task_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     task = db.get(AutomationTask, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail="자동화 작업을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="Automation task not found.")
     if task.owner_id != user.id and user.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="실행 권한이 없습니다.")
-    current_hash = automation_fingerprint(task)
-    if task.last_input_hash == current_hash:
-        result = {
-            "taskId": task.id,
-            "status": "skipped",
-            "reason": "감시 대상 입력값이 이전 실행과 같아서 외부 API 실행을 건너뜁니다.",
-            "changeHash": current_hash,
-            "watchedFields": [
-                "source",
-                "integration_profile_id",
-                "destination",
-                "instruction",
-                "template",
-                "api_provider",
-                "ai_agent",
-                "github_repo_url",
-                "github_project_url",
-                "notion_database_url",
-                "figma_file_url",
-                "calendar_id",
-                "ai_provider",
-                "ai_model",
-                "ai_api_base",
-                "request_template",
-                "github_issue_template",
-                "notion_template",
-                "figma_template",
-                "template_preset",
-                "custom_template",
-                "custom_connections",
-            ],
-        }
-        task.last_result = result_to_text(result)
-        task.last_run_at = datetime.now(timezone.utc)
-        log_activity(
-            db,
-            user,
-            "automation.run",
-            task.api_provider,
-            "skipped",
-            f"Skipped automation {task.name}: no watched input changes",
-            {"taskId": task.id, "changeHash": current_hash},
-            task_id=task.id,
-            profile_id=task.integration_profile_id,
-        )
-        db.commit()
-        return {"task": serialize_task(task), "run": {"id": None, "result": result, "createdPostId": None}}
-    result = automation_plan(task)
-    result["status"] = "changed"
-    result["changeHash"] = current_hash
-    task.last_result = result_to_text(result)
-    task.last_input_hash = current_hash
-    task.last_run_at = datetime.now(timezone.utc)
-    run = AutomationRun(task_id=task.id, owner_id=task.owner_id, result=task.last_result)
-    db.add(run)
-    log_activity(
-        db,
-        user,
-        "automation.run",
-        task.api_provider,
-        "changed",
-        f"Ran automation {task.name}",
-        {"taskId": task.id, "changeHash": current_hash, "targets": result.get("targets", [])},
-        task_id=task.id,
-        profile_id=task.integration_profile_id,
-    )
-    db.commit()
-    db.refresh(run)
-    return {"task": serialize_task(task), "run": {"id": run.id, "result": result, "createdPostId": None}}
+        raise HTTPException(status_code=403, detail="You do not have permission to run this automation.")
+    return execute_automation_task(db, task, user, scheduled=False)
 
 
 @app.post("/api/automations/scheduler/tick")
@@ -830,7 +789,7 @@ def tick_automations(limit: int = 20, user: User = Depends(current_user), db: Se
         stmt = stmt.where(AutomationTask.owner_id == user.id)
     tasks = db.scalars(stmt.limit(200)).all()
     due_tasks = [task for task in tasks if task_due(task)][:safe_limit]
-    results = [execute_scheduled_task(db, task, task.owner) for task in due_tasks]
+    results = [execute_automation_task(db, task, task.owner, scheduled=True) for task in due_tasks]
     return {
         "checked": len(tasks),
         "due": len(due_tasks),
@@ -851,9 +810,9 @@ def tick_automations(limit: int = 20, user: User = Depends(current_user), db: Se
 def share_automation(task_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     task = db.get(AutomationTask, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail="자동화 작업을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="Automation task not found.")
     if task.owner_id != user.id and user.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="공유 권한이 없습니다.")
+        raise HTTPException(status_code=403, detail="You do not have permission to share this automation.")
     result = task.last_result or result_to_text(automation_plan(task))
     content = f"""자동화 작업 공유
 
@@ -870,9 +829,11 @@ def share_automation(task_id: int, user: User = Depends(current_user), db: Sessi
 - Calendar: {task.calendar_id}
 - API Key 전략: {task.api_key_strategy}
 - 템플릿 선택: {task.template_preset}
-- 커스텀 템플릿:
+
+커스텀 템플릿:
 {task.custom_template}
-- 커스텀 연결:
+
+커스텀 연결:
 {task.custom_connections}
 
 GitHub 이슈 템플릿:
@@ -914,9 +875,9 @@ Figma 작업 템플릿:
 def delete_automation(task_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     task = db.get(AutomationTask, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail="자동화 작업을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="?먮룞???묒뾽??李얠쓣 ???놁뒿?덈떎.")
     if task.owner_id != user.id and user.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="삭제 권한이 없습니다.")
+        raise HTTPException(status_code=403, detail="??젣 沅뚰븳???놁뒿?덈떎.")
     db.delete(task)
     db.commit()
     return {"ok": True}
@@ -946,7 +907,7 @@ async def hub_run(data: InstructionIn) -> dict:
 async def mcp_rpc(payload: dict) -> dict:
     method = payload.get("method")
     if method == "weather.lookup":
-        return {"jsonrpc": "2.0", "id": payload.get("id"), "result": {"location": "Seoul", "summary": "서울 기준 데모 날씨 브리핑입니다.", "source": "demo-mcp"}}
+        return {"jsonrpc": "2.0", "id": payload.get("id"), "result": {"location": "Seoul", "summary": "서울 기준 날씨 브리핑입니다.", "source": "demo-mcp"}}
     if method == "automation.describe":
         return {"jsonrpc": "2.0", "id": payload.get("id"), "result": {"summary": "자동화 작업의 주기, 경로, API, AI Agent를 설명합니다."}}
     return {"jsonrpc": "2.0", "id": payload.get("id"), "error": {"code": -32601, "message": "method not found"}}

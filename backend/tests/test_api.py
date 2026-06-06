@@ -313,12 +313,14 @@ def test_full_fastapi_flow(monkeypatch):
         first_run = client.post(f"/api/automations/{task_id}/run", headers=headers)
         assert first_run.status_code == 200
         assert first_run.json()["run"]["result"]["status"] == "changed"
+        assert first_run.json()["run"]["result"]["scheduled"] is False
         assert first_run.json()["run"]["result"]["targets"][0]["target"] == "github"
         assert first_run.json()["run"]["result"]["targets"][0]["operation"] == "rag_collect_issues_commits_prs"
         assert {"issues", "commits", "pull_requests"} <= {item["target"] for item in first_run.json()["run"]["result"]["externalRagSources"]}
         second_run = client.post(f"/api/automations/{task_id}/run", headers=headers)
         assert second_run.status_code == 200
         assert second_run.json()["run"]["result"]["status"] == "skipped"
+        assert second_run.json()["run"]["result"]["scheduled"] is False
         assert client.post(f"/api/automations/{task_id}/share", headers=headers).status_code == 200
         run_activities = client.get("/api/integration-activities", headers=headers).json()["activities"]
         assert any(item["eventType"] == "automation.run" and item["status"] == "changed" for item in run_activities)
@@ -356,6 +358,10 @@ def test_full_fastapi_flow(monkeypatch):
         first_tick = client.post("/api/automations/scheduler/tick?limit=5", headers=headers)
         assert first_tick.status_code == 200
         assert any(item["taskId"] == scheduled_task_id and item["status"] == "changed" for item in first_tick.json()["results"])
+        latest_scheduled_run = next(
+            item for item in client.get("/api/automations", headers=headers).json()["tasks"] if item["id"] == scheduled_task_id
+        )["lastResult"]
+        assert '"scheduled": true' in latest_scheduled_run
         with SessionLocal() as db:
             scheduled_task = db.get(AutomationTask, scheduled_task_id)
             assert scheduled_task is not None
