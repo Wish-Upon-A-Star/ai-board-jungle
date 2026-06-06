@@ -98,7 +98,7 @@ RAG에 넣을만한 자료:
 - 자동화 실행 결과에는 `externalRagSources`가 포함되어 어떤 외부 소스를 어떤 API와 토큰 상태로 읽을지 표시합니다.
 - 실제 외부 fetch는 사용자가 저장한 연동 프로필의 `source_kind`, `base_url`, `api_provider`, `token_name/token_value`, `rag_targets`를 기준으로 붙이면 됩니다.
 - GitHub/Notion은 `/api/integration-profiles/{profile_id}/collect`로 실제 수집기가 연결되어 있습니다. 토큰이 저장된 프로필이면 GitHub issues/commits/pull requests, Notion database/page를 읽어 `knowledge_sources`에 저장합니다.
-- 수집 API는 `?limit=20&pages=2`처럼 페이지당 개수와 최대 페이지 수를 받을 수 있습니다. GitHub는 REST `page/per_page`, Notion은 `next_cursor`를 따라가며 기본 UI 버튼은 `20 x 2페이지` 범위를 사용합니다.
+- 수집 API는 `?limit=20&pages=2`처럼 페이지당 개수와 최대 페이지 수를 받을 수 있고, 쿼리를 생략하면 연동 프로필에 저장된 `collect_limit`, `collect_pages`를 사용합니다. GitHub는 REST `page/per_page`, Notion은 `next_cursor`를 따라가며 UI 버튼은 각 프로필에 저장된 범위를 그대로 실행합니다.
 - 같은 사용자에게 이미 저장된 외부 URL과 소스 타입은 중복 저장하지 않고 `unchanged`와 `skippedDuplicates`로 반환합니다. 반복 자동화가 같은 항목을 계속 쌓지 않도록 변경분 중심으로 동작합니다.
 - 연동 프로필 카드에는 최근 수집 상태, 읽은 항목 수, 새로 저장한 항목 수, 중복 건수, 경고 메시지, 수집 시간을 표시합니다.
 - 토큰이 없는 프로필이면 수집을 중단하고 `warnings`에 필요한 토큰 정보를 반환합니다.
@@ -194,7 +194,7 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 연동 프로필:
 
 - 사용자가 여러 개의 GitHub/Notion/커스텀 API 프로필을 등록할 수 있습니다.
-- 각 프로필은 `종류`, `Base URL`, `요청 API`, `토큰 이름`, `토큰/API Key`, `AI 제공자`, `AI 모델`, `AI API Base`, `RAG가 볼 대상`, `프로필 템플릿`을 가집니다.
+- 각 프로필은 `종류`, `Base URL`, `요청 API`, `토큰 이름`, `토큰/API Key`, `AI 제공자`, `AI 모델`, `AI API Base`, `RAG가 볼 대상`, `Collect limit`, `Collect pages`, `프로필 템플릿`을 가집니다.
 - 자동화 등록 화면에서 `저장된 연동 프로필`을 선택하면 해당 프로필의 API/AI/연결/RAG 설정이 자동화에 복사됩니다.
 - 같은 사용자라도 자동화 A는 GitHub + gpt-4o-mini, 자동화 B는 Notion + 사내 모델처럼 다르게 선택할 수 있습니다.
 - API 응답은 토큰 원문을 반환하지 않고 `hasToken`, `tokenPreview`, `tokenStorage`만 반환합니다.

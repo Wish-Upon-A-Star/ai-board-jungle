@@ -119,6 +119,8 @@ def init_db() -> None:
                     ai_model VARCHAR(120) DEFAULT 'gpt-4o-mini' NOT NULL,
                     ai_api_base VARCHAR(240) DEFAULT 'https://api.openai.com/v1' NOT NULL,
                     rag_targets_json TEXT DEFAULT '[]' NOT NULL,
+                    collect_limit INTEGER DEFAULT 20 NOT NULL,
+                    collect_pages INTEGER DEFAULT 2 NOT NULL,
                     custom_connections TEXT DEFAULT '[]' NOT NULL,
                     custom_template TEXT DEFAULT '' NOT NULL,
                     last_collect_status VARCHAR(40) DEFAULT '' NOT NULL,
@@ -133,6 +135,8 @@ def init_db() -> None:
             ))
             integration_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(integration_profiles)")).fetchall()}
             integration_additions = {
+                "collect_limit": "INTEGER DEFAULT 20 NOT NULL",
+                "collect_pages": "INTEGER DEFAULT 2 NOT NULL",
                 "last_collect_status": "VARCHAR(40) DEFAULT '' NOT NULL",
                 "last_collect_count": "INTEGER DEFAULT 0 NOT NULL",
                 "last_collect_saved": "INTEGER DEFAULT 0 NOT NULL",

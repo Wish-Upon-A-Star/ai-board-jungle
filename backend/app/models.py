@@ -109,6 +109,8 @@ class IntegrationProfile(Base):
     ai_model: Mapped[str] = mapped_column(String(120), default="gpt-4o-mini")
     ai_api_base: Mapped[str] = mapped_column(String(240), default="https://api.openai.com/v1")
     rag_targets_json: Mapped[str] = mapped_column(Text, default="[]")
+    collect_limit: Mapped[int] = mapped_column(default=20)
+    collect_pages: Mapped[int] = mapped_column(default=2)
     custom_connections: Mapped[str] = mapped_column(Text, default="[]")
     custom_template: Mapped[str] = mapped_column(Text, default="")
     last_collect_status: Mapped[str] = mapped_column(String(40), default="")

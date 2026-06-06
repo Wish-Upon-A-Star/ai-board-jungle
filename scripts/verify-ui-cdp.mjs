@@ -135,12 +135,14 @@ async function main() {
         ai_model: "gpt-4o-mini",
         ai_api_base: "https://api.openai.com/v1",
         rag_targets: ["issues", "commits", "pull_requests"],
+        collect_limit: 7,
+        collect_pages: 1,
         custom_connections: [],
         custom_template: "title: {title}"
       })
     });
     const data = await response.json();
-    return response.ok && data.profile.hasToken && data.profile.tokenStorage === "encrypted" && data.profile.ragTargets.includes("pull_requests") && !JSON.stringify(data).includes("secret-ui-token");
+    return response.ok && data.profile.hasToken && data.profile.tokenStorage === "encrypted" && data.profile.ragTargets.includes("pull_requests") && data.profile.collectLimit === 7 && data.profile.collectPages === 1 && !JSON.stringify(data).includes("secret-ui-token");
   })()`);
   const collectorApi = await evalJs(`(async () => {
     const token = localStorage.getItem("ai-board-token");
@@ -150,12 +152,12 @@ async function main() {
     const data = await list.json();
     const profile = data.profiles[0];
     if (!profile) return false;
-    const response = await fetch("http://127.0.0.1:8000/api/integration-profiles/" + profile.id + "/collect?limit=20&pages=2", {
+    const response = await fetch("http://127.0.0.1:8000/api/integration-profiles/" + profile.id + "/collect", {
       method: "POST",
       headers: { Authorization: "Bearer " + token }
     });
     const collected = await response.json();
-    return response.ok && collected.request.limit === 20 && collected.request.pages === 2 && ["collected", "unchanged", "no-data"].includes(collected.status);
+    return response.ok && collected.request.limit === profile.collectLimit && collected.request.pages === profile.collectPages && ["collected", "unchanged", "no-data"].includes(collected.status);
   })()`);
   const readinessApi = await evalJs(`(async () => {
     const token = localStorage.getItem("ai-board-token");

@@ -168,6 +168,8 @@ function App() {
     ai_model: "gpt-4o-mini",
     ai_api_base: "https://api.openai.com/v1",
     rag_targets: "issues,commits,pull_requests",
+    collect_limit: 20,
+    collect_pages: 2,
     custom_template: "출처: {source}\n제목: {title}\n요약: {summary}\n링크: {url}",
   });
   const [error, setError] = useState("");
@@ -434,6 +436,8 @@ function App() {
     try {
       const body = {
         ...integrationForm,
+        collect_limit: Number(integrationForm.collect_limit) || 20,
+        collect_pages: Number(integrationForm.collect_pages) || 2,
         rag_targets: integrationForm.rag_targets.split(",").map((item) => item.trim()).filter(Boolean),
         custom_connections: form.custom_connections || [],
       };
@@ -449,7 +453,7 @@ function App() {
   async function collectIntegrationProfile(profile) {
     setError("");
     try {
-      const data = await api(`/api/integration-profiles/${profile.id}/collect?limit=20&pages=2`, { method: "POST" });
+      const data = await api(`/api/integration-profiles/${profile.id}/collect`, { method: "POST" });
       setApiResult({ called: "integration-profile.collect", response: data });
       setSideTab("api");
       await loadAll();
@@ -727,6 +731,11 @@ function App() {
                   <Field label="AI 모델"><input value={integrationForm.ai_model} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_model: e.target.value })} /></Field>
                   <Field label="AI API Base"><input value={integrationForm.ai_api_base} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_api_base: e.target.value })} /></Field>
                 </div>
+                <div className="grid3 wide">
+                  <Field label="Collect limit"><input type="number" min="1" max="100" value={integrationForm.collect_limit} onChange={(e) => setIntegrationForm({ ...integrationForm, collect_limit: Number(e.target.value) })} /></Field>
+                  <Field label="Collect pages"><input type="number" min="1" max="5" value={integrationForm.collect_pages} onChange={(e) => setIntegrationForm({ ...integrationForm, collect_pages: Number(e.target.value) })} /></Field>
+                  <Field label="Collect scope"><input value={`${integrationForm.collect_limit || 20} x ${integrationForm.collect_pages || 2}p`} readOnly /></Field>
+                </div>
                 <Field label="RAG가 볼 대상"><input value={integrationForm.rag_targets} onChange={(e) => setIntegrationForm({ ...integrationForm, rag_targets: e.target.value })} placeholder="issues, commits, pull_requests, notion_pages, notion_database" /></Field>
                 <Field label="프로필 템플릿"><textarea value={integrationForm.custom_template} onChange={(e) => setIntegrationForm({ ...integrationForm, custom_template: e.target.value })} /></Field>
                 <button><KeyRound size={14} /> 연동 프로필 저장</button>
@@ -764,7 +773,7 @@ function App() {
                       <span>읽음 {profile.lastCollect?.collected || 0}</span>
                       <span>저장 {profile.lastCollect?.saved || 0}</span>
                       <span>중복 {profile.lastCollect?.skippedDuplicates || 0}</span>
-                      <span>범위 20 x 2p</span>
+                      <span>범위 {profile.collectLimit || 20} x {profile.collectPages || 2}p</span>
                       {profile.lastCollect?.at ? <span>{profile.lastCollect.at}</span> : null}
                     </div>
                     {profile.lastCollect?.warnings?.length ? <p className="warning-line">{profile.lastCollect.warnings.join(" / ")}</p> : null}

@@ -134,6 +134,8 @@ def serialize_integration_profile(profile: IntegrationProfile) -> dict:
         "aiModel": profile.ai_model,
         "aiApiBase": profile.ai_api_base,
         "ragTargets": parse_string_list(profile.rag_targets_json),
+        "collectLimit": profile.collect_limit,
+        "collectPages": profile.collect_pages,
         "customConnections": parse_connections(profile.custom_connections),
         "customTemplate": profile.custom_template,
         "lastCollect": {
@@ -365,6 +367,8 @@ def create_integration_profile(data: IntegrationProfileIn, user: User = Depends(
         ai_model=data.ai_model,
         ai_api_base=data.ai_api_base,
         rag_targets_json=json.dumps(data.rag_targets, ensure_ascii=False),
+        collect_limit=max(1, min(data.collect_limit, 100)),
+        collect_pages=max(1, min(data.collect_pages, 5)),
         custom_connections=json.dumps([item.model_dump() for item in data.custom_connections], ensure_ascii=False),
         custom_template=data.custom_template,
     )
@@ -398,14 +402,14 @@ def delete_integration_profile(profile_id: int, user: User = Depends(current_use
 
 
 @app.post("/api/integration-profiles/{profile_id}/collect")
-def collect_integration_profile(profile_id: int, limit: int = 20, pages: int = 2, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+def collect_integration_profile(profile_id: int, limit: int | None = None, pages: int | None = None, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     profile = db.get(IntegrationProfile, profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="연동 프로필을 찾을 수 없습니다.")
     if profile.owner_id != user.id:
         raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 수집할 수 없습니다.")
-    safe_limit = max(1, min(limit, 100))
-    safe_pages = max(1, min(pages, 5))
+    safe_limit = max(1, min(limit if limit is not None else profile.collect_limit, 100))
+    safe_pages = max(1, min(pages if pages is not None else profile.collect_pages, 5))
     items, warnings = collect_profile_items(profile, limit=safe_limit, pages=safe_pages)
     saved = save_collected_items(db, user, profile, items) if items else []
     status = "collected" if saved else "unchanged" if items else "no-data"

@@ -61,6 +61,8 @@ class IntegrationProfileIn(BaseModel):
     ai_model: str = Field(default="gpt-4o-mini", min_length=2, max_length=120)
     ai_api_base: str = Field(default="", max_length=240)
     rag_targets: list[str] = []
+    collect_limit: int = Field(default=20, ge=1, le=100)
+    collect_pages: int = Field(default=2, ge=1, le=5)
     custom_connections: list[CustomConnectionIn] = []
     custom_template: str = Field(default="", max_length=4000)
 
