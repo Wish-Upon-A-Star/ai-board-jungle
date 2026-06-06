@@ -63,6 +63,35 @@ async function main() {
   if (!login.ok) throw new Error(`admin login failed: ${login.status}`);
   const loginJson = await login.json();
   const token = loginJson.token;
+  const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  const apiJson = async (path, options = {}) => {
+    const response = await fetch(`${apiBase}${path}`, { ...options, headers: { ...headers, ...(options.headers || {}) } });
+    if (!response.ok) throw new Error(`${path} failed: ${response.status}`);
+    return response.json();
+  };
+
+  const profileData = await apiJson("/api/integration-profiles");
+  if (!profileData.profiles.some((profile) => ["figma", "google_calendar"].includes(profile.sourceKind))) {
+    await apiJson("/api/integration-profiles", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "CDP Figma dry-run profile",
+        source_kind: "figma",
+        base_url: "https://www.figma.com/design/cdp-test/ai-board",
+        api_provider: "Figma REST API",
+        token_name: "FIGMA_TOKEN",
+        token_value: "",
+        ai_provider: "OpenAI",
+        ai_model: "gpt-4o-mini",
+        ai_api_base: "https://api.openai.com/v1",
+        rag_targets: ["figma_comments"],
+        collect_limit: 5,
+        collect_pages: 1,
+        custom_connections: [],
+        custom_template: "Figma dry-run verification",
+      }),
+    });
+  }
 
   await evalJs(`localStorage.setItem("ai-board-token", ${JSON.stringify(token)}); location.reload();`);
   await wait(3000);
@@ -93,13 +122,18 @@ async function main() {
     `Boolean(Array.from(document.querySelectorAll("input")).find((input) => input.placeholder === "WRITE LIVE"))`
   );
   if (!hasLiveWritePlaceholder) missing.push("WRITE LIVE");
-
-  const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
-  const apiJson = async (path, options = {}) => {
-    const response = await fetch(`${apiBase}${path}`, { ...options, headers: { ...headers, ...(options.headers || {}) } });
-    if (!response.ok) throw new Error(`${path} failed: ${response.status}`);
-    return response.json();
-  };
+  const loadMorePostsClicked = await evalJs(`(() => {
+    const button = Array.from(document.querySelectorAll("button")).find((item) => item.innerText.includes("Load more posts"));
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`);
+  await wait(loadMorePostsClicked ? 1200 : 100);
+  const postIdsUnique = await evalJs(`(() => {
+    const ids = Array.from(document.querySelectorAll("[data-post-id]")).map((item) => item.getAttribute("data-post-id"));
+    return ids.length === new Set(ids).size;
+  })()`);
+  if (!postIdsUnique) missing.push("unique post ids");
 
   const integrationProfileApi = await apiJson("/api/integration-profiles").then((data) => Array.isArray(data.profiles));
   const readinessApi = await apiJson("/api/provider-readiness").then((data) => Array.isArray(data.providers));

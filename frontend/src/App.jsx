@@ -172,6 +172,15 @@ function runRowStateKey(taskId, runId) {
   return `${taskId}:${runId}`;
 }
 
+function mergePostsById(currentPosts, nextPosts) {
+  const seen = new Set();
+  return [...currentPosts, ...nextPosts].filter((post) => {
+    if (seen.has(post.id)) return false;
+    seen.add(post.id);
+    return true;
+  });
+}
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem("ai-board-token") || "");
   const [user, setUser] = useState(null);
@@ -400,7 +409,7 @@ function App() {
     setPostError("");
     try {
       const postData = await api(`/api/posts?q=${encodeURIComponent(q)}&limit=${postPage.limit}&offset=${postPage.nextOffset}`);
-      setPosts((current) => [...current, ...postData.posts]);
+      setPosts((current) => mergePostsById(current, postData.posts));
       setPostPage({
         total: postData.total || 0,
         limit: postData.limit || postPage.limit,
@@ -1204,7 +1213,7 @@ function App() {
               </div>
               <div className="post-list">
                 {posts.map((post) => (
-                  <button key={post.id} className={post.automationTaskId ? "post-link shared" : "post-link"} onClick={() => { setSelected(post); setSideTab("selected"); }}>
+                  <button key={post.id} data-post-id={post.id} className={post.automationTaskId ? "post-link shared" : "post-link"} onClick={() => { setSelected(post); setSideTab("selected"); }}>
                     <span>{post.title}</span>
                     <small>{post.author.name} {post.tags.map((t) => `#${t.tag.name}`).join(" ")}</small>
                   </button>
