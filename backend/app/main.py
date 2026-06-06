@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .collectors import collect_profile_items, save_collected_items
@@ -356,6 +356,7 @@ def list_integration_activities(
     automation_task_id: int | None = None,
     integration_profile_id: int | None = None,
     limit: int = 50,
+    offset: int = 0,
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -371,8 +372,25 @@ def list_integration_activities(
     if integration_profile_id is not None:
         filters.append(IntegrationActivity.integration_profile_id == integration_profile_id)
     safe_limit = max(1, min(limit, 100))
-    stmt = select(IntegrationActivity).where(*filters).order_by(IntegrationActivity.created_at.desc()).limit(safe_limit)
-    return {"activities": [serialize_activity(activity) for activity in db.scalars(stmt).all()]}
+    safe_offset = max(0, offset)
+    total = db.scalar(select(func.count()).select_from(IntegrationActivity).where(*filters)) or 0
+    stmt = (
+        select(IntegrationActivity)
+        .where(*filters)
+        .order_by(IntegrationActivity.created_at.desc(), IntegrationActivity.id.desc())
+        .offset(safe_offset)
+        .limit(safe_limit)
+    )
+    activities = [serialize_activity(activity) for activity in db.scalars(stmt).all()]
+    next_offset = safe_offset + len(activities)
+    return {
+        "activities": activities,
+        "total": total,
+        "limit": safe_limit,
+        "offset": safe_offset,
+        "nextOffset": next_offset,
+        "hasMore": next_offset < total,
+    }
 
 
 @app.post("/api/integration-profiles")

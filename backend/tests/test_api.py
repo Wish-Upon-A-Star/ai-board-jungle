@@ -347,6 +347,15 @@ def test_full_fastapi_flow(monkeypatch):
         profile_filtered = client.get(f"/api/integration-activities?integration_profile_id={profile_json['id']}&limit=2", headers=headers).json()["activities"]
         assert 1 <= len(profile_filtered) <= 2
         assert all(item["integrationProfileId"] == profile_json["id"] for item in profile_filtered)
+        first_activity_page = client.get("/api/integration-activities?limit=1&offset=0", headers=headers).json()
+        assert first_activity_page["limit"] == 1
+        assert first_activity_page["offset"] == 0
+        assert first_activity_page["total"] >= len(run_activities)
+        assert first_activity_page["nextOffset"] == 1
+        assert first_activity_page["hasMore"] is True
+        second_activity_page = client.get("/api/integration-activities?limit=1&offset=1", headers=headers).json()
+        assert second_activity_page["offset"] == 1
+        assert second_activity_page["activities"][0]["id"] != first_activity_page["activities"][0]["id"]
 
         scheduled = client.post(
             "/api/automations",

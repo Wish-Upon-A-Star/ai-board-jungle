@@ -144,6 +144,7 @@ function App() {
   const [integrationProfiles, setIntegrationProfiles] = useState([]);
   const [providerReadiness, setProviderReadiness] = useState([]);
   const [integrationActivities, setIntegrationActivities] = useState([]);
+  const [activityPage, setActivityPage] = useState({ total: 0, limit: 12, offset: 0, nextOffset: 0, hasMore: false });
   const [activityFilters, setActivityFilters] = useState({ provider: "", status: "", event_type: "", automation_task_id: "", integration_profile_id: "" });
   const [knowledgeSources, setKnowledgeSources] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -260,27 +261,40 @@ function App() {
     }
   }
 
-  function activityQuery(filters = activityFilters) {
+  function activityQuery(filters = activityFilters, offset = 0, limit = activityPage.limit) {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== "" && value !== null && value !== undefined) params.set(key, value);
     });
+    params.set("limit", String(limit));
+    params.set("offset", String(offset));
     return params.toString();
   }
 
-  async function loadActivities(filters = activityFilters) {
-    const query = activityQuery(filters);
+  async function loadActivities(filters = activityFilters, offset = 0, append = false) {
+    const query = activityQuery(filters, offset);
     const activityData = await api(`/api/integration-activities${query ? `?${query}` : ""}`);
-    setIntegrationActivities(activityData.activities);
+    setIntegrationActivities((current) => (append ? [...current, ...activityData.activities] : activityData.activities));
+    setActivityPage({
+      total: activityData.total || 0,
+      limit: activityData.limit || activityPage.limit,
+      offset: activityData.offset || 0,
+      nextOffset: activityData.nextOffset || 0,
+      hasMore: Boolean(activityData.hasMore),
+    });
   }
 
   async function updateActivityFilters(nextFilters) {
     setActivityFilters(nextFilters);
-    await loadActivities(nextFilters);
+    await loadActivities(nextFilters, 0, false);
+  }
+
+  async function loadMoreActivities() {
+    await loadActivities(activityFilters, activityPage.nextOffset, true);
   }
 
   async function loadAll(query = q, filters = activityFilters) {
-    const activityPath = activityQuery(filters);
+    const activityPath = activityQuery(filters, 0);
     const [postData, taskData, knowledgeData, profileData, readinessData, activityData] = await Promise.all([
       api(`/api/posts?q=${encodeURIComponent(query)}`),
       api("/api/automations"),
@@ -295,6 +309,13 @@ function App() {
     setIntegrationProfiles(profileData.profiles);
     setProviderReadiness(readinessData.providers);
     setIntegrationActivities(activityData.activities);
+    setActivityPage({
+      total: activityData.total || 0,
+      limit: activityData.limit || activityPage.limit,
+      offset: activityData.offset || 0,
+      nextOffset: activityData.nextOffset || 0,
+      hasMore: Boolean(activityData.hasMore),
+    });
     if (!selected && postData.posts[0]) setSelected(postData.posts[0]);
   }
 
@@ -827,6 +848,7 @@ function App() {
                 <div className="activity-log">
                   <div className="activity-head">
                     <strong>Integration Activity Log</strong>
+                    <span>{integrationActivities.length} / {activityPage.total} shown</span>
                     <button type="button" onClick={() => updateActivityFilters({ provider: "", status: "", event_type: "", automation_task_id: "", integration_profile_id: "" })}>Reset filters</button>
                   </div>
                   <div className="activity-filters">
@@ -851,7 +873,7 @@ function App() {
                       {integrationProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
                     </select>
                   </div>
-                  {integrationActivities.slice(0, 8).map((activity) => (
+                  {integrationActivities.map((activity) => (
                     <div key={activity.id} className={`activity-row ${activity.status}`}>
                       <span>{activity.eventType}</span>
                       <span>{activity.provider || "board"}</span>
@@ -859,6 +881,9 @@ function App() {
                       <p>{activity.summary}</p>
                     </div>
                   ))}
+                  {activityPage.hasMore ? (
+                    <button type="button" className="load-more" onClick={loadMoreActivities}>Load more activity</button>
+                  ) : null}
                   {!integrationActivities.length ? <p className="empty-state">No activity matches these filters.</p> : null}
                 </div>
                 {integrationProfiles.map((profile) => (

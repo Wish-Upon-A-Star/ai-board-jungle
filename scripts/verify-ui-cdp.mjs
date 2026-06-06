@@ -212,7 +212,7 @@ async function main() {
       headers: { Authorization: "Bearer " + token }
     });
     const data = await response.json();
-    return response.ok && Array.isArray(data.activities) && data.activities.some((item) => item.eventType === "integration_profile.created");
+    return response.ok && Array.isArray(data.activities) && Number.isInteger(data.total) && Number.isInteger(data.nextOffset) && "hasMore" in data && data.activities.some((item) => item.eventType === "integration_profile.created");
   })()`);
   const activityFilterApi = await evalJs(`(async () => {
     const token = localStorage.getItem("ai-board-token");
@@ -221,6 +221,16 @@ async function main() {
     });
     const data = await response.json();
     return response.ok && Array.isArray(data.activities) && data.activities.every((item) => item.provider === "figma" && item.eventType === "integration_profile.write");
+  })()`);
+  const activityPageApi = await evalJs(`(async () => {
+    const token = localStorage.getItem("ai-board-token");
+    const first = await fetch("http://127.0.0.1:8000/api/integration-activities?limit=1&offset=0", {
+      headers: { Authorization: "Bearer " + token }
+    }).then((response) => response.json());
+    const second = await fetch("http://127.0.0.1:8000/api/integration-activities?limit=1&offset=1", {
+      headers: { Authorization: "Bearer " + token }
+    }).then((response) => response.json());
+    return first.limit === 1 && first.offset === 0 && first.nextOffset === 1 && second.offset === 1;
   })()`);
   const schedulerApi = await evalJs(`(async () => {
     const token = localStorage.getItem("ai-board-token");
@@ -294,9 +304,9 @@ async function main() {
   page.close();
   browser.close();
 
-  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, liveWriteApi, activityApi, activityFilterApi, schedulerApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
+  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, liveWriteApi, activityApi, activityFilterApi, activityPageApi, schedulerApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
   console.log(JSON.stringify(result, null, 2));
-  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !liveWriteApi || !activityApi || !activityFilterApi || !schedulerApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
+  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !liveWriteApi || !activityApi || !activityFilterApi || !activityPageApi || !schedulerApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
     process.exit(1);
   }
 }
