@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from .db import SessionLocal, init_db
-from .models import AutomationTask, Post, User
+from .models import AutomationTask, IntegrationProfile, Post, User
 from .security import hash_password
 from .services import get_or_create_tags
 
@@ -168,6 +168,38 @@ def seed() -> None:
                 else:
                     task.owner_id = owner_id
                     apply_task_defaults(task, values)
+            if not db.query(IntegrationProfile).filter(IntegrationProfile.owner_id == admin.id, IntegrationProfile.name == "GitHub 이슈/커밋/PR RAG").first():
+                db.add(IntegrationProfile(
+                    owner_id=admin.id,
+                    name="GitHub 이슈/커밋/PR RAG",
+                    source_kind="github",
+                    base_url="https://github.com/<owner>/<repo>",
+                    api_provider="GitHub REST API",
+                    token_name="GITHUB_TOKEN",
+                    token_value="",
+                    ai_provider="OpenAI",
+                    ai_model="gpt-4o-mini",
+                    ai_api_base="https://api.openai.com/v1",
+                    rag_targets_json=json.dumps(["issues", "commits", "pull_requests"], ensure_ascii=False),
+                    custom_connections=defaults[0][2]["custom_connections"],
+                    custom_template="출처: {source}\n제목: {title}\n요약: {summary}\n링크: {url}",
+                ))
+            if not db.query(IntegrationProfile).filter(IntegrationProfile.owner_id == user.id, IntegrationProfile.name == "Notion 업무 DB RAG").first():
+                db.add(IntegrationProfile(
+                    owner_id=user.id,
+                    name="Notion 업무 DB RAG",
+                    source_kind="notion",
+                    base_url="https://www.notion.so/<workspace>/<database-id>",
+                    api_provider="Notion API",
+                    token_name="NOTION_TOKEN",
+                    token_value="",
+                    ai_provider="OpenAI",
+                    ai_model="gpt-4o-mini",
+                    ai_api_base="https://api.openai.com/v1",
+                    rag_targets_json=json.dumps(["notion_database", "notion_pages"], ensure_ascii=False),
+                    custom_connections=defaults[1][2]["custom_connections"],
+                    custom_template="업무명: {title}\n상태: {status}\n요약: {summary}\n링크: {url}",
+                ))
             db.commit()
     finally:
         db.close()

@@ -173,6 +173,14 @@ def automation_plan(task: AutomationTask) -> dict:
     return {
         "taskId": task.id,
         "agent": task.ai_agent,
+        "integrationProfile": {
+            "id": task.integration_profile.id,
+            "name": task.integration_profile.name,
+            "sourceKind": task.integration_profile.source_kind,
+            "baseUrl": task.integration_profile.base_url,
+            "ragTargets": json.loads(task.integration_profile.rag_targets_json or "[]"),
+            "hasToken": bool(task.integration_profile.token_value),
+        } if task.integration_profile else None,
         "ai": {"provider": task.ai_provider, "model": task.ai_model, "apiBase": task.ai_api_base, "keyStrategy": task.api_key_strategy},
         "intervalMinutes": task.interval_minutes,
         "route": f"{task.source} -> {task.destination}",
@@ -182,6 +190,16 @@ def automation_plan(task: AutomationTask) -> dict:
         "requestTemplate": task.request_template,
         "instruction": task.instruction,
         "targets": targets,
+        "externalRagSources": [
+            {
+                "source": task.integration_profile.source_kind,
+                "target": target,
+                "api": task.integration_profile.api_provider,
+                "baseUrl": task.integration_profile.base_url,
+                "mode": "live-token-ready" if task.integration_profile.token_value else "token-required",
+            }
+            for target in (json.loads(task.integration_profile.rag_targets_json or "[]") if task.integration_profile else [])
+        ],
         "loopGuard": {"maxToolCalls": 6, "timeoutSeconds": 45, "retry": 1},
         "exampleTransform": {
             "githubIssueToNotion": {
@@ -199,6 +217,7 @@ def automation_plan(task: AutomationTask) -> dict:
 
 def automation_fingerprint(task: AutomationTask) -> str:
     watched = {
+        "integration_profile_id": task.integration_profile_id,
         "source": task.source,
         "destination": task.destination,
         "instruction": task.instruction,

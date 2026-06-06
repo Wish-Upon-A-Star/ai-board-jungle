@@ -50,6 +50,21 @@ class CustomConnectionIn(BaseModel):
     template: str = Field(default="", max_length=4000)
 
 
+class IntegrationProfileIn(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    source_kind: str = Field(default="custom", max_length=60)
+    base_url: str = Field(default="", max_length=500)
+    api_provider: str = Field(default="REST API", max_length=120)
+    token_name: str = Field(default="", max_length=120)
+    token_value: str = Field(default="", max_length=4000)
+    ai_provider: str = Field(default="OpenAI", min_length=2, max_length=80)
+    ai_model: str = Field(default="gpt-4o-mini", min_length=2, max_length=120)
+    ai_api_base: str = Field(default="", max_length=240)
+    rag_targets: list[str] = []
+    custom_connections: list[CustomConnectionIn] = []
+    custom_template: str = Field(default="", max_length=4000)
+
+
 class ProfileSettingsIn(BaseModel):
     ai_provider: str = Field(default="OpenAI", min_length=2, max_length=80)
     ai_model: str = Field(default="gpt-4o-mini", min_length=2, max_length=120)
@@ -62,6 +77,7 @@ class ProfileSettingsIn(BaseModel):
 
 class AutomationIn(BaseModel):
     name: str = Field(min_length=2, max_length=160)
+    integration_profile_id: int | None = None
     source: str = Field(min_length=2, max_length=120)
     destination: str = Field(min_length=2, max_length=120)
     interval_minutes: int = Field(ge=1, le=1440)

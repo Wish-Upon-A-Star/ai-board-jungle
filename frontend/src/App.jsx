@@ -6,6 +6,7 @@ import "./style.css";
 
 const githubNotionPreset = {
   name: "GitHub 이슈를 Notion 업무로 동기화",
+  integration_profile_id: "",
   source: "GitHub Issues",
   destination: "Notion Tasks DB",
   interval_minutes: 5,
@@ -136,6 +137,7 @@ function App() {
   const [authForm, setAuthForm] = useState({ email: "admin@example.com", name: "새 사용자", password: "password123" });
   const [posts, setPosts] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [integrationProfiles, setIntegrationProfiles] = useState([]);
   const [knowledgeSources, setKnowledgeSources] = useState([]);
   const [selected, setSelected] = useState(null);
   const [q, setQ] = useState("");
@@ -152,6 +154,19 @@ function App() {
     extracted_text: "예: GitHub 이슈가 bug 라벨이면 Notion 업무 상태를 확인 필요로 작성한다.",
     tags: "automation,rag",
     file: null,
+  });
+  const [integrationForm, setIntegrationForm] = useState({
+    name: "GitHub RAG 소스",
+    source_kind: "github",
+    base_url: "https://github.com/<owner>/<repo>",
+    api_provider: "GitHub REST API",
+    token_name: "GITHUB_TOKEN",
+    token_value: "",
+    ai_provider: "OpenAI",
+    ai_model: "gpt-4o-mini",
+    ai_api_base: "https://api.openai.com/v1",
+    rag_targets: "issues,commits,pull_requests",
+    custom_template: "출처: {source}\n제목: {title}\n요약: {summary}\n링크: {url}",
   });
   const [error, setError] = useState("");
 
@@ -236,14 +251,16 @@ function App() {
   }
 
   async function loadAll(query = q) {
-    const [postData, taskData, knowledgeData] = await Promise.all([
+    const [postData, taskData, knowledgeData, profileData] = await Promise.all([
       api(`/api/posts?q=${encodeURIComponent(query)}`),
       api("/api/automations"),
       api("/api/knowledge"),
+      api("/api/integration-profiles"),
     ]);
     setPosts(postData.posts);
     setTasks(taskData.tasks);
     setKnowledgeSources(knowledgeData.sources);
+    setIntegrationProfiles(profileData.profiles);
     if (!selected && postData.posts[0]) setSelected(postData.posts[0]);
   }
 
@@ -386,6 +403,43 @@ function App() {
     }
   }
 
+  function applyIntegrationProfile(profileId) {
+    const selectedProfile = integrationProfiles.find((profile) => String(profile.id) === String(profileId));
+    if (!selectedProfile) {
+      setForm({ ...form, integration_profile_id: "" });
+      return;
+    }
+    setForm({
+      ...form,
+      integration_profile_id: selectedProfile.id,
+      api_provider: selectedProfile.apiProvider,
+      ai_provider: selectedProfile.aiProvider,
+      ai_model: selectedProfile.aiModel,
+      ai_api_base: selectedProfile.aiApiBase,
+      api_key_strategy: `서버 저장 연동 프로필 '${selectedProfile.name}'의 ${selectedProfile.tokenName || "토큰"} 사용`,
+      custom_template: selectedProfile.customTemplate || form.custom_template,
+      custom_connections: selectedProfile.customConnections?.length ? selectedProfile.customConnections : form.custom_connections,
+    });
+  }
+
+  async function saveIntegrationProfile(event) {
+    event.preventDefault();
+    setError("");
+    try {
+      const body = {
+        ...integrationForm,
+        rag_targets: integrationForm.rag_targets.split(",").map((item) => item.trim()).filter(Boolean),
+        custom_connections: form.custom_connections || [],
+      };
+      const data = await api("/api/integration-profiles", { method: "POST", body: JSON.stringify(body) });
+      setIntegrationProfiles([data.profile, ...integrationProfiles]);
+      setApiResult({ called: "integration-profile.save", response: data });
+      setSideTab("api");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   if (!token || !user) {
     return (
       <main className="login-page">
@@ -420,6 +474,7 @@ function App() {
         <nav>
           <a href="#automations" className="active">자동화</a>
           <a href="#new-task">등록</a>
+          <a href="#integration-profiles">연동</a>
           <a href="#knowledge">RAG</a>
           <a href="#api-console">API</a>
           <a href="#board">게시판</a>
@@ -471,6 +526,7 @@ function App() {
                       <div><dt>경로</dt><dd>{task.source} {"->"} {task.destination}</dd></div>
                       <div><dt>AI</dt><dd>{task.aiProvider} / {task.aiModel}</dd></div>
                       <div><dt>API</dt><dd>{task.apiProvider}</dd></div>
+                      <div><dt>연동 프로필</dt><dd>{task.integrationProfile ? `${task.integrationProfile.name} / ${task.integrationProfile.sourceKind}` : "커스텀"}</dd></div>
                       <div><dt>템플릿 선택</dt><dd>{task.templatePreset || "github_notion"}</dd></div>
                       <div><dt>커스텀 연결</dt><dd>{task.customConnections?.length ? task.customConnections.map((item) => `${item.label}(${item.service})`).join(", ") : "빠른 입력만 사용"}</dd></div>
                       <div><dt>빠른 입력</dt><dd>{[task.githubRepoUrl || task.githubProjectUrl, task.notionDatabaseUrl, task.figmaFileUrl, task.calendarId].filter(Boolean).join(" / ") || "미설정"}</dd></div>
@@ -511,6 +567,27 @@ function App() {
                       <button type="button" onClick={reloadProfileSettings}><Link2 size={14} /> 서버 저장값 불러오기</button>
                       <button type="button" onClick={saveProfileSettings}><KeyRound size={14} /> 현재 설정 서버 저장</button>
                     </div>
+                  </div>
+                </section>
+                <section className="integration-profile-box">
+                  <div className="section-head">
+                    <div>
+                      <strong>자동화별 연동 프로필 선택</strong>
+                      <span>사용자별로 등록한 GitHub/Notion/커스텀 API, 토큰, AI 모델, RAG 수집 대상을 자동화마다 선택합니다.</span>
+                    </div>
+                  </div>
+                  <div className="grid2">
+                    <Field label="저장된 연동 프로필">
+                      <select value={form.integration_profile_id || ""} onChange={(e) => applyIntegrationProfile(e.target.value)}>
+                        <option value="">커스텀 직접 입력</option>
+                        {integrationProfiles.map((profile) => (
+                          <option key={profile.id} value={profile.id}>{profile.name} / {profile.sourceKind} / {profile.aiModel}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="RAG 수집 대상">
+                      <input value={integrationProfiles.find((profile) => String(profile.id) === String(form.integration_profile_id))?.ragTargets?.join(", ") || "선택 프로필 없음"} readOnly />
+                    </Field>
                   </div>
                 </section>
                 <Field label="작업명"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
@@ -596,6 +673,51 @@ function App() {
                 </div>
                 <button><CalendarClock size={14} /> 자동화 저장</button>
               </form>
+            </article>
+
+            <article id="integration-profiles" className="panel">
+              <div className="panel-title row-title">
+                <span>연동 프로필 목록</span>
+                <span className="subtle">사용자별 토큰/API/AI 모델/RAG 대상 등록</span>
+              </div>
+              <form className="knowledge-form" onSubmit={saveIntegrationProfile}>
+                <div className="grid3 wide">
+                  <Field label="프로필명"><input value={integrationForm.name} onChange={(e) => setIntegrationForm({ ...integrationForm, name: e.target.value })} /></Field>
+                  <Field label="종류">
+                    <select value={integrationForm.source_kind} onChange={(e) => setIntegrationForm({ ...integrationForm, source_kind: e.target.value })}>
+                      <option value="github">GitHub</option>
+                      <option value="notion">Notion</option>
+                      <option value="gitlab">GitLab</option>
+                      <option value="jira">Jira</option>
+                      <option value="slack">Slack</option>
+                      <option value="custom">커스텀 API</option>
+                    </select>
+                  </Field>
+                  <Field label="요청 API"><input value={integrationForm.api_provider} onChange={(e) => setIntegrationForm({ ...integrationForm, api_provider: e.target.value })} /></Field>
+                </div>
+                <div className="grid3 wide">
+                  <Field label="Base URL"><input value={integrationForm.base_url} onChange={(e) => setIntegrationForm({ ...integrationForm, base_url: e.target.value })} placeholder="repo URL, Notion DB URL, API base" /></Field>
+                  <Field label="토큰 이름"><input value={integrationForm.token_name} onChange={(e) => setIntegrationForm({ ...integrationForm, token_name: e.target.value })} placeholder="GITHUB_TOKEN" /></Field>
+                  <Field label="토큰/API Key"><input type="password" value={integrationForm.token_value} onChange={(e) => setIntegrationForm({ ...integrationForm, token_value: e.target.value })} placeholder="서버 DB에 사용자별 저장" /></Field>
+                </div>
+                <div className="grid3 wide">
+                  <Field label="AI 제공자"><input value={integrationForm.ai_provider} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_provider: e.target.value })} /></Field>
+                  <Field label="AI 모델"><input value={integrationForm.ai_model} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_model: e.target.value })} /></Field>
+                  <Field label="AI API Base"><input value={integrationForm.ai_api_base} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_api_base: e.target.value })} /></Field>
+                </div>
+                <Field label="RAG가 볼 대상"><input value={integrationForm.rag_targets} onChange={(e) => setIntegrationForm({ ...integrationForm, rag_targets: e.target.value })} placeholder="issues, commits, pull_requests, notion_pages, notion_database" /></Field>
+                <Field label="프로필 템플릿"><textarea value={integrationForm.custom_template} onChange={(e) => setIntegrationForm({ ...integrationForm, custom_template: e.target.value })} /></Field>
+                <button><KeyRound size={14} /> 연동 프로필 저장</button>
+              </form>
+              <div className="knowledge-list">
+                {integrationProfiles.map((profile) => (
+                  <div key={profile.id} className="knowledge-item">
+                    <strong>{profile.name}</strong>
+                    <span>{profile.sourceKind} / {profile.apiProvider} / {profile.aiModel} / token {profile.hasToken ? "저장됨" : "없음"}</span>
+                    <p>{profile.baseUrl} / RAG: {profile.ragTargets.join(", ") || "미설정"}</p>
+                  </div>
+                ))}
+              </div>
             </article>
 
             <article id="knowledge" className="panel">

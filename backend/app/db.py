@@ -66,6 +66,7 @@ def init_db() -> None:
                     conn.execute(text(f"ALTER TABLE users ADD COLUMN {column} {ddl}"))
             task_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(automation_tasks)")).fetchall()}
             task_additions = {
+                "integration_profile_id": "INTEGER REFERENCES integration_profiles(id) ON DELETE SET NULL",
                 "github_repo_url": "VARCHAR(300) DEFAULT ''",
                 "github_project_url": "VARCHAR(300) DEFAULT ''",
                 "notion_database_url": "VARCHAR(300) DEFAULT ''",
@@ -99,6 +100,27 @@ def init_db() -> None:
                     instruction TEXT DEFAULT '' NOT NULL,
                     extracted_text TEXT DEFAULT '' NOT NULL,
                     tags_json TEXT DEFAULT '[]' NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            ))
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS integration_profiles (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    name VARCHAR(120) NOT NULL,
+                    source_kind VARCHAR(60) DEFAULT 'custom' NOT NULL,
+                    base_url VARCHAR(500) DEFAULT '' NOT NULL,
+                    api_provider VARCHAR(120) DEFAULT 'REST API' NOT NULL,
+                    token_name VARCHAR(120) DEFAULT '' NOT NULL,
+                    token_value TEXT DEFAULT '' NOT NULL,
+                    ai_provider VARCHAR(80) DEFAULT 'OpenAI' NOT NULL,
+                    ai_model VARCHAR(120) DEFAULT 'gpt-4o-mini' NOT NULL,
+                    ai_api_base VARCHAR(240) DEFAULT 'https://api.openai.com/v1' NOT NULL,
+                    rag_targets_json TEXT DEFAULT '[]' NOT NULL,
+                    custom_connections TEXT DEFAULT '[]' NOT NULL,
+                    custom_template TEXT DEFAULT '' NOT NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
                 """

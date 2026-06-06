@@ -85,6 +85,7 @@ a:hover { color: #0086d1; }
 .preset-actions button { padding: 4px 8px; }
 .connection-builder { display: grid; gap: 8px; border: 1px solid #e2e2e2; padding: 10px; background: #fcfcfc; }
 .profile-settings-box { border: 1px solid #d7e7f7; padding: 10px; background: #f8fbff; }
+.integration-profile-box { border: 1px solid #d9eadf; padding: 10px; background: #fbfffc; }
 .subtle { color: #888; font-weight: 400; }
 .section-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 .section-head strong { display: block; color: #333; margin-bottom: 3px; }

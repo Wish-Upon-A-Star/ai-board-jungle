@@ -47,6 +47,40 @@ def test_full_fastapi_flow():
         assert saved_profile["aiModel"] == "gpt-4o-mini"
         assert saved_profile["customConnections"][0]["auth_key_name"] == "PROFILE_NOTION_TOKEN"
 
+        integration_profile = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "GitHub private RAG",
+                "source_kind": "github",
+                "base_url": "https://github.com/acme/private-repo",
+                "api_provider": "GitHub REST API",
+                "token_name": "GITHUB_TOKEN",
+                "token_value": "ghp_secret_value",
+                "ai_provider": "OpenAI",
+                "ai_model": "gpt-4o-mini",
+                "ai_api_base": "https://api.openai.com/v1",
+                "rag_targets": ["issues", "commits", "pull_requests"],
+                "custom_template": "source: {source}\nsummary: {summary}",
+                "custom_connections": [
+                    {
+                        "label": "Private GitHub",
+                        "service": "github",
+                        "url": "https://github.com/acme/private-repo",
+                        "api": "GitHub REST API",
+                        "auth_key_name": "GITHUB_TOKEN",
+                        "operation": "rag_collect_issues_commits_prs",
+                        "template": "title: {title}\nurl: {url}",
+                    }
+                ],
+            },
+        )
+        assert integration_profile.status_code == 200
+        profile_json = integration_profile.json()["profile"]
+        assert profile_json["hasToken"] is True
+        assert "ghp_secret_value" not in str(profile_json)
+        assert "pull_requests" in profile_json["ragTargets"]
+
         knowledge = client.post(
             "/api/knowledge",
             headers=headers,
@@ -84,6 +118,7 @@ def test_full_fastapi_flow():
             headers=headers,
             json={
                 "name": "Sync GitHub issues to Notion",
+                "integration_profile_id": profile_json["id"],
                 "source": "GitHub Issues",
                 "destination": "Notion Tasks",
                 "interval_minutes": 3,
@@ -108,13 +143,15 @@ def test_full_fastapi_flow():
         )
         assert automation.status_code == 200
         task_id = automation.json()["task"]["id"]
-        assert automation.json()["task"]["customConnections"][0]["service"] == "notion"
+        assert automation.json()["task"]["integrationProfile"]["sourceKind"] == "github"
+        assert automation.json()["task"]["customConnections"][0]["service"] == "github"
         assert client.get("/api/automations", headers=headers).json()["tasks"]
         first_run = client.post(f"/api/automations/{task_id}/run", headers=headers)
         assert first_run.status_code == 200
         assert first_run.json()["run"]["result"]["status"] == "changed"
-        assert first_run.json()["run"]["result"]["targets"][0]["target"] == "notion"
-        assert first_run.json()["run"]["result"]["targets"][0]["operation"] == "upsert_task_page"
+        assert first_run.json()["run"]["result"]["targets"][0]["target"] == "github"
+        assert first_run.json()["run"]["result"]["targets"][0]["operation"] == "rag_collect_issues_commits_prs"
+        assert {"issues", "commits", "pull_requests"} <= {item["target"] for item in first_run.json()["run"]["result"]["externalRagSources"]}
         second_run = client.post(f"/api/automations/{task_id}/run", headers=headers)
         assert second_run.status_code == 200
         assert second_run.json()["run"]["result"]["status"] == "skipped"
@@ -136,6 +173,21 @@ def test_regular_user_only_sees_own_automations():
         user = client.post("/api/auth/register", json={"email": "user2@example.com", "name": "User", "password": "password123"})
         admin_headers = {"Authorization": f"Bearer {admin.json()['token']}"}
         user_headers = {"Authorization": f"Bearer {user.json()['token']}"}
+
+        admin_profile = client.post(
+            "/api/integration-profiles",
+            headers=admin_headers,
+            json={
+                "name": "Admin Notion",
+                "source_kind": "notion",
+                "base_url": "https://www.notion.so/private-db",
+                "api_provider": "Notion API",
+                "token_name": "ADMIN_NOTION_TOKEN",
+                "token_value": "secret",
+                "rag_targets": ["notion_database", "notion_pages"],
+            },
+        )
+        assert admin_profile.status_code == 200
 
         admin_task = client.post(
             "/api/automations",
@@ -173,3 +225,20 @@ def test_regular_user_only_sees_own_automations():
 
         forbidden = client.post(f"/api/automations/{admin_task.json()['task']['id']}/run", headers=user_headers)
         assert forbidden.status_code == 403
+
+        forbidden_profile_use = client.post(
+            "/api/automations",
+            headers=user_headers,
+            json={
+                "name": "Steal admin profile",
+                "integration_profile_id": admin_profile.json()["profile"]["id"],
+                "source": "Notion",
+                "destination": "Board",
+                "interval_minutes": 5,
+                "instruction": "Try using admin profile.",
+                "template": "title / link",
+                "api_provider": "Notion API",
+                "ai_agent": "SyncPlannerAgent",
+            },
+        )
+        assert forbidden_profile_use.status_code == 403

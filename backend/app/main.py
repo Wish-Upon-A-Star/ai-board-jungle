@@ -9,8 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import get_db, init_db
-from .models import AutomationRun, AutomationTask, Comment, KnowledgeSource, Post, User
-from .schemas import AutomationIn, CommentIn, InstructionIn, KnowledgeIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
+from .models import AutomationRun, AutomationTask, Comment, IntegrationProfile, KnowledgeSource, Post, User
+from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
 from .security import create_token, current_user, hash_password, verify_password
 from .services import agent_review, automation_fingerprint, automation_plan, get_or_create_tags, instruction_hub, rag_answer, result_to_text, search_posts, summarize
 
@@ -69,6 +69,26 @@ def serialize_knowledge(source: KnowledgeSource) -> dict:
     }
 
 
+def serialize_integration_profile(profile: IntegrationProfile) -> dict:
+    return {
+        "id": profile.id,
+        "name": profile.name,
+        "sourceKind": profile.source_kind,
+        "baseUrl": profile.base_url,
+        "apiProvider": profile.api_provider,
+        "tokenName": profile.token_name,
+        "hasToken": bool(profile.token_value),
+        "tokenPreview": f"{profile.token_value[:4]}..." if profile.token_value else "",
+        "aiProvider": profile.ai_provider,
+        "aiModel": profile.ai_model,
+        "aiApiBase": profile.ai_api_base,
+        "ragTargets": parse_string_list(profile.rag_targets_json),
+        "customConnections": parse_connections(profile.custom_connections),
+        "customTemplate": profile.custom_template,
+        "createdAt": str(profile.created_at),
+    }
+
+
 async def extract_upload_text(upload: UploadFile | None) -> tuple[str, str, str]:
     if upload is None:
         return "", "", ""
@@ -102,6 +122,8 @@ def serialize_task(task: AutomationTask) -> dict:
         "id": task.id,
         "name": task.name,
         "owner": serialize_user(task.owner),
+        "integrationProfileId": task.integration_profile_id,
+        "integrationProfile": serialize_integration_profile(task.integration_profile) if task.integration_profile else None,
         "source": task.source,
         "destination": task.destination,
         "intervalMinutes": task.interval_minutes,
@@ -180,6 +202,49 @@ def update_profile_settings(data: ProfileSettingsIn, user: User = Depends(curren
     db.commit()
     db.refresh(user)
     return {"profileSettings": serialize_profile_settings(user)}
+
+
+@app.get("/api/integration-profiles")
+def list_integration_profiles(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    profiles = db.scalars(
+        select(IntegrationProfile).where(IntegrationProfile.owner_id == user.id).order_by(IntegrationProfile.created_at.desc())
+    ).all()
+    return {"profiles": [serialize_integration_profile(profile) for profile in profiles]}
+
+
+@app.post("/api/integration-profiles")
+def create_integration_profile(data: IntegrationProfileIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    profile = IntegrationProfile(
+        owner_id=user.id,
+        name=data.name,
+        source_kind=data.source_kind,
+        base_url=data.base_url,
+        api_provider=data.api_provider,
+        token_name=data.token_name,
+        token_value=data.token_value,
+        ai_provider=data.ai_provider,
+        ai_model=data.ai_model,
+        ai_api_base=data.ai_api_base,
+        rag_targets_json=json.dumps(data.rag_targets, ensure_ascii=False),
+        custom_connections=json.dumps([item.model_dump() for item in data.custom_connections], ensure_ascii=False),
+        custom_template=data.custom_template,
+    )
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    return {"profile": serialize_integration_profile(profile)}
+
+
+@app.delete("/api/integration-profiles/{profile_id}")
+def delete_integration_profile(profile_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    profile = db.get(IntegrationProfile, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="연동 프로필을 찾을 수 없습니다.")
+    if profile.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 사용할 수 없습니다.")
+    db.delete(profile)
+    db.commit()
+    return {"ok": True}
 
 
 @app.get("/api/posts")
@@ -302,32 +367,53 @@ def list_automations(user: User = Depends(current_user), db: Session = Depends(g
 
 @app.post("/api/automations")
 def create_automation(data: AutomationIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    selected_profile = db.get(IntegrationProfile, data.integration_profile_id) if data.integration_profile_id else None
+    if selected_profile and selected_profile.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 자동화에 사용할 수 없습니다.")
+    custom_connections = data.custom_connections
+    custom_template = data.custom_template
+    ai_provider = data.ai_provider
+    ai_model = data.ai_model
+    ai_api_base = data.ai_api_base
+    api_provider = data.api_provider
+    api_key_strategy = data.api_key_strategy
+    if selected_profile:
+        ai_provider = selected_profile.ai_provider
+        ai_model = selected_profile.ai_model
+        ai_api_base = selected_profile.ai_api_base
+        api_provider = selected_profile.api_provider
+        api_key_strategy = f"사용자별 연동 프로필 '{selected_profile.name}'의 {selected_profile.token_name or '토큰'} 사용"
+        custom_template = selected_profile.custom_template or custom_template
+        profile_connections = parse_connections(selected_profile.custom_connections)
+        if profile_connections:
+            custom_connections = profile_connections
     task = AutomationTask(
         name=data.name,
+        integration_profile_id=selected_profile.id if selected_profile else None,
         owner_id=user.id,
         source=data.source,
         destination=data.destination,
         interval_minutes=data.interval_minutes,
         instruction=data.instruction,
         template=data.template,
-        api_provider=data.api_provider,
+        api_provider=api_provider,
         ai_agent=data.ai_agent,
         github_repo_url=data.github_repo_url,
         github_project_url=data.github_project_url,
         notion_database_url=data.notion_database_url,
         figma_file_url=data.figma_file_url,
         calendar_id=data.calendar_id,
-        ai_provider=data.ai_provider,
-        ai_model=data.ai_model,
-        ai_api_base=data.ai_api_base,
-        api_key_strategy=data.api_key_strategy,
+        ai_provider=ai_provider,
+        ai_model=ai_model,
+        ai_api_base=ai_api_base,
+        api_key_strategy=api_key_strategy,
         request_template=data.request_template,
         github_issue_template=data.github_issue_template,
         notion_template=data.notion_template,
         figma_template=data.figma_template,
         template_preset=data.template_preset,
-        custom_template=data.custom_template,
-        custom_connections=json.dumps([item.model_dump() for item in data.custom_connections], ensure_ascii=False),
+        custom_template=custom_template,
+        custom_connections=json.dumps([item.model_dump() if hasattr(item, "model_dump") else item for item in custom_connections], ensure_ascii=False),
         status=data.status,
     )
     db.add(task)
@@ -352,6 +438,7 @@ def run_automation(task_id: int, user: User = Depends(current_user), db: Session
             "changeHash": current_hash,
             "watchedFields": [
                 "source",
+                "integration_profile_id",
                 "destination",
                 "instruction",
                 "template",

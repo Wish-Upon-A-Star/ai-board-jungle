@@ -34,6 +34,7 @@ class User(Base):
     comments: Mapped[list["Comment"]] = relationship(back_populates="author")
     automations: Mapped[list["AutomationTask"]] = relationship(back_populates="owner")
     knowledge_sources: Mapped[list["KnowledgeSource"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
+    integration_profiles: Mapped[list["IntegrationProfile"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
 
 
 class Post(Base):
@@ -90,12 +91,35 @@ class KnowledgeSource(Base):
     owner: Mapped[User] = relationship(back_populates="knowledge_sources")
 
 
+class IntegrationProfile(Base):
+    __tablename__ = "integration_profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(120), index=True)
+    source_kind: Mapped[str] = mapped_column(String(60), default="custom")
+    base_url: Mapped[str] = mapped_column(String(500), default="")
+    api_provider: Mapped[str] = mapped_column(String(120), default="REST API")
+    token_name: Mapped[str] = mapped_column(String(120), default="")
+    token_value: Mapped[str] = mapped_column(Text, default="")
+    ai_provider: Mapped[str] = mapped_column(String(80), default="OpenAI")
+    ai_model: Mapped[str] = mapped_column(String(120), default="gpt-4o-mini")
+    ai_api_base: Mapped[str] = mapped_column(String(240), default="https://api.openai.com/v1")
+    rag_targets_json: Mapped[str] = mapped_column(Text, default="[]")
+    custom_connections: Mapped[str] = mapped_column(Text, default="[]")
+    custom_template: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    owner: Mapped[User] = relationship(back_populates="integration_profiles")
+    automations: Mapped[list["AutomationTask"]] = relationship(back_populates="integration_profile")
+
+
 class AutomationTask(Base):
     __tablename__ = "automation_tasks"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(160), index=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    integration_profile_id: Mapped[int | None] = mapped_column(ForeignKey("integration_profiles.id", ondelete="SET NULL"), nullable=True)
     source: Mapped[str] = mapped_column(String(120))
     destination: Mapped[str] = mapped_column(String(120))
     interval_minutes: Mapped[int] = mapped_column(default=5)
@@ -125,6 +149,7 @@ class AutomationTask(Base):
     last_run_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
     owner: Mapped[User] = relationship(back_populates="automations")
+    integration_profile: Mapped["IntegrationProfile | None"] = relationship(back_populates="automations")
     runs: Mapped[list["AutomationRun"]] = relationship(back_populates="task", cascade="all, delete-orphan")
     shared_posts: Mapped[list[Post]] = relationship(back_populates="automation_task")
 

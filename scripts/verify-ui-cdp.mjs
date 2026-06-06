@@ -74,6 +74,10 @@ async function main() {
     "서버 저장값",
     "서버 저장값 불러오기",
     "현재 설정 서버 저장",
+    "자동화별 연동 프로필 선택",
+    "연동 프로필 목록",
+    "RAG가 볼 대상",
+    "연동 프로필 저장",
     "RAG 지식자료",
     "어디에 어떻게 작성/사용할지",
     "지식자료 저장",
@@ -107,6 +111,30 @@ async function main() {
   await wait(900);
   const afterProfileSave = await bodyText();
   const profileSaved = afterProfileSave.includes("profile.save") || afterProfileSave.includes("profileSettings");
+
+  const integrationProfileApi = await evalJs(`(async () => {
+    const token = localStorage.getItem("ai-board-token");
+    const response = await fetch("http://127.0.0.1:8000/api/integration-profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+      body: JSON.stringify({
+        name: "UI GitHub RAG profile",
+        source_kind: "github",
+        base_url: "https://github.com/example/repo",
+        api_provider: "GitHub REST API",
+        token_name: "GITHUB_TOKEN",
+        token_value: "secret-ui-token",
+        ai_provider: "OpenAI",
+        ai_model: "gpt-4o-mini",
+        ai_api_base: "https://api.openai.com/v1",
+        rag_targets: ["issues", "commits", "pull_requests"],
+        custom_connections: [],
+        custom_template: "title: {title}"
+      })
+    });
+    const data = await response.json();
+    return response.ok && data.profile.hasToken && data.profile.ragTargets.includes("pull_requests") && !JSON.stringify(data).includes("secret-ui-token");
+  })()`);
 
   await page.call("Runtime.evaluate", {
     expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('지식자료 저장')).click()",
@@ -170,9 +198,9 @@ async function main() {
   page.close();
   browser.close();
 
-  const result = { missing, customConnectionAdded, profileSaved, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
+  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
   console.log(JSON.stringify(result, null, 2));
-  if (missing.length || !customConnectionAdded || !profileSaved || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
+  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
     process.exit(1);
   }
 }

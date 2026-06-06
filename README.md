@@ -47,6 +47,12 @@ React, FastAPI, PostgreSQL-ready SQLAlchemy, Redis 캐시를 기반으로 만든
 - 연결별 서비스 키, URL/ID, 요청 API, 토큰 변수명, 작업 방식, 템플릿 등록
 - 사용자별 서버 저장값 저장/불러오기
 - 자동화별 서버 저장 설정 재사용
+- 사용자별 연동 프로필 등록
+- 자동화별 연동 프로필 선택 또는 커스텀 직접 입력
+- GitHub issue, commit, pull request RAG 수집 대상 설정
+- Notion database/page RAG 수집 대상 설정
+- 사용자별 API token/API key 서버 저장 및 응답 마스킹
+- 자동화별 AI provider/model/API base 선택
 - 사용자별 RAG 지식자료 저장
 - 텍스트 문서 내용 추출 저장
 - 문서, 음성, 이미지, 영상, 표/엑셀, 기타 파일의 설명/작성 지침 저장
@@ -84,6 +90,15 @@ RAG에 넣을만한 자료:
 - 이미지 설명, 화면 캡처 설명, 디자인 QA 기준
 - API 사용법, 사내 시스템 작업 절차, 실패 시 대응법
 
+외부 시스템 RAG:
+
+- GitHub: `issues`, `commits`, `pull_requests`를 연동 프로필의 RAG 수집 대상으로 설정할 수 있습니다.
+- Notion: `notion_database`, `notion_pages`를 연동 프로필의 RAG 수집 대상으로 설정할 수 있습니다.
+- 기타: Jira, Slack, GitLab, 사내 REST API 등은 `custom` 연동 프로필로 등록하고 대상 이름을 자유롭게 넣을 수 있습니다.
+- 자동화 실행 결과에는 `externalRagSources`가 포함되어 어떤 외부 소스를 어떤 API와 토큰 상태로 읽을지 표시합니다.
+- 실제 외부 fetch는 사용자가 저장한 연동 프로필의 `source_kind`, `base_url`, `api_provider`, `token_name/token_value`, `rag_targets`를 기준으로 붙이면 됩니다.
+- 다른 사용자의 연동 프로필 ID를 자동화에 넣으면 403으로 차단합니다.
+
 관련 API:
 
 - `POST /api/ai/rag`
@@ -92,6 +107,9 @@ RAG에 넣을만한 자료:
 - `POST /api/knowledge`
 - `POST /api/knowledge/upload`
 - `DELETE /api/knowledge/{source_id}`
+- `GET /api/integration-profiles`
+- `POST /api/integration-profiles`
+- `DELETE /api/integration-profiles/{profile_id}`
 
 ### MCP
 
@@ -165,6 +183,15 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 - 저장된 서버 설정은 새 자동화를 만들 때마다 재사용할 수 있습니다.
 - 자동화 작업은 서버 저장값을 복사해 생성되므로, 자동화별로 다른 연결/템플릿을 갖도록 수정할 수 있습니다.
 - 실제 API Key 원문은 저장하지 않고 `NOTION_TOKEN`, `FIGMA_TOKEN`, `JIRA_TOKEN` 같은 토큰 변수명만 저장합니다.
+
+연동 프로필:
+
+- 사용자가 여러 개의 GitHub/Notion/커스텀 API 프로필을 등록할 수 있습니다.
+- 각 프로필은 `종류`, `Base URL`, `요청 API`, `토큰 이름`, `토큰/API Key`, `AI 제공자`, `AI 모델`, `AI API Base`, `RAG가 볼 대상`, `프로필 템플릿`을 가집니다.
+- 자동화 등록 화면에서 `저장된 연동 프로필`을 선택하면 해당 프로필의 API/AI/연결/RAG 설정이 자동화에 복사됩니다.
+- 같은 사용자라도 자동화 A는 GitHub + gpt-4o-mini, 자동화 B는 Notion + 사내 모델처럼 다르게 선택할 수 있습니다.
+- API 응답은 토큰 원문을 반환하지 않고 `hasToken`, `tokenPreview`만 반환합니다.
+- 운영 환경에서는 `token_value`를 DB 암호화 또는 KMS/secret manager로 대체하는 것이 권장됩니다.
 
 RAG 지식자료:
 
