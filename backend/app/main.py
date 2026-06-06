@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from .collectors import collect_profile_items, save_collected_items
 from .db import get_db, init_db
-from .models import AutomationRun, AutomationTask, Comment, IntegrationProfile, KnowledgeSource, Post, User
+from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, User
 from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
 from .security import create_token, current_user, hash_password, protect_secret, reveal_secret, secret_preview, verify_password
 from .services import agent_review, automation_fingerprint, automation_plan, get_or_create_tags, instruction_hub, rag_answer, result_to_text, search_posts, summarize
@@ -68,6 +68,54 @@ def serialize_knowledge(source: KnowledgeSource) -> dict:
         "tags": parse_string_list(source.tags_json),
         "createdAt": str(source.created_at),
     }
+
+
+def parse_json_object(raw: str) -> dict:
+    try:
+        value = json.loads(raw or "{}")
+        return value if isinstance(value, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def serialize_activity(activity: IntegrationActivity) -> dict:
+    return {
+        "id": activity.id,
+        "ownerId": activity.owner_id,
+        "automationTaskId": activity.automation_task_id,
+        "integrationProfileId": activity.integration_profile_id,
+        "eventType": activity.event_type,
+        "provider": activity.provider,
+        "status": activity.status,
+        "summary": activity.summary,
+        "details": parse_json_object(activity.details_json),
+        "createdAt": str(activity.created_at),
+    }
+
+
+def log_activity(
+    db: Session,
+    user: User,
+    event_type: str,
+    provider: str,
+    status: str,
+    summary: str,
+    details: dict | None = None,
+    task_id: int | None = None,
+    profile_id: int | None = None,
+) -> IntegrationActivity:
+    activity = IntegrationActivity(
+        owner_id=user.id,
+        automation_task_id=task_id,
+        integration_profile_id=profile_id,
+        event_type=event_type,
+        provider=provider,
+        status=status,
+        summary=summary[:240],
+        details_json=json.dumps(details or {}, ensure_ascii=False),
+    )
+    db.add(activity)
+    return activity
 
 
 def serialize_integration_profile(profile: IntegrationProfile) -> dict:
@@ -292,6 +340,17 @@ def list_provider_readiness(user: User = Depends(current_user), db: Session = De
     return {"providers": provider_readiness(user, db)}
 
 
+@app.get("/api/integration-activities")
+def list_integration_activities(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    stmt = (
+        select(IntegrationActivity)
+        .where(IntegrationActivity.owner_id == user.id)
+        .order_by(IntegrationActivity.created_at.desc())
+        .limit(50)
+    )
+    return {"activities": [serialize_activity(activity) for activity in db.scalars(stmt).all()]}
+
+
 @app.post("/api/integration-profiles")
 def create_integration_profile(data: IntegrationProfileIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     profile = IntegrationProfile(
@@ -312,6 +371,17 @@ def create_integration_profile(data: IntegrationProfileIn, user: User = Depends(
     db.add(profile)
     db.commit()
     db.refresh(profile)
+    log_activity(
+        db,
+        user,
+        "integration_profile.created",
+        profile.source_kind,
+        "ok",
+        f"Saved integration profile {profile.name}",
+        {"profile": serialize_integration_profile(profile)},
+        profile_id=profile.id,
+    )
+    db.commit()
     return {"profile": serialize_integration_profile(profile)}
 
 
@@ -347,6 +417,16 @@ def collect_integration_profile(profile_id: int, limit: int = 20, pages: int = 2
     profile.last_collect_warnings = json.dumps(warnings, ensure_ascii=False)
     profile.last_collected_at = datetime.now(timezone.utc)
     db.add(profile)
+    log_activity(
+        db,
+        user,
+        "integration_profile.collect",
+        profile.source_kind,
+        status,
+        f"Collected {len(items)} items, saved {len(saved)}, skipped {skipped_duplicates}",
+        {"warnings": warnings, "limit": safe_limit, "pages": safe_pages, "saved": len(saved), "collected": len(items)},
+        profile_id=profile.id,
+    )
     db.commit()
     db.refresh(profile)
     return {
@@ -532,6 +612,18 @@ def create_automation(data: AutomationIn, user: User = Depends(current_user), db
     db.add(task)
     db.commit()
     db.refresh(task)
+    log_activity(
+        db,
+        user,
+        "automation.created",
+        task.api_provider,
+        "ok",
+        f"Created automation {task.name}",
+        {"taskId": task.id, "route": f"{task.source} -> {task.destination}", "agent": task.ai_agent},
+        task_id=task.id,
+        profile_id=task.integration_profile_id,
+    )
+    db.commit()
     return {"task": serialize_task(task), "plan": automation_plan(task)}
 
 
@@ -576,6 +668,17 @@ def run_automation(task_id: int, user: User = Depends(current_user), db: Session
         }
         task.last_result = result_to_text(result)
         task.last_run_at = datetime.now(timezone.utc)
+        log_activity(
+            db,
+            user,
+            "automation.run",
+            task.api_provider,
+            "skipped",
+            f"Skipped automation {task.name}: no watched input changes",
+            {"taskId": task.id, "changeHash": current_hash},
+            task_id=task.id,
+            profile_id=task.integration_profile_id,
+        )
         db.commit()
         return {"task": serialize_task(task), "run": {"id": None, "result": result, "createdPostId": None}}
     result = automation_plan(task)
@@ -586,6 +689,17 @@ def run_automation(task_id: int, user: User = Depends(current_user), db: Session
     task.last_run_at = datetime.now(timezone.utc)
     run = AutomationRun(task_id=task.id, owner_id=task.owner_id, result=task.last_result)
     db.add(run)
+    log_activity(
+        db,
+        user,
+        "automation.run",
+        task.api_provider,
+        "changed",
+        f"Ran automation {task.name}",
+        {"taskId": task.id, "changeHash": current_hash, "targets": result.get("targets", [])},
+        task_id=task.id,
+        profile_id=task.integration_profile_id,
+    )
     db.commit()
     db.refresh(run)
     return {"task": serialize_task(task), "run": {"id": run.id, "result": result, "createdPostId": None}}
@@ -634,6 +748,17 @@ Figma 작업 템플릿:
     post = Post(title=f"[자동화] {task.name}", content=content, summary=summarize(task.name, content), author_id=user.id, automation_task_id=task.id)
     post.tags = get_or_create_tags(db, ["automation", "github", "notion", "agent"])
     db.add(post)
+    log_activity(
+        db,
+        user,
+        "automation.shared",
+        task.api_provider,
+        "ok",
+        f"Shared automation {task.name} to board",
+        {"taskId": task.id, "postTitle": post.title},
+        task_id=task.id,
+        profile_id=task.integration_profile_id,
+    )
     db.commit()
     db.refresh(post)
     run = db.scalars(select(AutomationRun).where(AutomationRun.task_id == task.id).order_by(AutomationRun.created_at.desc())).first()

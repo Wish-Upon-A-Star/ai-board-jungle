@@ -113,6 +113,13 @@ a:hover { color: #0086d1; }
 .provider-card strong { display: block; margin-bottom: 4px; color: #333; }
 .provider-card span { display: block; margin-bottom: 5px; color: #2780c2; }
 .provider-card p, .provider-card small { display: block; margin: 0; color: #555; line-height: 1.5; }
+.activity-log { border: 1px solid #e2e2e2; padding: 9px; background: #fff; display: grid; gap: 5px; }
+.activity-log > strong { color: #333; margin-bottom: 2px; }
+.activity-row { display: grid; grid-template-columns: 142px 96px 72px minmax(0, 1fr); gap: 6px; align-items: center; border-top: 1px solid #f0f0f0; padding-top: 5px; color: #555; }
+.activity-row span { color: #2780c2; margin: 0; }
+.activity-row.changed span:nth-child(3), .activity-row.ok span:nth-child(3) { color: #008767; }
+.activity-row.skipped span:nth-child(3), .activity-row.unchanged span:nth-child(3) { color: #7a5a00; }
+.activity-row p { margin: 0; color: #555; line-height: 1.4; min-width: 0; overflow-wrap: anywhere; }
 .knowledge-item { border: 1px solid #e2e2e2; padding: 9px; }
 .knowledge-item strong { display: block; color: #333; margin-bottom: 4px; }
 .knowledge-item span { display: block; color: #2780c2; margin-bottom: 5px; }
@@ -171,4 +178,5 @@ pre { margin: 0; padding: 10px; border: 1px solid #e2e2e2; background: #fafafa; 
   .search { width: 100%; margin-top: 8px; }
   .grid2, .grid3, .grid3.wide { grid-template-columns: 1fr; }
   .provider-grid { grid-template-columns: 1fr; }
+  .activity-row { grid-template-columns: 1fr; }
 }

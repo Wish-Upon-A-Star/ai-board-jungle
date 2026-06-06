@@ -143,3 +143,19 @@ def init_db() -> None:
             for column, ddl in integration_additions.items():
                 if column not in integration_columns:
                     conn.execute(text(f"ALTER TABLE integration_profiles ADD COLUMN {column} {ddl}"))
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS integration_activities (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    automation_task_id INTEGER REFERENCES automation_tasks(id) ON DELETE SET NULL,
+                    integration_profile_id INTEGER REFERENCES integration_profiles(id) ON DELETE SET NULL,
+                    event_type VARCHAR(80) NOT NULL,
+                    provider VARCHAR(80) DEFAULT '' NOT NULL,
+                    status VARCHAR(40) DEFAULT 'info' NOT NULL,
+                    summary VARCHAR(240) DEFAULT '' NOT NULL,
+                    details_json TEXT DEFAULT '{}' NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            ))

@@ -96,6 +96,10 @@ def test_full_fastapi_flow(monkeypatch):
         )
         assert integration_profile.status_code == 200
         profile_json = integration_profile.json()["profile"]
+        activities = client.get("/api/integration-activities", headers=headers)
+        assert activities.status_code == 200
+        assert activities.json()["activities"][0]["eventType"] == "integration_profile.created"
+        assert "ghp_secret_value" not in str(activities.json())
         assert profile_json["hasToken"] is True
         assert profile_json["tokenStorage"] == "encrypted"
         assert "ghp_secret_value" not in str(profile_json)
@@ -151,6 +155,8 @@ def test_full_fastapi_flow(monkeypatch):
         after_duplicate_profile = next(item for item in profiles_after_duplicate if item["id"] == profile_json["id"])
         assert after_duplicate_profile["lastCollect"]["status"] == "unchanged"
         assert after_duplicate_profile["lastCollect"]["skippedDuplicates"] == 1
+        activities_after_collect = client.get("/api/integration-activities", headers=headers).json()["activities"]
+        assert any(item["eventType"] == "integration_profile.collect" and item["status"] == "unchanged" for item in activities_after_collect)
 
         knowledge = client.post(
             "/api/knowledge",
@@ -215,6 +221,8 @@ def test_full_fastapi_flow(monkeypatch):
         )
         assert automation.status_code == 200
         task_id = automation.json()["task"]["id"]
+        activities_after_create = client.get("/api/integration-activities", headers=headers).json()["activities"]
+        assert any(item["eventType"] == "automation.created" and item["automationTaskId"] == task_id for item in activities_after_create)
         assert automation.json()["task"]["integrationProfile"]["sourceKind"] == "github"
         assert automation.json()["task"]["customConnections"][0]["service"] == "github"
         assert client.get("/api/automations", headers=headers).json()["tasks"]
@@ -228,6 +236,10 @@ def test_full_fastapi_flow(monkeypatch):
         assert second_run.status_code == 200
         assert second_run.json()["run"]["result"]["status"] == "skipped"
         assert client.post(f"/api/automations/{task_id}/share", headers=headers).status_code == 200
+        run_activities = client.get("/api/integration-activities", headers=headers).json()["activities"]
+        assert any(item["eventType"] == "automation.run" and item["status"] == "changed" for item in run_activities)
+        assert any(item["eventType"] == "automation.run" and item["status"] == "skipped" for item in run_activities)
+        assert any(item["eventType"] == "automation.shared" for item in run_activities)
         assert client.delete(f"/api/automations/{task_id}", headers=headers).status_code == 200
 
         hub = client.post(
@@ -294,6 +306,10 @@ def test_regular_user_only_sees_own_automations():
 
         visible_to_user = client.get("/api/automations", headers=user_headers).json()["tasks"]
         assert [task["name"] for task in visible_to_user] == ["User Calendar task"]
+        user_activities = client.get("/api/integration-activities", headers=user_headers).json()["activities"]
+        assert user_activities
+        assert all(activity["ownerId"] == user.json()["user"]["id"] for activity in user_activities)
+        assert not any(activity["summary"].endswith("Admin GitHub task") for activity in user_activities)
 
         forbidden = client.post(f"/api/automations/{admin_task.json()['task']['id']}/run", headers=user_headers)
         assert forbidden.status_code == 403

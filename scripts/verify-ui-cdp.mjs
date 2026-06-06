@@ -90,6 +90,7 @@ async function main() {
     "연결 칸 추가",
     "커스텀 출력 템플릿",
     "Live Write Readiness",
+    "Integration Activity Log",
     "Google Calendar",
     "Figma Review",
     "GitHub Repo URL",
@@ -165,6 +166,14 @@ async function main() {
     const keys = new Set((data.providers || []).map((item) => item.key));
     return response.ok && keys.has("figma") && keys.has("google_calendar") && keys.has("github") && keys.has("notion");
   })()`);
+  const activityApi = await evalJs(`(async () => {
+    const token = localStorage.getItem("ai-board-token");
+    const response = await fetch("http://127.0.0.1:8000/api/integration-activities", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const data = await response.json();
+    return response.ok && Array.isArray(data.activities) && data.activities.some((item) => item.eventType === "integration_profile.created");
+  })()`);
 
   await page.call("Runtime.evaluate", {
     expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('지식자료 저장')).click()",
@@ -228,9 +237,9 @@ async function main() {
   page.close();
   browser.close();
 
-  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
+  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, activityApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
   console.log(JSON.stringify(result, null, 2));
-  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
+  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !activityApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
     process.exit(1);
   }
 }

@@ -37,6 +37,7 @@ class User(Base):
     automations: Mapped[list["AutomationTask"]] = relationship(back_populates="owner")
     knowledge_sources: Mapped[list["KnowledgeSource"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
     integration_profiles: Mapped[list["IntegrationProfile"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
+    integration_activities: Mapped[list["IntegrationActivity"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
 
 
 class Post(Base):
@@ -172,3 +173,19 @@ class AutomationRun(Base):
     created_post_id: Mapped[int | None] = mapped_column(ForeignKey("posts.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
     task: Mapped[AutomationTask] = relationship(back_populates="runs")
+
+
+class IntegrationActivity(Base):
+    __tablename__ = "integration_activities"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    automation_task_id: Mapped[int | None] = mapped_column(ForeignKey("automation_tasks.id", ondelete="SET NULL"), nullable=True)
+    integration_profile_id: Mapped[int | None] = mapped_column(ForeignKey("integration_profiles.id", ondelete="SET NULL"), nullable=True)
+    event_type: Mapped[str] = mapped_column(String(80), index=True)
+    provider: Mapped[str] = mapped_column(String(80), default="")
+    status: Mapped[str] = mapped_column(String(40), default="info")
+    summary: Mapped[str] = mapped_column(String(240), default="")
+    details_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    owner: Mapped[User] = relationship(back_populates="integration_activities")

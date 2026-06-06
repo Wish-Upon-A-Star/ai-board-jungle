@@ -139,6 +139,7 @@ function App() {
   const [tasks, setTasks] = useState([]);
   const [integrationProfiles, setIntegrationProfiles] = useState([]);
   const [providerReadiness, setProviderReadiness] = useState([]);
+  const [integrationActivities, setIntegrationActivities] = useState([]);
   const [knowledgeSources, setKnowledgeSources] = useState([]);
   const [selected, setSelected] = useState(null);
   const [q, setQ] = useState("");
@@ -252,18 +253,20 @@ function App() {
   }
 
   async function loadAll(query = q) {
-    const [postData, taskData, knowledgeData, profileData, readinessData] = await Promise.all([
+    const [postData, taskData, knowledgeData, profileData, readinessData, activityData] = await Promise.all([
       api(`/api/posts?q=${encodeURIComponent(query)}`),
       api("/api/automations"),
       api("/api/knowledge"),
       api("/api/integration-profiles"),
       api("/api/provider-readiness"),
+      api("/api/integration-activities"),
     ]);
     setPosts(postData.posts);
     setTasks(taskData.tasks);
     setKnowledgeSources(knowledgeData.sources);
     setIntegrationProfiles(profileData.profiles);
     setProviderReadiness(readinessData.providers);
+    setIntegrationActivities(activityData.activities);
     if (!selected && postData.posts[0]) setSelected(postData.posts[0]);
   }
 
@@ -736,6 +739,17 @@ function App() {
                       <span>Live Write Readiness: {provider.ready ? "ready" : "setup required"} / {provider.readyCount}/{provider.profileCount}</span>
                       <p>{provider.requiredUrl} / {provider.requiredToken} / {provider.operation}</p>
                       <small>{provider.nextAction}</small>
+                    </div>
+                  ))}
+                </div>
+                <div className="activity-log">
+                  <strong>Integration Activity Log</strong>
+                  {integrationActivities.slice(0, 8).map((activity) => (
+                    <div key={activity.id} className={`activity-row ${activity.status}`}>
+                      <span>{activity.eventType}</span>
+                      <span>{activity.provider || "board"}</span>
+                      <span>{activity.status}</span>
+                      <p>{activity.summary}</p>
                     </div>
                   ))}
                 </div>

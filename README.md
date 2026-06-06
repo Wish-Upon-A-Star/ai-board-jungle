@@ -116,6 +116,7 @@ RAG에 넣을만한 자료:
 - `POST /api/integration-profiles`
 - `DELETE /api/integration-profiles/{profile_id}`
 - `GET /api/provider-readiness`: 사용자별 연동 프로필, 암호화 토큰, URL을 기준으로 GitHub/Notion/Figma/Google Calendar live write 준비 상태를 반환합니다.
+- `GET /api/integration-activities`: 사용자별 연동 프로필 저장, 외부 RAG 수집, 자동화 생성/실행/공유 활동 로그를 최근 50개까지 반환합니다.
 
 ### MCP
 
@@ -245,6 +246,7 @@ Live write readiness:
 - 연동 프로필 목록 상단의 `Live Write Readiness` 카드가 GitHub, Notion, Figma, Google Calendar별 live write 준비 여부를 표시합니다.
 - Figma는 `source_kind=figma` 또는 custom connection `service=figma`, Figma file URL, `FIGMA_TOKEN` 토큰이 있는 프로필이면 ready입니다.
 - Google Calendar는 `source_kind=google_calendar` 또는 custom connection `service=google_calendar`, calendar id, `GOOGLE_CALENDAR_TOKEN` 토큰이 있는 프로필이면 ready입니다.
+- `Integration Activity Log`에는 profile save, RAG collect, automation run/share 같은 작업 이력이 사용자별로 표시됩니다. 다른 사용자의 활동 로그는 조회되지 않습니다.
 
 ```mermaid
 flowchart LR
