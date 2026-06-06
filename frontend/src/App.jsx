@@ -365,6 +365,7 @@ function App() {
     ]);
     setPosts(postData.posts);
     setTasks(taskData.tasks);
+    setDeleteConfirmTaskId((current) => (current && !taskData.tasks.some((task) => task.id === current) ? null : current));
     setKnowledgeSources(knowledgeData.sources);
     setIntegrationProfiles(profileData.profiles);
     setProviderReadiness(readinessData.providers);
