@@ -1,5 +1,32 @@
 # AI Board
 
+## 목차
+
+- [과제 제출물 매핑](#과제-제출물-매핑)
+- [현재 구현 상태 요약](#현재-구현-상태-요약)
+- [주요 사용 흐름](#주요-사용-흐름)
+- [기술 스택](#기술-스택)
+- [구현 기능](#구현-기능)
+- [AI 기능이 사이트에 녹아든 방식](#ai-기능이-사이트에-녹아든-방식)
+- [사용자별 외부 사이트 설정](#사용자별-외부-사이트-설정)
+- [아키텍처](#아키텍처)
+- [실행 방법](#실행-방법)
+- [실제 외부 연동 검증 기록](#실제-외부-연동-검증-기록)
+- [한계와 개선 아이디어](#한계와-개선-아이디어)
+
+## 과제 제출물 매핑
+
+| 제출 요구 | README 위치 | 구현/검증 근거 |
+| --- | --- | --- |
+| 프로젝트 개요 | [주요 사용 흐름](#주요-사용-흐름), [기술 스택](#기술-스택) | React + FastAPI + PostgreSQL-ready SQLAlchemy + Redis-ready AI automation board |
+| 주요 구현 기능 | [구현 기능](#구현-기능) | 회원가입/로그인, 게시글 CRUD, 댓글, 태그, 페이징, 검색, 자동화 실행/공유 |
+| 전체 아키텍처 구조 | [아키텍처](#아키텍처) | React, FastAPI, DB, Redis, RAG, MCP, Agent, 외부 API 연결 Mermaid |
+| RAG 기능 | [RAG](#rag) | 게시글/자동화/사용자 지식자료/외부 GitHub-Notion 수집 기반 검색/요약 |
+| MCP 기능 | [MCP](#mcp) | FastAPI `POST /mcp/rpc` JSON-RPC endpoint, CDP smoke `mcpOk: true` |
+| Agent 기능 | [AI Agent](#ai-agent) | 자동화 지침과 연결 칸을 분석해 대상/API/템플릿을 선택하는 Agent 흐름 |
+| 데모/스크린샷 | [실행 방법](#실행-방법), [실제 외부 연동 검증 기록](#실제-외부-연동-검증-기록) | `npm run verify:full:quick`, CDP UI smoke, GitHub push 기록 |
+| 회고/한계/개선 | [한계와 개선 아이디어](#한계와-개선-아이디어) | 실제 외부 API 권한, 운영 KMS, 배포 환경 개선 항목 |
+
 ## 현재 구현 상태 요약
 
 - React 프론트엔드, FastAPI 백엔드, PostgreSQL-ready SQLAlchemy 모델, Redis 캐시 옵션을 사용합니다.

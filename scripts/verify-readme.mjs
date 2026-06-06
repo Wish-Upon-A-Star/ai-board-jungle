@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 const readme = readFileSync("README.md", "utf8");
 
 const requiredSnippets = [
+  "## 목차",
+  "## 과제 제출물 매핑",
   "React",
   "FastAPI",
   "PostgreSQL-ready SQLAlchemy",
@@ -14,6 +16,7 @@ const requiredSnippets = [
   "AI Agent",
   "npm run verify:full",
   "docs/evaluation-reports",
+  "| 제출 요구 | README 위치 | 구현/검증 근거 |",
 ];
 
 const suspiciousPatterns = [
