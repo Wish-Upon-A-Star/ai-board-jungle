@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { rmSync } from "node:fs";
 
 function run(cmd, args, opts = {}) {
   console.log(`\n== ${cmd} ${args.join(" ")} ==`);
@@ -26,7 +27,17 @@ async function wait(url) {
 }
 
 const env = { PYTHONPATH: "backend", AI_BOARD_DATABASE_URL: "sqlite:///./data/fastapi-verify.db" };
-run("powershell", ["-NoProfile", "-Command", "\"Get-NetTCPConnection -LocalPort 3000,8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; exit 0\""], { timeout: 30000 });
+const verifyDbPath = "data/fastapi-verify.db";
+function resetVerifyDb() {
+  for (const path of [verifyDbPath, `${verifyDbPath}-shm`, `${verifyDbPath}-wal`]) {
+    rmSync(path, { force: true });
+  }
+}
+function stopLocalServers() {
+  run("powershell", ["-NoProfile", "-Command", "\"1..8 | ForEach-Object { Get-NetTCPConnection -LocalPort 3000,8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 1000 }; exit 0\""], { timeout: 30000 });
+}
+stopLocalServers();
+resetVerifyDb();
 run("python", ["-m", "pip", "install", "-r", "backend/requirements.txt"], { timeout: 180000 });
 run("python", ["-m", "pytest", "backend/tests"], { env });
 run("npm", ["--prefix", "frontend", "install"], { timeout: 180000 });
@@ -42,4 +53,5 @@ try {
 } finally {
   api.kill();
   web.kill();
+  stopLocalServers();
 }

@@ -26,6 +26,7 @@
 - 전체 로컬 검증은 `npm run verify:full`로 FastAPI/React 서버를 한 번만 띄운 뒤 HTTP smoke와 UI CDP smoke를 순차 실행해 포트 경합을 피합니다.
 - 의존성이 이미 설치된 반복 개발 상황에서는 `npm run verify:full:quick`으로 pip/npm install 단계를 건너뛰고 같은 전체 smoke를 빠르게 실행할 수 있습니다.
 - `verify:full`과 `verify:full:quick`은 시작할 때 `data/full-verify.db`와 SQLite sidecar 파일을 초기화해 이전 검증 데이터가 결과에 섞이지 않게 합니다.
+- `verify:fastapi`도 시작할 때 `data/fastapi-verify.db`와 SQLite sidecar 파일을 초기화하고 종료 시 3000/8000 포트를 정리합니다.
 
 ## 운영 Secret/KMS 설정
 
