@@ -6,6 +6,7 @@ const skipInstall = process.argv.includes("--skip-install");
 
 stopLocalServers();
 resetSqliteDb(verifyDbPath);
+run("node", ["scripts/verify-readme.mjs"]);
 run("python", ["-m", "py_compile", "backend/app/main.py", "backend/app/services.py"]);
 if (!skipInstall) {
   run("python", ["-m", "pip", "install", "-r", "backend/requirements.txt"], { timeout: 180000 });
