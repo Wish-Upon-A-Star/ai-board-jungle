@@ -56,6 +56,7 @@ AI Board는 게시판 사용자가 GitHub, Notion, Figma, Google Calendar 같은
 - 자동화 실행 이력 페이지네이션과 retry UI
 - 자동화 결과 게시판 공유
 - 사용자별 integration activity log와 필터
+- 비개발자도 현재 React/FastAPI/PostgreSQL/Redis/RAG/MCP/Agent/외부 API 준비 상태를 볼 수 있는 System Readiness 패널
 - RAG 질문 응답, 문서/텍스트/업로드 지식자료 저장
 - MCP JSON-RPC endpoint
 - API hub dry-run 실행 콘솔

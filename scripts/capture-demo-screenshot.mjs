@@ -92,7 +92,7 @@ async function main() {
   });
   await wait(3500);
   await page.call("Runtime.evaluate", {
-    expression: `document.querySelector("#automation")?.scrollIntoView({ block: "start" });`,
+    expression: `document.querySelector("#automations")?.scrollIntoView({ block: "start" });`,
     awaitPromise: true,
   });
   await wait(800);

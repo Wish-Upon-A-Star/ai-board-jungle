@@ -131,6 +131,12 @@ a:hover { color: #0086d1; }
 .activity-row p { margin: 0; color: #555; line-height: 1.4; min-width: 0; overflow-wrap: anywhere; }
 .load-more { margin-top: 8px; width: 100%; border-color: #1687c9; color: #1687c9; }
 .empty-state { margin: 0; padding: 10px 0 2px; color: #777; }
+.system-readiness { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 10px; }
+.system-card { border: 1px solid #e2e2e2; background: #fff; padding: 9px; min-height: 58px; }
+.system-card strong { display: block; color: #333; margin-bottom: 5px; }
+.system-card span { color: #2780c2; }
+.system-card.ready { border-color: #b7ead8; background: #fbfffc; }
+.system-card.pending { border-color: #eadca8; background: #fffdf7; }
 .knowledge-item { border: 1px solid #e2e2e2; padding: 9px; }
 .knowledge-item strong { display: block; color: #333; margin-bottom: 4px; }
 .knowledge-item span { display: block; color: #2780c2; margin-bottom: 5px; }
@@ -215,6 +221,7 @@ pre { margin: 0; padding: 10px; border: 1px solid #e2e2e2; background: #fafafa; 
   .search { width: 100%; margin-top: 8px; }
   .grid2, .grid3, .grid3.wide { grid-template-columns: 1fr; }
   .provider-grid { grid-template-columns: 1fr; }
+  .system-readiness { grid-template-columns: 1fr 1fr; }
   .activity-head { align-items: flex-start; flex-direction: column; }
   .activity-actions { justify-content: flex-start; }
   .activity-filters { grid-template-columns: 1fr; }
