@@ -45,6 +45,7 @@ function App() {
   const [liveWriteConfirmations, setLiveWriteConfirmations] = useState({});
   const [profileSettings, setProfileSettings] = useState(null);
   const [error, setError] = useState("");
+  const [validationIssues, setValidationIssues] = useState([]);
 
   const myTasks = useMemo(() => tasks.filter((task) => task.owner?.id === user?.id), [tasks, user]);
   const sharedCount = posts.filter((post) => post.automationTaskId).length;
@@ -53,6 +54,16 @@ function App() {
   useEffect(() => {
     if (token) loadAll();
   }, [token]);
+
+  function clearErrorState() {
+    setError("");
+    setValidationIssues([]);
+  }
+
+  function showActionError(err) {
+    setError(err.message || "요청을 처리하지 못했습니다.");
+    setValidationIssues(Array.isArray(err.validationIssues) ? err.validationIssues : []);
+  }
 
   async function loadActivities(filters = activityFilters, offset = 0, append = false) {
     const params = new URLSearchParams();
@@ -67,7 +78,7 @@ function App() {
   }
 
   async function loadAll(search = q, filters = activityFilters) {
-    setError("");
+    clearErrorState();
     try {
       const activityParams = new URLSearchParams({ limit: "12", offset: "0" });
       Object.entries(filters).forEach(([key, value]) => {
@@ -94,7 +105,7 @@ function App() {
       setActivityPage({ total: activityData.total, limit: activityData.limit, offset: activityData.offset, nextOffset: activityData.nextOffset, hasMore: activityData.hasMore });
       setSelected((current) => current || postData.posts[0] || null);
     } catch (err) {
-      setError(err.message);
+      showActionError(err);
     }
   }
 
@@ -106,7 +117,7 @@ function App() {
 
   async function submitAuth(event) {
     event.preventDefault();
-    setError("");
+    clearErrorState();
     try {
       const path = authMode === "register" ? "/api/auth/register" : "/api/auth/login";
       const body = authMode === "register" ? authForm : { email: authForm.email, password: authForm.password };
@@ -115,7 +126,7 @@ function App() {
       setToken(data.token);
       setUser(data.user);
     } catch (err) {
-      setError(err.message);
+      showActionError(err);
     }
   }
 
@@ -134,11 +145,16 @@ function App() {
 
   async function createAutomation(event) {
     event.preventDefault();
-    const payload = { ...form, interval_minutes: Number(form.interval_minutes), integration_profile_id: form.integration_profile_id ? Number(form.integration_profile_id) : null };
-    const data = await api("/api/automations", { method: "POST", body: JSON.stringify(payload) });
-    setResult(data.plan);
-    setApiResult({ called: "automation.create", response: data });
-    await loadAll();
+    clearErrorState();
+    try {
+      const payload = { ...form, interval_minutes: Number(form.interval_minutes), integration_profile_id: form.integration_profile_id ? Number(form.integration_profile_id) : null };
+      const data = await api("/api/automations", { method: "POST", body: JSON.stringify(payload) });
+      setResult(data.plan);
+      setApiResult({ called: "automation.create", response: data });
+      await loadAll();
+    } catch (err) {
+      showActionError(err);
+    }
   }
 
   async function runTask(task) {
@@ -196,51 +212,66 @@ function App() {
 
   async function createPost(event) {
     event.preventDefault();
-    const data = await api("/api/posts", {
-      method: "POST",
-      body: JSON.stringify({ title: event.currentTarget.title.value, content: event.currentTarget.content.value, tags: event.currentTarget.tags.value.split(",").map((tag) => tag.trim()).filter(Boolean) }),
-    });
-    setSelected(data.post);
-    event.currentTarget.reset();
-    await loadAll();
+    clearErrorState();
+    try {
+      const data = await api("/api/posts", {
+        method: "POST",
+        body: JSON.stringify({ title: event.currentTarget.title.value, content: event.currentTarget.content.value, tags: event.currentTarget.tags.value.split(",").map((tag) => tag.trim()).filter(Boolean) }),
+      });
+      setSelected(data.post);
+      event.currentTarget.reset();
+      await loadAll();
+    } catch (err) {
+      showActionError(err);
+    }
   }
 
   async function saveKnowledge(event) {
     event.preventDefault();
-    let data;
-    if (knowledgeForm.file) {
-      const body = new FormData();
-      body.set("title", knowledgeForm.title);
-      body.set("source_type", knowledgeForm.source_type);
-      body.set("instruction", knowledgeForm.instruction);
-      body.set("tags", knowledgeForm.tags);
-      body.set("file", knowledgeForm.file);
-      data = await api("/api/knowledge/upload", { method: "POST", body });
-    } else {
-      data = await api("/api/knowledge", {
-        method: "POST",
-        body: JSON.stringify({ ...knowledgeForm, tags: knowledgeForm.tags.split(",").map((tag) => tag.trim()).filter(Boolean) }),
-      });
+    clearErrorState();
+    try {
+      let data;
+      if (knowledgeForm.file) {
+        const body = new FormData();
+        body.set("title", knowledgeForm.title);
+        body.set("source_type", knowledgeForm.source_type);
+        body.set("instruction", knowledgeForm.instruction);
+        body.set("tags", knowledgeForm.tags);
+        body.set("file", knowledgeForm.file);
+        data = await api("/api/knowledge/upload", { method: "POST", body });
+      } else {
+        data = await api("/api/knowledge", {
+          method: "POST",
+          body: JSON.stringify({ ...knowledgeForm, tags: knowledgeForm.tags.split(",").map((tag) => tag.trim()).filter(Boolean) }),
+        });
+      }
+      setApiResult({ called: "knowledge.save", response: data });
+      setResult(data.rag);
+      setKnowledgeForm({ ...defaultKnowledge });
+      await loadAll();
+    } catch (err) {
+      showActionError(err);
     }
-    setApiResult({ called: "knowledge.save", response: data });
-    setResult(data.rag);
-    setKnowledgeForm({ ...defaultKnowledge });
-    await loadAll();
   }
 
   async function saveIntegrationProfile(event) {
     event.preventDefault();
-    const body = {
-      ...integrationForm,
-      collect_limit: Number(integrationForm.collect_limit) || 20,
-      collect_pages: Number(integrationForm.collect_pages) || 2,
-      rag_targets: integrationForm.rag_targets.split(",").map((item) => item.trim()).filter(Boolean),
-      custom_connections: [],
-    };
-    const data = await api("/api/integration-profiles", { method: "POST", body: JSON.stringify(body) });
-    setApiResult({ called: "integration-profile.save", response: data });
-    setIntegrationForm({ ...defaultIntegration, token_value: "" });
-    await loadAll();
+    clearErrorState();
+    try {
+      const body = {
+        ...integrationForm,
+        collect_limit: Number(integrationForm.collect_limit) || 20,
+        collect_pages: Number(integrationForm.collect_pages) || 2,
+        rag_targets: integrationForm.rag_targets.split(",").map((item) => item.trim()).filter(Boolean),
+        custom_connections: [],
+      };
+      const data = await api("/api/integration-profiles", { method: "POST", body: JSON.stringify(body) });
+      setApiResult({ called: "integration-profile.save", response: data });
+      setIntegrationForm({ ...defaultIntegration, token_value: "" });
+      await loadAll();
+    } catch (err) {
+      showActionError(err);
+    }
   }
 
   async function collectIntegrationProfile(profile) {
@@ -334,7 +365,16 @@ function App() {
           </div>
         </section>
 
-        {error && <div className="top-error">{error}</div>}
+        {error && (
+          <div className="top-error">
+            <strong>{error}</strong>
+            {validationIssues.length ? (
+              <ul className="validation-list">
+                {validationIssues.map((issue, index) => <li key={`${issue.field}:${index}`}><b>{issue.field}</b><span>{issue.message}</span></li>)}
+              </ul>
+            ) : null}
+          </div>
+        )}
 
         <div className="layout">
           <aside className="stats">

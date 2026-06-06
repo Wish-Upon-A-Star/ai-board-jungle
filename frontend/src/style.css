@@ -29,6 +29,11 @@ a:hover { color: #0086d1; }
 .demo-actions { display: flex; gap: 6px; margin: 10px 0; }
 .error, .top-error { color: #b91c1c; background: #fff5f5; border: 1px solid #ffd4d4; padding: 8px 10px; }
 .top-error { margin-bottom: 14px; }
+.top-error strong { display: block; margin-bottom: 4px; }
+.validation-list { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.validation-list li { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 8px; border-top: 1px solid #ffdede; padding-top: 4px; line-height: 1.45; }
+.validation-list b { color: #7f1d1d; word-break: break-word; }
+.validation-list span { color: #9f1d1d; word-break: break-word; }
 
 .container { max-width: 1180px; margin: 0 auto; padding: 62px 24px 40px; }
 .profile-head { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; }
@@ -231,4 +236,5 @@ pre { margin: 0; padding: 10px; border: 1px solid #e2e2e2; background: #fafafa; 
   .live-write-controls button { width: 100%; }
   .run-row-main { grid-template-columns: 1fr; }
   .inline-link { justify-self: start; }
+  .validation-list li { grid-template-columns: 1fr; gap: 2px; }
 }

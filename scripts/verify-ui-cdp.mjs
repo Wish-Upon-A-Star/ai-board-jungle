@@ -277,6 +277,38 @@ async function main() {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ instruction: "Summarize GitHub Notion automation status" }),
   }).then((response) => response.ok);
+  const validationErrorVisible = await evalJs(`(async () => {
+    const mod = await import("/src/api.js");
+    try {
+      await mod.api("/api/automations", {
+        method: "POST",
+        body: JSON.stringify({
+          name: "Broken UI validation",
+          source: "Custom source",
+          destination: "Custom target",
+          interval_minutes: 5,
+          instruction: "Reject incomplete custom connection metadata.",
+          template: "title / action",
+          api_provider: "Custom API",
+          ai_agent: "CustomWorkflowAgent",
+          custom_connections: [{
+            label: "Broken target",
+            service: "notion",
+            url: "https://www.notion.so/workspace/db",
+            api: "",
+            auth_key_name: " ",
+            operation: "",
+            template: "title: {title}"
+          }]
+        })
+      });
+      return false;
+    } catch (error) {
+      return error.message.includes("입력값을 확인하세요") &&
+        Array.isArray(error.validationIssues) &&
+        error.validationIssues.some((issue) => issue.field.includes("custom_connections") && issue.message.includes("api, auth_key_name, operation"));
+    }
+  })()`);
 
   const runClicked = await evalJs(`(() => {
     const button = Array.from(document.querySelectorAll("button")).find((item) => item.innerText.includes("Run history"));
@@ -331,6 +363,7 @@ async function main() {
     healthOk,
     mcpOk,
     hubOk,
+    validationErrorVisible,
     runHistoryVisible,
     runDetailsVisible,
     runRetryVisible,
@@ -357,6 +390,7 @@ async function main() {
     !healthOk ||
     !mcpOk ||
     !hubOk ||
+    !validationErrorVisible ||
     !runHistoryVisible ||
     !runDetailsVisible ||
     !runRetryVisible ||
