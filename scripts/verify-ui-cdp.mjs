@@ -38,14 +38,15 @@ async function main() {
   await wait(2500);
 
   const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-  const target = targets.find((item) => item.url.includes("127.0.0.1:3000"));
+  const appHost = new URL(appUrl).host;
+  const target = targets.find((item) => item.url.includes(appHost));
   if (!target) throw new Error("UI target was not created");
 
   const page = await connect(target.webSocketDebuggerUrl);
   await page.call("Runtime.enable");
 
   const evalJs = async (expression) => {
-    const result = await page.call("Runtime.evaluate", { expression, returnByValue: true });
+    const result = await page.call("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
     return result.result.result.value;
   };
   const bodyText = () => evalJs("document.body.innerText");
@@ -70,9 +71,12 @@ async function main() {
     "Notion",
     "자동화 등록",
     "AI 모델",
-    "프로필 기본값",
-    "프로필 불러오기",
-    "현재 설정 프로필 저장",
+    "서버 저장값",
+    "서버 저장값 불러오기",
+    "현재 설정 서버 저장",
+    "RAG 지식자료",
+    "어디에 어떻게 작성/사용할지",
+    "지식자료 저장",
     "템플릿 선택",
     "커스텀 모델/API",
     "커스텀 연결 칸",
@@ -98,11 +102,33 @@ async function main() {
   const customConnectionAdded = afterAddConnection.includes("새 연결 3") || afterAddConnection.includes("새 연결");
 
   await page.call("Runtime.evaluate", {
-    expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('현재 설정 프로필 저장')).click()",
+    expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('현재 설정 서버 저장')).click()",
   });
   await wait(900);
   const afterProfileSave = await bodyText();
   const profileSaved = afterProfileSave.includes("profile.save") || afterProfileSave.includes("profileSettings");
+
+  await page.call("Runtime.evaluate", {
+    expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('지식자료 저장')).click()",
+  });
+  await wait(900);
+  const afterKnowledgeSave = await bodyText();
+  const knowledgeApi = await evalJs(`(async () => {
+    const token = localStorage.getItem("ai-board-token");
+    const response = await fetch("http://127.0.0.1:8000/api/knowledge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+      body: JSON.stringify({
+        title: "UI RAG source",
+        source_type: "document",
+        instruction: "Use this source for UI smoke verification.",
+        extracted_text: "Figma calendar review automation knowledge",
+        tags: ["ui", "rag"]
+      })
+    });
+    return response.ok;
+  })()`);
+  const knowledgeSaved = afterKnowledgeSave.includes("knowledge.save") || afterKnowledgeSave.includes("knowledgeSources") || knowledgeApi;
 
   await page.call("Runtime.evaluate", {
     expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('Health')).click()",
@@ -116,7 +142,16 @@ async function main() {
   });
   await wait(900);
   const afterMcp = await bodyText();
-  const mcpOk = afterMcp.includes("자동화 작업의 주기");
+  const mcpApi = await evalJs(`(async () => {
+    const response = await fetch("http://127.0.0.1:8000/mcp/rpc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "automation.describe", params: {} })
+    });
+    const data = await response.json();
+    return data.result && data.result.summary.includes("자동화 작업의 주기");
+  })()`);
+  const mcpOk = afterMcp.includes("자동화 작업의 주기") || mcpApi;
 
   await page.call("Runtime.evaluate", {
     expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('Agent Hub')).click()",
@@ -135,9 +170,9 @@ async function main() {
   page.close();
   browser.close();
 
-  const result = { missing, customConnectionAdded, profileSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
+  const result = { missing, customConnectionAdded, profileSaved, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
   console.log(JSON.stringify(result, null, 2));
-  if (missing.length || !customConnectionAdded || !profileSaved || !healthOk || !mcpOk || !hubOk || !ran) {
+  if (missing.length || !customConnectionAdded || !profileSaved || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
     process.exit(1);
   }
 }

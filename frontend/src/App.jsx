@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Bot, CalendarClock, Database, GitBranch, KeyRound, Link2, LogOut, Play, Plus, Search, Share2, Trash2, UserPlus } from "lucide-react";
+import { Bot, CalendarClock, Database, FileText, GitBranch, KeyRound, Link2, LogOut, Play, Plus, Search, Share2, Trash2, Upload, UserPlus } from "lucide-react";
 import { api } from "./api";
 import "./style.css";
 
@@ -136,6 +136,7 @@ function App() {
   const [authForm, setAuthForm] = useState({ email: "admin@example.com", name: "새 사용자", password: "password123" });
   const [posts, setPosts] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [knowledgeSources, setKnowledgeSources] = useState([]);
   const [selected, setSelected] = useState(null);
   const [q, setQ] = useState("");
   const [result, setResult] = useState(null);
@@ -144,6 +145,14 @@ function App() {
   const [sideTab, setSideTab] = useState("selected");
   const [form, setForm] = useState(githubNotionPreset);
   const [profileSettings, setProfileSettings] = useState(null);
+  const [knowledgeForm, setKnowledgeForm] = useState({
+    title: "운영 자동화 지침",
+    source_type: "document",
+    instruction: "이 자료를 자동화 실행 지침과 RAG 답변 근거로 사용한다.",
+    extracted_text: "예: GitHub 이슈가 bug 라벨이면 Notion 업무 상태를 확인 필요로 작성한다.",
+    tags: "automation,rag",
+    file: null,
+  });
   const [error, setError] = useState("");
 
   const myTasks = useMemo(() => tasks.filter((task) => task.owner.id === user?.id), [tasks, user]);
@@ -227,12 +236,14 @@ function App() {
   }
 
   async function loadAll(query = q) {
-    const [postData, taskData] = await Promise.all([
+    const [postData, taskData, knowledgeData] = await Promise.all([
       api(`/api/posts?q=${encodeURIComponent(query)}`),
       api("/api/automations"),
+      api("/api/knowledge"),
     ]);
     setPosts(postData.posts);
     setTasks(taskData.tasks);
+    setKnowledgeSources(knowledgeData.sources);
     if (!selected && postData.posts[0]) setSelected(postData.posts[0]);
   }
 
@@ -327,7 +338,7 @@ function App() {
       if (kind === "health") {
         data = await api("/api/health");
       } else if (kind === "rag") {
-        data = await api("/api/ai/rag", { method: "POST", body: JSON.stringify({ question: apiPrompt }) });
+        data = await api("/api/knowledge/rag", { method: "POST", body: JSON.stringify({ question: apiPrompt }) });
       } else if (kind === "mcp") {
         data = await api("/mcp/rpc", { method: "POST", body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method: "automation.describe", params: {} }) });
       } else {
@@ -339,6 +350,39 @@ function App() {
       setError(err.message);
       setApiResult({ called: kind, error: err.message });
       setSideTab("api");
+    }
+  }
+
+  async function saveKnowledge(event) {
+    event.preventDefault();
+    setError("");
+    try {
+      let data;
+      if (knowledgeForm.file) {
+        const body = new FormData();
+        body.append("title", knowledgeForm.title);
+        body.append("source_type", knowledgeForm.source_type);
+        body.append("instruction", knowledgeForm.instruction);
+        body.append("tags", knowledgeForm.tags);
+        body.append("file", knowledgeForm.file);
+        data = await api("/api/knowledge/upload", { method: "POST", body });
+      } else {
+        data = await api("/api/knowledge", {
+          method: "POST",
+          body: JSON.stringify({
+            title: knowledgeForm.title,
+            source_type: knowledgeForm.source_type,
+            instruction: knowledgeForm.instruction,
+            extracted_text: knowledgeForm.extracted_text,
+            tags: knowledgeForm.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+          }),
+        });
+      }
+      setApiResult({ called: "knowledge.save", response: data });
+      setSideTab("api");
+      await loadAll();
+    } catch (err) {
+      setError(err.message);
     }
   }
 
@@ -376,6 +420,7 @@ function App() {
         <nav>
           <a href="#automations" className="active">자동화</a>
           <a href="#new-task">등록</a>
+          <a href="#knowledge">RAG</a>
           <a href="#api-console">API</a>
           <a href="#board">게시판</a>
         </nav>
@@ -387,7 +432,7 @@ function App() {
           <div className={user.role === "ADMIN" ? "avatar admin" : "avatar user"}>{user.role === "ADMIN" ? "A" : "U"}</div>
           <div>
             <h1>{user.name}</h1>
-            <p><Badge role={user.role} /> 프로필에 저장한 연결/API/AI 모델을 자동화마다 불러와 실행하는 게시판</p>
+            <p><Badge role={user.role} /> 서버 DB에 사용자별 연결/API/AI 모델과 RAG 지식자료를 저장해 자동화마다 불러오는 게시판</p>
           </div>
         </section>
 
@@ -402,6 +447,7 @@ function App() {
               <div><dt>Redis</dt><dd className="green">RAG 캐시</dd></div>
               <div><dt>AI 모델</dt><dd className="green">{form.ai_model}</dd></div>
               <div><dt>연결 칸</dt><dd className="green">{connectionCount}</dd></div>
+              <div><dt>지식자료</dt><dd className="green">{knowledgeSources.length}</dd></div>
               <div><dt>RAG</dt><dd className="green">검색/요약</dd></div>
               <div><dt>MCP</dt><dd>JSON-RPC</dd></div>
               <div><dt>Agent</dt><dd>도구 선택</dd></div>
@@ -454,7 +500,7 @@ function App() {
                 <section className="profile-settings-box">
                   <div className="section-head">
                     <div>
-                      <strong>프로필 기본값</strong>
+                      <strong>서버 저장값</strong>
                       <span>
                         저장된 AI 모델 {profileSettings?.aiModel || "미설정"} /
                         연결 {profileSettings?.customConnections?.length || 0}개.
@@ -462,8 +508,8 @@ function App() {
                       </span>
                     </div>
                     <div className="profile-actions">
-                      <button type="button" onClick={reloadProfileSettings}><Link2 size={14} /> 프로필 불러오기</button>
-                      <button type="button" onClick={saveProfileSettings}><KeyRound size={14} /> 현재 설정 프로필 저장</button>
+                      <button type="button" onClick={reloadProfileSettings}><Link2 size={14} /> 서버 저장값 불러오기</button>
+                      <button type="button" onClick={saveProfileSettings}><KeyRound size={14} /> 현재 설정 서버 저장</button>
                     </div>
                   </div>
                 </section>
@@ -550,6 +596,49 @@ function App() {
                 </div>
                 <button><CalendarClock size={14} /> 자동화 저장</button>
               </form>
+            </article>
+
+            <article id="knowledge" className="panel">
+              <div className="panel-title row-title">
+                <span>RAG 지식자료</span>
+                <span className="subtle">문서, 음성, 이미지, 기타 파일 설명을 사용자별 서버 DB에 저장</span>
+              </div>
+              <form className="knowledge-form" onSubmit={saveKnowledge}>
+                <div className="grid3 wide">
+                  <Field label="자료명"><input value={knowledgeForm.title} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, title: e.target.value })} /></Field>
+                  <Field label="자료 종류">
+                    <select value={knowledgeForm.source_type} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, source_type: e.target.value })}>
+                      <option value="document">문서</option>
+                      <option value="audio">음성</option>
+                      <option value="image">이미지</option>
+                      <option value="video">영상</option>
+                      <option value="spreadsheet">표/엑셀</option>
+                      <option value="custom">기타</option>
+                    </select>
+                  </Field>
+                  <Field label="태그"><input value={knowledgeForm.tags} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, tags: e.target.value })} placeholder="rag,policy,design" /></Field>
+                </div>
+                <Field label="어디에 어떻게 작성/사용할지"><textarea value={knowledgeForm.instruction} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, instruction: e.target.value })} placeholder="예: 이 음성 회의록은 GitHub 이슈 요약과 Notion 업무 작성 기준으로 사용" /></Field>
+                <Field label="직접 입력할 내용"><textarea value={knowledgeForm.extracted_text} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, extracted_text: e.target.value })} placeholder="문서 내용, 음성 녹취 요약, 이미지 설명, 표의 핵심 값 등을 넣으면 RAG가 검색합니다." /></Field>
+                <div className="file-row">
+                  <label className="file-picker">
+                    <Upload size={14} />
+                    파일 선택
+                    <input type="file" onChange={(e) => setKnowledgeForm({ ...knowledgeForm, file: e.target.files?.[0] || null })} />
+                  </label>
+                  <span>{knowledgeForm.file ? `${knowledgeForm.file.name} (${knowledgeForm.file.type || "unknown"})` : "텍스트 파일은 내용을 추출하고, 이미지/음성/PDF는 설명과 지침을 RAG 근거로 저장합니다."}</span>
+                  <button><FileText size={14} /> 지식자료 저장</button>
+                </div>
+              </form>
+              <div className="knowledge-list">
+                {knowledgeSources.map((source) => (
+                  <div key={source.id} className="knowledge-item">
+                    <strong>{source.title}</strong>
+                    <span>{source.sourceType} / {source.fileName || "직접 입력"} / {source.tags.map((tag) => `#${tag}`).join(" ")}</span>
+                    <p>{source.instruction || source.extractedText}</p>
+                  </div>
+                ))}
+              </div>
             </article>
 
             <article id="api-console" className="panel">

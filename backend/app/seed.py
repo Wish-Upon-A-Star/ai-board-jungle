@@ -24,6 +24,15 @@ def seed() -> None:
 
         admin = db.query(User).filter(User.email == "admin@example.com").first()
         user = db.query(User).filter(User.email == "user@example.com").first()
+        if admin:
+            admin.name = "관리자"
+            admin.role = "ADMIN"
+            admin.password_hash = hash_password("password123")
+        if user:
+            user.name = "사용자"
+            user.role = "USER"
+            user.password_hash = hash_password("password123")
+        db.commit()
 
         if db.query(Post).count() == 0 and admin:
             samples = [

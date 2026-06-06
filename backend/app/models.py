@@ -33,6 +33,7 @@ class User(Base):
     posts: Mapped[list["Post"]] = relationship(back_populates="author")
     comments: Mapped[list["Comment"]] = relationship(back_populates="author")
     automations: Mapped[list["AutomationTask"]] = relationship(back_populates="owner")
+    knowledge_sources: Mapped[list["KnowledgeSource"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
 
 
 class Post(Base):
@@ -71,6 +72,22 @@ class Tag(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(60), unique=True, index=True)
     posts: Mapped[list[Post]] = relationship(secondary=post_tags, back_populates="tags")
+
+
+class KnowledgeSource(Base):
+    __tablename__ = "knowledge_sources"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String(180), index=True)
+    source_type: Mapped[str] = mapped_column(String(40), default="document")
+    file_name: Mapped[str] = mapped_column(String(240), default="")
+    mime_type: Mapped[str] = mapped_column(String(120), default="")
+    instruction: Mapped[str] = mapped_column(Text, default="")
+    extracted_text: Mapped[str] = mapped_column(Text, default="")
+    tags_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    owner: Mapped[User] = relationship(back_populates="knowledge_sources")
 
 
 class AutomationTask(Base):

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from .cache import cache_get, cache_set
 from .config import settings
-from .models import AutomationTask, Post, Tag
+from .models import AutomationTask, KnowledgeSource, Post, Tag
 
 
 WORD_RE = re.compile(r"[a-zA-Z0-9가-힣]+")
@@ -58,13 +58,47 @@ def similar_posts(db: Session, question: str) -> list[dict]:
     return result
 
 
-def rag_answer(db: Session, question: str) -> dict:
+def similar_knowledge(db: Session, question: str, owner_id: int | None = None) -> list[dict]:
+    cache_key = f"rag:knowledge:{owner_id or 'all'}:{hash(question)}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    stmt = select(KnowledgeSource).order_by(KnowledgeSource.created_at.desc()).limit(120)
+    if owner_id is not None:
+        stmt = stmt.where(KnowledgeSource.owner_id == owner_id)
+    sources = db.scalars(stmt).all()
+    ranked = [
+        {
+            "id": source.id,
+            "title": source.title,
+            "summary": summarize(source.title, f"{source.instruction}\n{source.extracted_text}"),
+            "score": lexical_score(question, f"{source.title} {source.source_type} {source.file_name} {source.instruction} {source.extracted_text} {source.tags_json}"),
+            "tags": json.loads(source.tags_json or "[]"),
+            "sourceType": source.source_type,
+            "fileName": source.file_name,
+        }
+        for source in sources
+    ]
+    result = [item for item in sorted(ranked, key=lambda x: x["score"], reverse=True) if item["score"] > 0][:5]
+    cache_set(cache_key, result, 90)
+    return result
+
+
+def rag_answer(db: Session, question: str, owner_id: int | None = None) -> dict:
     hits = similar_posts(db, question)
-    if hits:
-        answer = f"가장 관련 있는 기록은 '{hits[0]['title']}'입니다. {hits[0]['summary']}"
+    knowledge_hits = similar_knowledge(db, question, owner_id)
+    combined = sorted(
+        [{**hit, "kind": "post"} for hit in hits] + [{**hit, "kind": "knowledge"} for hit in knowledge_hits],
+        key=lambda x: x["score"],
+        reverse=True,
+    )[:5]
+    if combined:
+        top = combined[0]
+        answer = f"가장 관련 있는 근거는 '{top['title']}'입니다. {top['summary']}"
     else:
         answer = "게시판 지식 베이스에서 충분한 근거를 찾지 못했습니다."
-    return {"answer": answer, "sources": [hit["title"] for hit in hits], "recommendations": hits}
+    return {"answer": answer, "sources": [hit["title"] for hit in combined], "recommendations": combined, "knowledgeSources": knowledge_hits}
 
 
 def agent_review(db: Session, title: str, content: str) -> dict:

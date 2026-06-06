@@ -3,14 +3,14 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import get_db, init_db
-from .models import AutomationRun, AutomationTask, Comment, Post, User
-from .schemas import AutomationIn, CommentIn, InstructionIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
+from .models import AutomationRun, AutomationTask, Comment, KnowledgeSource, Post, User
+from .schemas import AutomationIn, CommentIn, InstructionIn, KnowledgeIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
 from .security import create_token, current_user, hash_password, verify_password
 from .services import agent_review, automation_fingerprint, automation_plan, get_or_create_tags, instruction_hub, rag_answer, result_to_text, search_posts, summarize
 
@@ -35,6 +35,14 @@ def parse_connections(raw: str) -> list[dict]:
         return []
 
 
+def parse_string_list(raw: str) -> list[str]:
+    try:
+        value = json.loads(raw or "[]")
+        return [str(item) for item in value] if isinstance(value, list) else []
+    except json.JSONDecodeError:
+        return []
+
+
 def serialize_profile_settings(user: User) -> dict:
     return {
         "aiProvider": user.profile_ai_provider,
@@ -45,6 +53,32 @@ def serialize_profile_settings(user: User) -> dict:
         "customTemplate": user.profile_custom_template,
         "customConnections": parse_connections(user.profile_custom_connections),
     }
+
+
+def serialize_knowledge(source: KnowledgeSource) -> dict:
+    return {
+        "id": source.id,
+        "title": source.title,
+        "sourceType": source.source_type,
+        "fileName": source.file_name,
+        "mimeType": source.mime_type,
+        "instruction": source.instruction,
+        "extractedText": source.extracted_text,
+        "tags": parse_string_list(source.tags_json),
+        "createdAt": str(source.created_at),
+    }
+
+
+async def extract_upload_text(upload: UploadFile | None) -> tuple[str, str, str]:
+    if upload is None:
+        return "", "", ""
+    raw = await upload.read()
+    mime_type = upload.content_type or ""
+    file_name = upload.filename or ""
+    if mime_type.startswith("text/") or file_name.lower().endswith((".txt", ".md", ".csv", ".json", ".log")):
+        text = raw[:20000].decode("utf-8", errors="ignore")
+        return file_name, mime_type, text
+    return file_name, mime_type, f"[{mime_type or 'binary'} 파일: {file_name}] 파일 설명/작성 지침을 RAG 근거로 사용합니다."
 
 
 def serialize_post(post: Post) -> dict:
@@ -190,6 +224,69 @@ def delete_post(post_id: int, user: User = Depends(current_user), db: Session = 
     if post.author_id != user.id and user.role != "ADMIN":
         raise HTTPException(status_code=403, detail="삭제 권한이 없습니다.")
     db.delete(post)
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/knowledge")
+def list_knowledge(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    stmt = select(KnowledgeSource).where(KnowledgeSource.owner_id == user.id).order_by(KnowledgeSource.created_at.desc())
+    sources = db.scalars(stmt).all()
+    return {"sources": [serialize_knowledge(source) for source in sources]}
+
+
+@app.post("/api/knowledge")
+def create_knowledge(data: KnowledgeIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    source = KnowledgeSource(
+        owner_id=user.id,
+        title=data.title,
+        source_type=data.source_type,
+        instruction=data.instruction,
+        extracted_text=data.extracted_text,
+        tags_json=json.dumps(data.tags, ensure_ascii=False),
+    )
+    db.add(source)
+    db.commit()
+    db.refresh(source)
+    return {"source": serialize_knowledge(source), "rag": rag_answer(db, data.title, user.id)}
+
+
+@app.post("/api/knowledge/upload")
+async def upload_knowledge(
+    title: str = Form(...),
+    source_type: str = Form("document"),
+    instruction: str = Form(""),
+    tags: str = Form(""),
+    file: UploadFile | None = File(None),
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    file_name, mime_type, extracted = await extract_upload_text(file)
+    tag_list = [tag.strip().removeprefix("#") for tag in tags.split(",") if tag.strip()]
+    source = KnowledgeSource(
+        owner_id=user.id,
+        title=title,
+        source_type=source_type,
+        file_name=file_name,
+        mime_type=mime_type,
+        instruction=instruction,
+        extracted_text=extracted,
+        tags_json=json.dumps(tag_list, ensure_ascii=False),
+    )
+    db.add(source)
+    db.commit()
+    db.refresh(source)
+    return {"source": serialize_knowledge(source), "rag": rag_answer(db, f"{title}\n{instruction}\n{extracted}", user.id)}
+
+
+@app.delete("/api/knowledge/{source_id}")
+def delete_knowledge(source_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    source = db.get(KnowledgeSource, source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="지식자료를 찾을 수 없습니다.")
+    if source.owner_id != user.id and user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="삭제 권한이 없습니다.")
+    db.delete(source)
     db.commit()
     return {"ok": True}
 
@@ -361,6 +458,11 @@ def delete_automation(task_id: int, user: User = Depends(current_user), db: Sess
 @app.post("/api/ai/rag")
 def rag(data: QuestionIn, db: Session = Depends(get_db)) -> dict:
     return rag_answer(db, data.question)
+
+
+@app.post("/api/knowledge/rag")
+def user_rag(data: QuestionIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    return rag_answer(db, data.question, user.id)
 
 
 @app.post("/api/ai/agent/moderate")

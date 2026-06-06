@@ -47,6 +47,22 @@ def test_full_fastapi_flow():
         assert saved_profile["aiModel"] == "gpt-4o-mini"
         assert saved_profile["customConnections"][0]["auth_key_name"] == "PROFILE_NOTION_TOKEN"
 
+        knowledge = client.post(
+            "/api/knowledge",
+            headers=headers,
+            json={
+                "title": "Audio meeting automation guide",
+                "source_type": "audio",
+                "instruction": "Use this transcript summary when writing Notion task actions.",
+                "extracted_text": "When the meeting says design review, create a Figma checklist and a calendar event.",
+                "tags": ["audio", "figma", "calendar"],
+            },
+        )
+        assert knowledge.status_code == 200
+        assert client.get("/api/knowledge", headers=headers).json()["sources"][0]["sourceType"] == "audio"
+        user_rag = client.post("/api/knowledge/rag", headers=headers, json={"question": "design review Figma calendar"}).json()
+        assert "Audio meeting automation guide" in user_rag["sources"]
+
         created = client.post(
             "/api/posts",
             headers=headers,

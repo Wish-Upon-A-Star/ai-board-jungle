@@ -32,6 +32,14 @@ class QuestionIn(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
 
 
+class KnowledgeIn(BaseModel):
+    title: str = Field(min_length=2, max_length=180)
+    source_type: str = Field(default="document", max_length=40)
+    instruction: str = Field(default="", max_length=4000)
+    extracted_text: str = Field(default="", max_length=20000)
+    tags: list[str] = []
+
+
 class CustomConnectionIn(BaseModel):
     label: str = Field(min_length=1, max_length=80)
     service: str = Field(min_length=1, max_length=80)

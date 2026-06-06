@@ -85,6 +85,7 @@ a:hover { color: #0086d1; }
 .preset-actions button { padding: 4px 8px; }
 .connection-builder { display: grid; gap: 8px; border: 1px solid #e2e2e2; padding: 10px; background: #fcfcfc; }
 .profile-settings-box { border: 1px solid #d7e7f7; padding: 10px; background: #f8fbff; }
+.subtle { color: #888; font-weight: 400; }
 .section-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 .section-head strong { display: block; color: #333; margin-bottom: 3px; }
 .section-head span { display: block; color: #777; line-height: 1.45; }
@@ -97,6 +98,17 @@ a:hover { color: #0086d1; }
 .connection-title strong { color: #333; }
 .connection-title .danger { width: 74px; border-color: #c7372f; color: #c7372f; }
 .quick-inputs { margin-top: 2px; }
+.knowledge-form { display: grid; gap: 8px; padding: 10px; border-bottom: 1px solid #eee; }
+.file-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.file-row button { width: 108px; border-color: #1687c9; color: #1687c9; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.file-picker { width: 92px; border: 1px solid #cfcfcf; padding: 6px 8px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; }
+.file-picker input { display: none; }
+.file-row span { color: #777; flex: 1 1 260px; line-height: 1.5; }
+.knowledge-list { display: grid; gap: 8px; padding: 10px; }
+.knowledge-item { border: 1px solid #e2e2e2; padding: 9px; }
+.knowledge-item strong { display: block; color: #333; margin-bottom: 4px; }
+.knowledge-item span { display: block; color: #2780c2; margin-bottom: 5px; }
+.knowledge-item p { margin: 0; color: #555; line-height: 1.5; }
 .api-console { display: grid; gap: 8px; padding: 10px; }
 .api-console textarea { min-height: 68px; }
 .api-buttons { display: flex; flex-wrap: wrap; gap: 6px; }

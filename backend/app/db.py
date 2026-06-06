@@ -87,3 +87,19 @@ def init_db() -> None:
             for column, ddl in task_additions.items():
                 if column not in task_columns:
                     conn.execute(text(f"ALTER TABLE automation_tasks ADD COLUMN {column} {ddl}"))
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS knowledge_sources (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    title VARCHAR(180) NOT NULL,
+                    source_type VARCHAR(40) DEFAULT 'document' NOT NULL,
+                    file_name VARCHAR(240) DEFAULT '' NOT NULL,
+                    mime_type VARCHAR(120) DEFAULT '' NOT NULL,
+                    instruction TEXT DEFAULT '' NOT NULL,
+                    extracted_text TEXT DEFAULT '' NOT NULL,
+                    tags_json TEXT DEFAULT '[]' NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            ))
