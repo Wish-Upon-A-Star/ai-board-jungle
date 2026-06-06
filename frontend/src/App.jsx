@@ -141,6 +141,7 @@ function App() {
   const [authForm, setAuthForm] = useState({ email: "admin@example.com", name: "새 사용자", password: "password123" });
   const [posts, setPosts] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [runHistory, setRunHistory] = useState({});
   const [integrationProfiles, setIntegrationProfiles] = useState([]);
   const [providerReadiness, setProviderReadiness] = useState([]);
   const [integrationActivities, setIntegrationActivities] = useState([]);
@@ -417,6 +418,26 @@ function App() {
     }
   }
 
+  async function loadTaskRuns(task, offset = 0, append = false) {
+    setError("");
+    try {
+      const data = await api(`/api/automations/${task.id}/runs?limit=5&offset=${offset}`);
+      setRunHistory((current) => ({
+        ...current,
+        [task.id]: {
+          ...data,
+          runs: append ? [...(current[task.id]?.runs || []), ...data.runs] : data.runs,
+        },
+      }));
+      setApiResult({ called: "automation.runs", response: data });
+      setSideTab("api");
+    } catch (err) {
+      setError(err.message);
+      setApiResult({ called: "automation.runs", error: err.message });
+      setSideTab("api");
+    }
+  }
+
   async function callApiDemo(kind) {
     setError("");
     try {
@@ -653,9 +674,28 @@ function App() {
                       <div><dt>지침</dt><dd>{task.instruction}</dd></div>
                     </dl>
                     <div className="task-actions">
-                      <button onClick={() => runTask(task)}><Play size={14} /> 실행</button>
-                      <button onClick={() => shareTask(task)} className="secondary"><Share2 size={14} /> 게시판 공유</button>
+                      <button onClick={() => runTask(task)}><Play size={14} /> Run</button>
+                      <button onClick={() => shareTask(task)} className="secondary"><Share2 size={14} /> Share</button>
+                      <button onClick={() => loadTaskRuns(task)} className="secondary"><Database size={14} /> Run history</button>
                     </div>
+                    {runHistory[task.id] ? (
+                      <div className="run-history">
+                        <div className="run-history-head">
+                          <strong>Run history</strong>
+                          <span>{runHistory[task.id].runs.length} / {runHistory[task.id].total}</span>
+                        </div>
+                        {runHistory[task.id].runs.map((run) => (
+                          <div key={run.id} className="run-row">
+                            <span>#{run.id}</span>
+                            <span>{run.createdAt}</span>
+                            <p>{run.result}</p>
+                          </div>
+                        ))}
+                        {runHistory[task.id].hasMore ? (
+                          <button type="button" className="load-more" onClick={() => loadTaskRuns(task, runHistory[task.id].nextOffset, true)}>Load more runs</button>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </section>
                 ))}
               </div>

@@ -11,6 +11,7 @@
 - 통합 활동 로그는 `limit`, `offset`, `total`, `nextOffset`, `hasMore` 기반 페이지네이션과 UI 더보기를 지원합니다.
 - 통합 활동 로그는 `dry_run=true/false` 필터와 `Real-write audit` 프리셋으로 실제 외부 쓰기만 감시할 수 있습니다.
 - 활동 로그, RAG 지식자료, 자동화 실행 이력에는 owner/filter/sort 기준 복합 인덱스를 적용해 고용량 조회를 대비합니다.
+- 자동화별 실행 이력은 `/api/automations/{task_id}/runs`에서 `limit`, `offset`, `total`, `nextOffset`, `hasMore`로 페이지네이션됩니다.
 
 ## 운영 Secret/KMS 설정
 

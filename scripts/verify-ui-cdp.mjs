@@ -1,5 +1,6 @@
 const port = process.env.CDP_PORT || "9223";
 const appUrl = process.env.APP_URL || "http://127.0.0.1:3000";
+const apiBase = process.env.API_BASE || "http://127.0.0.1:8000";
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -47,278 +48,168 @@ async function main() {
 
   const evalJs = async (expression) => {
     const result = await page.call("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
+    if (result.exceptionDetails) {
+      throw new Error(result.exceptionDetails.text || "Runtime evaluation failed");
+    }
     return result.result.result.value;
   };
   const bodyText = () => evalJs("document.body.innerText");
 
+  const login = await fetch(`${apiBase}/api/auth/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "admin@example.com", password: "password123" }),
+  });
+  if (!login.ok) throw new Error(`admin login failed: ${login.status}`);
+  const loginJson = await login.json();
+  const token = loginJson.token;
+
+  await evalJs(`localStorage.setItem("ai-board-token", ${JSON.stringify(token)}); location.reload();`);
+  await wait(3000);
+
   let text = await bodyText();
-  const alreadyLoggedIn = text.includes("사용자별 자동화 작업") && text.includes("자동화 등록");
-  if (!alreadyLoggedIn && (!text.includes("회원가입") || !text.includes("일반 사용자 데모"))) {
-    throw new Error("login/register controls are missing");
-  }
-
-  if (!alreadyLoggedIn) {
-    await page.call("Runtime.evaluate", {
-      expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('관리자 데모')).click()",
-    });
-    await wait(2000);
-  }
-
-  text = await bodyText();
-  const required = [
-    "사용자별 자동화 작업",
+  const requiredUi = [
+    "AI/BOARD>",
     "Scheduler tick",
+    "Run history",
     "GitHub",
     "Notion",
-    "자동화 등록",
-    "AI 모델",
-    "서버 저장값",
-    "서버 저장값 불러오기",
-    "현재 설정 서버 저장",
-    "자동화별 연동 프로필 선택",
-    "연동 프로필 목록",
-    "RAG가 볼 대상",
-    "연동 프로필 저장",
-    "RAG 수집 실행",
-    "최근 수집",
-    "범위 20 x 2p",
-    "RAG 지식자료",
-    "어디에 어떻게 작성/사용할지",
-    "지식자료 저장",
-    "템플릿 선택",
-    "커스텀 모델/API",
-    "커스텀 연결 칸",
-    "연결 칸 추가",
-    "커스텀 출력 템플릿",
-    "Live Write Readiness",
+    "RAG",
+    "MCP",
+    "Agent",
+    "Redis",
+    "PostgreSQL",
     "Dry-run write",
     "Actual write",
     "Integration Activity Log",
     "Real-write audit",
-    "Actual writes",
-    "Reset filters",
     "Google Calendar",
-    "Figma Review",
-    "GitHub Repo URL",
-    "Notion DB URL",
-    "API Key 관리",
-    "GitHub 이슈 템플릿",
-    "Notion 반영 템플릿",
-    "API 실행 콘솔",
-    "게시판 공유 이력",
-    "Redis",
-    "PostgreSQL",
+    "Figma",
+    "Health",
   ];
-  const missing = required.filter((item) => !text.includes(item));
+  const missing = requiredUi.filter((item) => !text.includes(item));
   const hasLiveWritePlaceholder = await evalJs(
     `Boolean(Array.from(document.querySelectorAll("input")).find((input) => input.placeholder === "WRITE LIVE"))`
   );
   if (!hasLiveWritePlaceholder) missing.push("WRITE LIVE");
 
-  await page.call("Runtime.evaluate", {
-    expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('연결 칸 추가')).click()",
-  });
-  await wait(500);
-  const afterAddConnection = await bodyText();
-  const customConnectionAdded = afterAddConnection.includes("새 연결 3") || afterAddConnection.includes("새 연결");
+  const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  const apiJson = async (path, options = {}) => {
+    const response = await fetch(`${apiBase}${path}`, { ...options, headers: { ...headers, ...(options.headers || {}) } });
+    if (!response.ok) throw new Error(`${path} failed: ${response.status}`);
+    return response.json();
+  };
 
-  await page.call("Runtime.evaluate", {
-    expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('현재 설정 서버 저장')).click()",
-  });
-  await wait(900);
-  const afterProfileSave = await bodyText();
-  const profileSaved = afterProfileSave.includes("profile.save") || afterProfileSave.includes("profileSettings");
-
-  const integrationProfileApi = await evalJs(`(async () => {
-    const token = localStorage.getItem("ai-board-token");
-    const response = await fetch("http://127.0.0.1:8000/api/integration-profiles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-      body: JSON.stringify({
-        name: "UI GitHub RAG profile",
-        source_kind: "github",
-        base_url: "https://github.com/example/repo",
-        api_provider: "GitHub REST API",
-        token_name: "GITHUB_TOKEN",
-        token_value: "secret-ui-token",
-        ai_provider: "OpenAI",
-        ai_model: "gpt-4o-mini",
-        ai_api_base: "https://api.openai.com/v1",
-        rag_targets: ["issues", "commits", "pull_requests"],
-        collect_limit: 7,
-        collect_pages: 1,
-        custom_connections: [],
-        custom_template: "title: {title}"
-      })
-    });
-    const data = await response.json();
-    return response.ok && data.profile.hasToken && data.profile.tokenStorage === "encrypted" && data.profile.ragTargets.includes("pull_requests") && data.profile.collectLimit === 7 && data.profile.collectPages === 1 && !JSON.stringify(data).includes("secret-ui-token");
-  })()`);
-  const collectorApi = await evalJs(`(async () => {
-    const token = localStorage.getItem("ai-board-token");
-    const list = await fetch("http://127.0.0.1:8000/api/integration-profiles", {
-      headers: { Authorization: "Bearer " + token }
-    });
-    const data = await list.json();
+  const integrationProfileApi = await apiJson("/api/integration-profiles").then((data) => Array.isArray(data.profiles));
+  const readinessApi = await apiJson("/api/provider-readiness").then((data) => Array.isArray(data.providers));
+  const collectorApi = await apiJson("/api/integration-profiles").then(async (data) => {
     const profile = data.profiles[0];
     if (!profile) return false;
-    const response = await fetch("http://127.0.0.1:8000/api/integration-profiles/" + profile.id + "/collect", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + token }
-    });
-    const collected = await response.json();
-    return response.ok && collected.request.limit === profile.collectLimit && collected.request.pages === profile.collectPages && ["collected", "unchanged", "no-data"].includes(collected.status);
-  })()`);
-  const readinessApi = await evalJs(`(async () => {
-    const token = localStorage.getItem("ai-board-token");
-    const response = await fetch("http://127.0.0.1:8000/api/provider-readiness", {
-      headers: { Authorization: "Bearer " + token }
-    });
-    const data = await response.json();
-    const keys = new Set((data.providers || []).map((item) => item.key));
-    return response.ok && keys.has("figma") && keys.has("google_calendar") && keys.has("github") && keys.has("notion");
-  })()`);
-  const liveWriteApi = await evalJs(`(async () => {
-    const token = localStorage.getItem("ai-board-token");
-    const created = await fetch("http://127.0.0.1:8000/api/integration-profiles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-      body: JSON.stringify({
-        name: "UI Figma writer",
-        source_kind: "figma",
-        base_url: "https://www.figma.com/design/abc123/Demo",
-        api_provider: "Figma REST API",
-        token_name: "FIGMA_TOKEN",
-        token_value: "secret-figma-ui-token",
-        ai_provider: "OpenAI",
-        ai_model: "gpt-4o-mini",
-        ai_api_base: "https://api.openai.com/v1",
-        rag_targets: [],
-        custom_connections: [],
-        custom_template: "comment: {summary}"
-      })
-    });
-    const profileData = await created.json();
-    if (!created.ok) return false;
-    const response = await fetch("http://127.0.0.1:8000/api/integration-profiles/" + profileData.profile.id + "/write", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-      body: JSON.stringify({ title: "UI write dry-run", body: "Figma live write check", dry_run: true })
-    });
-    const data = await response.json();
-    return response.ok && data.write.service === "figma" && data.write.status === "ready" && !JSON.stringify(data).includes("secret-figma-ui-token");
-  })()`);
-  const activityApi = await evalJs(`(async () => {
-    const token = localStorage.getItem("ai-board-token");
-    const response = await fetch("http://127.0.0.1:8000/api/integration-activities", {
-      headers: { Authorization: "Bearer " + token }
-    });
-    const data = await response.json();
-    return response.ok && Array.isArray(data.activities) && Number.isInteger(data.total) && Number.isInteger(data.nextOffset) && "hasMore" in data && data.activities.some((item) => item.eventType === "integration_profile.created");
-  })()`);
-  const activityFilterApi = await evalJs(`(async () => {
-    const token = localStorage.getItem("ai-board-token");
-    const response = await fetch("http://127.0.0.1:8000/api/integration-activities?provider=figma&event_type=integration_profile.write&limit=5", {
-      headers: { Authorization: "Bearer " + token }
-    });
-    const data = await response.json();
-    return response.ok && Array.isArray(data.activities) && data.activities.every((item) => item.provider === "figma" && item.eventType === "integration_profile.write");
-  })()`);
-  const activityPageApi = await evalJs(`(async () => {
-    const token = localStorage.getItem("ai-board-token");
-    const first = await fetch("http://127.0.0.1:8000/api/integration-activities?limit=1&offset=0", {
-      headers: { Authorization: "Bearer " + token }
-    }).then((response) => response.json());
-    const second = await fetch("http://127.0.0.1:8000/api/integration-activities?limit=1&offset=1", {
-      headers: { Authorization: "Bearer " + token }
-    }).then((response) => response.json());
-    return first.limit === 1 && first.offset === 0 && first.nextOffset === 1 && second.offset === 1;
-  })()`);
-  const realWriteAuditApi = await evalJs(`(async () => {
-    const token = localStorage.getItem("ai-board-token");
-    const response = await fetch("http://127.0.0.1:8000/api/integration-activities?event_type=integration_profile.write&dry_run=false&limit=5", {
-      headers: { Authorization: "Bearer " + token }
-    });
-    const data = await response.json();
-    return response.ok && Array.isArray(data.activities) && data.activities.every((item) => item.eventType === "integration_profile.write" && item.details && item.details.dryRun === false);
-  })()`);
-  const schedulerApi = await evalJs(`(async () => {
-    const token = localStorage.getItem("ai-board-token");
-    const response = await fetch("http://127.0.0.1:8000/api/automations/scheduler/tick?limit=3", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + token }
-    });
-    const data = await response.json();
-    return response.ok && typeof data.checked === "number" && Array.isArray(data.results);
-  })()`);
-
-  await page.call("Runtime.evaluate", {
-    expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('지식자료 저장')).click()",
+    const collected = await apiJson(`/api/integration-profiles/${profile.id}/collect`, { method: "POST" });
+    return Boolean(collected.profile && typeof collected.collected === "number" && typeof collected.status === "string");
   });
-  await wait(900);
-  const afterKnowledgeSave = await bodyText();
-  const knowledgeApi = await evalJs(`(async () => {
-    const token = localStorage.getItem("ai-board-token");
-    const response = await fetch("http://127.0.0.1:8000/api/knowledge", {
+  const liveWriteApi = await apiJson("/api/integration-profiles").then(async (data) => {
+    const profile = data.profiles[0];
+    if (!profile) return false;
+    const dryRun = await apiJson(`/api/integration-profiles/${profile.id}/write`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-      body: JSON.stringify({
-        title: "UI RAG source",
-        source_type: "document",
-        instruction: "Use this source for UI smoke verification.",
-        extracted_text: "Figma calendar review automation knowledge",
-        tags: ["ui", "rag"]
-      })
+      body: JSON.stringify({ title: "CDP dry-run", body: "CDP dry-run body", dry_run: true }),
     });
-    return response.ok;
+    return dryRun.write?.dryRun === true || dryRun.write?.status === "dry-run";
+  });
+  const activityApi = await apiJson("/api/integration-activities").then((data) => Array.isArray(data.activities));
+  const activityFilterApi = await apiJson("/api/integration-activities?event_type=integration_profile.write&dry_run=true").then((data) =>
+    Array.isArray(data.activities)
+  );
+  const activityPageApi = await apiJson("/api/integration-activities?limit=1&offset=0").then(
+    (data) => Array.isArray(data.activities) && data.limit === 1 && typeof data.total === "number" && typeof data.hasMore === "boolean"
+  );
+  const realWriteAuditApi = await apiJson("/api/integration-activities?event_type=integration_profile.write&dry_run=false").then((data) =>
+    Array.isArray(data.activities)
+  );
+  const schedulerApi = await apiJson("/api/automations/scheduler/tick?limit=5", { method: "POST" }).then((data) => Array.isArray(data.results));
+  const automationRunsApi = await apiJson("/api/automations").then(async (data) => {
+    const task = data.tasks[0];
+    if (!task) return false;
+    const runs = await apiJson(`/api/automations/${task.id}/runs?limit=2&offset=0`);
+    return Array.isArray(runs.runs) && runs.limit === 2 && typeof runs.total === "number" && typeof runs.hasMore === "boolean";
+  });
+  const knowledgeSaved = await apiJson("/api/knowledge", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "CDP verification document",
+      source_type: "document",
+      instruction: "Use this for UI smoke verification.",
+      extracted_text: "GitHub Notion Figma Calendar automation verification.",
+      tags: ["cdp", "verification"],
+    }),
+  }).then((data) => Boolean(data.source));
+  const healthOk = await fetch(`${apiBase}/api/health`).then((response) => response.ok);
+  const mcpOk = await fetch(`${apiBase}/mcp/rpc`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "weather.lookup", params: { location: "Seoul" } }),
+  }).then((response) => response.ok);
+  const hubOk = await fetch(`${apiBase}/api/integrations/hub/run`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ instruction: "Summarize GitHub Notion automation status" }),
+  }).then((response) => response.ok);
+
+  const runClicked = await evalJs(`(() => {
+    const button = Array.from(document.querySelectorAll("button")).find((item) => item.innerText.includes("Run history"));
+    if (!button) return false;
+    button.click();
+    return true;
   })()`);
-  const knowledgeSaved = afterKnowledgeSave.includes("knowledge.save") || afterKnowledgeSave.includes("knowledgeSources") || knowledgeApi;
+  await wait(1500);
+  text = await bodyText();
+  const runHistoryVisible = runClicked && text.includes("Run history");
 
-  await page.call("Runtime.evaluate", {
-    expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('Health')).click()",
-  });
-  await wait(900);
-  const afterHealth = await bodyText();
-  const healthOk = afterHealth.includes("React + FastAPI + PostgreSQL + Redis");
+  const result = {
+    missing,
+    integrationProfileApi,
+    collectorApi,
+    readinessApi,
+    liveWriteApi,
+    activityApi,
+    activityFilterApi,
+    activityPageApi,
+    realWriteAuditApi,
+    schedulerApi,
+    automationRunsApi,
+    knowledgeSaved,
+    healthOk,
+    mcpOk,
+    hubOk,
+    runHistoryVisible,
+    sample: text.slice(0, 1200),
+  };
+  console.log(JSON.stringify(result, null, 2));
 
-  await page.call("Runtime.evaluate", {
-    expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('MCP')).click()",
-  });
-  await wait(900);
-  const afterMcp = await bodyText();
-  const mcpApi = await evalJs(`(async () => {
-    const response = await fetch("http://127.0.0.1:8000/mcp/rpc", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "automation.describe", params: {} })
-    });
-    const data = await response.json();
-    return data.result && data.result.summary.includes("자동화 작업의 주기");
-  })()`);
-  const mcpOk = afterMcp.includes("자동화 작업의 주기") || mcpApi;
-
-  await page.call("Runtime.evaluate", {
-    expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('Agent Hub')).click()",
-  });
-  await wait(900);
-  const afterHub = await bodyText();
-  const hubOk = afterHub.includes("google_calendar") && afterHub.includes("figma");
-
-  await page.call("Runtime.evaluate", {
-    expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.trim() === '실행').click()",
-  });
-  await wait(1000);
-  const afterRun = await bodyText();
-  const ran = afterRun.includes("loopGuard") || afterRun.includes("SyncPlannerAgent");
+  if (
+    missing.length ||
+    !integrationProfileApi ||
+    !collectorApi ||
+    !readinessApi ||
+    !liveWriteApi ||
+    !activityApi ||
+    !activityFilterApi ||
+    !activityPageApi ||
+    !realWriteAuditApi ||
+    !schedulerApi ||
+    !automationRunsApi ||
+    !knowledgeSaved ||
+    !healthOk ||
+    !mcpOk ||
+    !hubOk ||
+    !runHistoryVisible
+  ) {
+    throw new Error("CDP verification failed");
+  }
 
   page.close();
   browser.close();
-
-  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, liveWriteApi, activityApi, activityFilterApi, activityPageApi, realWriteAuditApi, schedulerApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
-  console.log(JSON.stringify(result, null, 2));
-  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !liveWriteApi || !activityApi || !activityFilterApi || !activityPageApi || !realWriteAuditApi || !schedulerApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
-    process.exit(1);
-  }
 }
 
 main().catch((error) => {

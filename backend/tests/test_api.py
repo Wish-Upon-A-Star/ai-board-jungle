@@ -334,6 +334,13 @@ def test_full_fastapi_flow(monkeypatch):
         assert second_run.status_code == 200
         assert second_run.json()["run"]["result"]["status"] == "skipped"
         assert second_run.json()["run"]["result"]["scheduled"] is False
+        run_history = client.get(f"/api/automations/{task_id}/runs?limit=1&offset=0", headers=headers).json()
+        assert run_history["task"]["id"] == task_id
+        assert run_history["limit"] == 1
+        assert run_history["offset"] == 0
+        assert run_history["total"] == 1
+        assert run_history["runs"][0]["taskId"] == task_id
+        assert run_history["hasMore"] is False
         assert client.post(f"/api/automations/{task_id}/share", headers=headers).status_code == 200
         run_activities = client.get("/api/integration-activities", headers=headers).json()["activities"]
         assert any(item["eventType"] == "automation.run" and item["status"] == "changed" for item in run_activities)
@@ -474,6 +481,8 @@ def test_regular_user_only_sees_own_automations():
 
         forbidden = client.post(f"/api/automations/{admin_task.json()['task']['id']}/run", headers=user_headers)
         assert forbidden.status_code == 403
+        forbidden_runs = client.get(f"/api/automations/{admin_task.json()['task']['id']}/runs", headers=user_headers)
+        assert forbidden_runs.status_code == 403
 
         forbidden_profile_use = client.post(
             "/api/automations",

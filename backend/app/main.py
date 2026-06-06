@@ -94,6 +94,17 @@ def serialize_activity(activity: IntegrationActivity) -> dict:
     }
 
 
+def serialize_run(run: AutomationRun) -> dict:
+    return {
+        "id": run.id,
+        "taskId": run.task_id,
+        "ownerId": run.owner_id,
+        "result": run.result,
+        "createdPostId": run.created_post_id,
+        "createdAt": str(run.created_at),
+    }
+
+
 def log_activity(
     db: Session,
     user: User,
@@ -283,7 +294,7 @@ def serialize_task(task: AutomationTask) -> dict:
         "lastInputHash": task.last_input_hash,
         "lastRunAt": str(task.last_run_at) if task.last_run_at else None,
         "createdAt": str(task.created_at),
-        "runs": [{"id": run.id, "result": run.result, "createdPostId": run.created_post_id, "createdAt": str(run.created_at)} for run in task.runs[-5:]],
+        "runs": [serialize_run(run) for run in task.runs[-5:]],
     }
 
 
@@ -802,6 +813,43 @@ def run_automation(task_id: int, user: User = Depends(current_user), db: Session
     if task.owner_id != user.id and user.role != "ADMIN":
         raise HTTPException(status_code=403, detail="You do not have permission to run this automation.")
     return execute_automation_task(db, task, user, scheduled=False)
+
+
+@app.get("/api/automations/{task_id}/runs")
+def list_automation_runs(
+    task_id: int,
+    limit: int = 10,
+    offset: int = 0,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    task = db.get(AutomationTask, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Automation task not found.")
+    if task.owner_id != user.id and user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="You do not have permission to view this automation history.")
+    safe_limit = max(1, min(limit, 50))
+    safe_offset = max(0, offset)
+    filters = [AutomationRun.task_id == task.id]
+    total = db.scalar(select(func.count()).select_from(AutomationRun).where(*filters)) or 0
+    stmt = (
+        select(AutomationRun)
+        .where(*filters)
+        .order_by(AutomationRun.created_at.desc(), AutomationRun.id.desc())
+        .offset(safe_offset)
+        .limit(safe_limit)
+    )
+    runs = [serialize_run(run) for run in db.scalars(stmt).all()]
+    next_offset = safe_offset + len(runs)
+    return {
+        "task": {"id": task.id, "name": task.name},
+        "runs": runs,
+        "total": total,
+        "limit": safe_limit,
+        "offset": safe_offset,
+        "nextOffset": next_offset,
+        "hasMore": next_offset < total,
+    }
 
 
 @app.post("/api/automations/scheduler/tick")

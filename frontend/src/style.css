@@ -168,6 +168,12 @@ a:hover { color: #0086d1; }
 .task-actions { display: flex; gap: 6px; margin-top: 10px; }
 .task-actions button:first-child { border-color: #1687c9; color: #1687c9; }
 .task-actions .secondary { color: #555; }
+.run-history { display: grid; gap: 6px; margin-top: 10px; border-top: 1px solid #f0f0f0; padding-top: 8px; }
+.run-history-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #444; }
+.run-history-head span { color: #666; font-size: 12px; }
+.run-row { display: grid; grid-template-columns: 60px 170px minmax(0, 1fr); gap: 8px; align-items: start; border: 1px solid #e8e8e8; background: #fafafa; padding: 7px; }
+.run-row span { color: #2780c2; font-size: 12px; }
+.run-row p { margin: 0; color: #444; font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; max-height: 100px; overflow: auto; }
 
 .result-panel { background: #fff; }
 .tabs { display: flex; justify-content: flex-end; border-bottom: 1px solid #ddd; margin-bottom: 14px; }
@@ -202,4 +208,5 @@ pre { margin: 0; padding: 10px; border: 1px solid #e2e2e2; background: #fafafa; 
   .scheduler-bar { align-items: flex-start; flex-direction: column; }
   .live-write-controls { grid-template-columns: 1fr; }
   .live-write-controls button { width: 100%; }
+  .run-row { grid-template-columns: 1fr; }
 }
