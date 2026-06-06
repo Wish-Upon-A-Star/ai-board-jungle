@@ -138,6 +138,7 @@ function App() {
   const [posts, setPosts] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [integrationProfiles, setIntegrationProfiles] = useState([]);
+  const [providerReadiness, setProviderReadiness] = useState([]);
   const [knowledgeSources, setKnowledgeSources] = useState([]);
   const [selected, setSelected] = useState(null);
   const [q, setQ] = useState("");
@@ -251,16 +252,18 @@ function App() {
   }
 
   async function loadAll(query = q) {
-    const [postData, taskData, knowledgeData, profileData] = await Promise.all([
+    const [postData, taskData, knowledgeData, profileData, readinessData] = await Promise.all([
       api(`/api/posts?q=${encodeURIComponent(query)}`),
       api("/api/automations"),
       api("/api/knowledge"),
       api("/api/integration-profiles"),
+      api("/api/provider-readiness"),
     ]);
     setPosts(postData.posts);
     setTasks(taskData.tasks);
     setKnowledgeSources(knowledgeData.sources);
     setIntegrationProfiles(profileData.profiles);
+    setProviderReadiness(readinessData.providers);
     if (!selected && postData.posts[0]) setSelected(postData.posts[0]);
   }
 
@@ -701,6 +704,8 @@ function App() {
                     <select value={integrationForm.source_kind} onChange={(e) => setIntegrationForm({ ...integrationForm, source_kind: e.target.value })}>
                       <option value="github">GitHub</option>
                       <option value="notion">Notion</option>
+                      <option value="figma">Figma</option>
+                      <option value="google_calendar">Google Calendar</option>
                       <option value="gitlab">GitLab</option>
                       <option value="jira">Jira</option>
                       <option value="slack">Slack</option>
@@ -724,6 +729,16 @@ function App() {
                 <button><KeyRound size={14} /> 연동 프로필 저장</button>
               </form>
               <div className="knowledge-list">
+                <div className="provider-grid">
+                  {providerReadiness.map((provider) => (
+                    <div key={provider.key} className={provider.ready ? "provider-card ready" : "provider-card missing"}>
+                      <strong>{provider.name}</strong>
+                      <span>Live Write Readiness: {provider.ready ? "ready" : "setup required"} / {provider.readyCount}/{provider.profileCount}</span>
+                      <p>{provider.requiredUrl} / {provider.requiredToken} / {provider.operation}</p>
+                      <small>{provider.nextAction}</small>
+                    </div>
+                  ))}
+                </div>
                 {integrationProfiles.map((profile) => (
                   <div key={profile.id} className="knowledge-item">
                     <strong>{profile.name}</strong>

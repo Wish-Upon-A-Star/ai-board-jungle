@@ -100,6 +100,70 @@ def serialize_integration_profile(profile: IntegrationProfile) -> dict:
     }
 
 
+def provider_readiness(user: User, db: Session) -> list[dict]:
+    profiles = db.scalars(select(IntegrationProfile).where(IntegrationProfile.owner_id == user.id)).all()
+    providers = [
+        {
+            "key": "github",
+            "name": "GitHub Issues",
+            "requiredToken": "GITHUB_TOKEN",
+            "requiredUrl": "GitHub repository URL",
+            "operation": "issue_create_or_update / rag_collect_issues_commits_prs",
+        },
+        {
+            "key": "notion",
+            "name": "Notion Tasks DB",
+            "requiredToken": "NOTION_TOKEN",
+            "requiredUrl": "Notion database/page URL",
+            "operation": "upsert_task_page / rag_collect_pages",
+        },
+        {
+            "key": "figma",
+            "name": "Figma Review",
+            "requiredToken": "FIGMA_TOKEN",
+            "requiredUrl": "Figma file URL",
+            "operation": "create_review_comment",
+        },
+        {
+            "key": "google_calendar",
+            "name": "Google Calendar",
+            "requiredToken": "GOOGLE_CALENDAR_TOKEN",
+            "requiredUrl": "calendar id",
+            "operation": "create_event",
+        },
+    ]
+    results: list[dict] = []
+    for provider in providers:
+        key = provider["key"]
+        matches: list[IntegrationProfile] = []
+        for profile in profiles:
+            connections = parse_connections(profile.custom_connections)
+            has_connection = any(str(item.get("service", "")).lower() == key for item in connections)
+            if profile.source_kind == key or has_connection:
+                matches.append(profile)
+        ready_profiles = [profile for profile in matches if reveal_secret(profile.token_value) and profile.base_url]
+        results.append({
+            **provider,
+            "profileCount": len(matches),
+            "readyCount": len(ready_profiles),
+            "ready": bool(ready_profiles),
+            "profiles": [
+                {
+                    "id": profile.id,
+                    "name": profile.name,
+                    "sourceKind": profile.source_kind,
+                    "hasToken": bool(reveal_secret(profile.token_value)),
+                    "hasUrl": bool(profile.base_url),
+                    "tokenStorage": "encrypted" if profile.token_value.startswith("enc:v1:") else "legacy" if profile.token_value else "empty",
+                    "customConnections": [item.get("service", "custom") for item in parse_connections(profile.custom_connections)],
+                }
+                for profile in matches
+            ],
+            "nextAction": "ready" if ready_profiles else f"Add an integration profile with {provider['requiredUrl']} and {provider['requiredToken']}.",
+        })
+    return results
+
+
 async def extract_upload_text(upload: UploadFile | None) -> tuple[str, str, str]:
     if upload is None:
         return "", "", ""
@@ -221,6 +285,11 @@ def list_integration_profiles(user: User = Depends(current_user), db: Session = 
         select(IntegrationProfile).where(IntegrationProfile.owner_id == user.id).order_by(IntegrationProfile.created_at.desc())
     ).all()
     return {"profiles": [serialize_integration_profile(profile) for profile in profiles]}
+
+
+@app.get("/api/provider-readiness")
+def list_provider_readiness(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    return {"providers": provider_readiness(user, db)}
 
 
 @app.post("/api/integration-profiles")

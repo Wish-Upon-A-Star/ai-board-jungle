@@ -106,6 +106,13 @@ a:hover { color: #0086d1; }
 .file-picker input { display: none; }
 .file-row span { color: #777; flex: 1 1 260px; line-height: 1.5; }
 .knowledge-list { display: grid; gap: 8px; padding: 10px; }
+.provider-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.provider-card { border: 1px solid #e2e2e2; padding: 9px; background: #fff; }
+.provider-card.ready { border-color: #b7ead8; background: #fbfffc; }
+.provider-card.missing { border-color: #eadca8; background: #fffdf7; }
+.provider-card strong { display: block; margin-bottom: 4px; color: #333; }
+.provider-card span { display: block; margin-bottom: 5px; color: #2780c2; }
+.provider-card p, .provider-card small { display: block; margin: 0; color: #555; line-height: 1.5; }
 .knowledge-item { border: 1px solid #e2e2e2; padding: 9px; }
 .knowledge-item strong { display: block; color: #333; margin-bottom: 4px; }
 .knowledge-item span { display: block; color: #2780c2; margin-bottom: 5px; }
@@ -163,4 +170,5 @@ pre { margin: 0; padding: 10px; border: 1px solid #e2e2e2; background: #fafafa; 
   .row-title { display: block; }
   .search { width: 100%; margin-top: 8px; }
   .grid2, .grid3, .grid3.wide { grid-template-columns: 1fr; }
+  .provider-grid { grid-template-columns: 1fr; }
 }

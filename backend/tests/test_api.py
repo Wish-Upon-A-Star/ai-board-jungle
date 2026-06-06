@@ -106,19 +106,49 @@ def test_full_fastapi_flow(monkeypatch):
             assert stored_profile.token_value.startswith("enc:v1:")
             assert "ghp_secret_value" not in stored_profile.token_value
             assert reveal_secret(stored_profile.token_value) == "ghp_secret_value"
+        readiness = client.get("/api/provider-readiness", headers=headers)
+        assert readiness.status_code == 200
+        readiness_by_key = {item["key"]: item for item in readiness.json()["providers"]}
+        assert readiness_by_key["github"]["ready"] is True
+        assert readiness_by_key["figma"]["ready"] is False
+
+        figma_profile = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Figma review writer",
+                "source_kind": "figma",
+                "base_url": "https://www.figma.com/design/abc123/Demo",
+                "api_provider": "Figma REST API",
+                "token_name": "FIGMA_TOKEN",
+                "token_value": "figma_secret_value",
+                "ai_provider": "OpenAI",
+                "ai_model": "gpt-4o-mini",
+                "ai_api_base": "https://api.openai.com/v1",
+                "rag_targets": [],
+                "custom_template": "comment: {summary}",
+                "custom_connections": [],
+            },
+        )
+        assert figma_profile.status_code == 200
+        readiness_by_key = {item["key"]: item for item in client.get("/api/provider-readiness", headers=headers).json()["providers"]}
+        assert readiness_by_key["figma"]["ready"] is True
+        assert readiness_by_key["figma"]["profiles"][0]["tokenStorage"] == "encrypted"
         collected = client.post(f"/api/integration-profiles/{profile_json['id']}/collect?limit=20&pages=2", headers=headers)
         assert collected.status_code == 200
         assert collected.json()["status"] == "collected"
         assert collected.json()["request"] == {"limit": 20, "pages": 2}
         assert collected.json()["saved"][0]["sourceType"] == "github_issue"
-        after_collect_profile = client.get("/api/integration-profiles", headers=headers).json()["profiles"][0]
+        profiles_after_collect = client.get("/api/integration-profiles", headers=headers).json()["profiles"]
+        after_collect_profile = next(item for item in profiles_after_collect if item["id"] == profile_json["id"])
         assert after_collect_profile["lastCollect"]["status"] == "collected"
         assert after_collect_profile["lastCollect"]["saved"] == 1
         collected_again = client.post(f"/api/integration-profiles/{profile_json['id']}/collect?limit=20&pages=2", headers=headers)
         assert collected_again.status_code == 200
         assert collected_again.json()["status"] == "unchanged"
         assert collected_again.json()["skippedDuplicates"] == 1
-        after_duplicate_profile = client.get("/api/integration-profiles", headers=headers).json()["profiles"][0]
+        profiles_after_duplicate = client.get("/api/integration-profiles", headers=headers).json()["profiles"]
+        after_duplicate_profile = next(item for item in profiles_after_duplicate if item["id"] == profile_json["id"])
         assert after_duplicate_profile["lastCollect"]["status"] == "unchanged"
         assert after_duplicate_profile["lastCollect"]["skippedDuplicates"] == 1
 

@@ -89,6 +89,9 @@ async function main() {
     "커스텀 연결 칸",
     "연결 칸 추가",
     "커스텀 출력 템플릿",
+    "Live Write Readiness",
+    "Google Calendar",
+    "Figma Review",
     "GitHub Repo URL",
     "Notion DB URL",
     "API Key 관리",
@@ -153,6 +156,15 @@ async function main() {
     const collected = await response.json();
     return response.ok && collected.request.limit === 20 && collected.request.pages === 2 && ["collected", "unchanged", "no-data"].includes(collected.status);
   })()`);
+  const readinessApi = await evalJs(`(async () => {
+    const token = localStorage.getItem("ai-board-token");
+    const response = await fetch("http://127.0.0.1:8000/api/provider-readiness", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const data = await response.json();
+    const keys = new Set((data.providers || []).map((item) => item.key));
+    return response.ok && keys.has("figma") && keys.has("google_calendar") && keys.has("github") && keys.has("notion");
+  })()`);
 
   await page.call("Runtime.evaluate", {
     expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('지식자료 저장')).click()",
@@ -216,9 +228,9 @@ async function main() {
   page.close();
   browser.close();
 
-  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
+  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
   console.log(JSON.stringify(result, null, 2));
-  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
+  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
     process.exit(1);
   }
 }
