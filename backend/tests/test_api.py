@@ -10,10 +10,11 @@ from pathlib import Path
 os.environ["AI_BOARD_DATABASE_URL"] = "sqlite:///:memory:"
 
 from fastapi.testclient import TestClient
+from sqlalchemy import inspect
 
 from app.collectors import CollectedItem
 from app.config import settings
-from app.db import SessionLocal
+from app.db import SessionLocal, engine, init_db
 from app.main import app
 from app.models import AutomationTask, IntegrationProfile
 from app.security import reveal_secret
@@ -579,3 +580,31 @@ def test_sample_secret_adapter_roundtrip(tmp_path):
         check=True,
     )
     assert json.loads(revealed.stdout)["value"] == "sample_secret_value"
+
+
+def test_high_volume_query_indexes_exist():
+    init_db()
+    indexes = {
+        table: {item["name"] for item in inspect(engine).get_indexes(table)}
+        for table in [
+            "integration_activities",
+            "knowledge_sources",
+            "automation_tasks",
+            "automation_runs",
+            "integration_profiles",
+            "posts",
+        ]
+    }
+    assert {
+        "ix_activities_owner_created",
+        "ix_activities_owner_event_created",
+        "ix_activities_owner_provider_event",
+        "ix_activities_owner_status_created",
+        "ix_activities_owner_task_created",
+        "ix_activities_owner_profile_created",
+    } <= indexes["integration_activities"]
+    assert {"ix_knowledge_owner_created", "ix_knowledge_owner_type_file"} <= indexes["knowledge_sources"]
+    assert {"ix_tasks_owner_created", "ix_tasks_owner_status_created", "ix_tasks_status_created"} <= indexes["automation_tasks"]
+    assert {"ix_runs_task_created", "ix_runs_owner_created"} <= indexes["automation_runs"]
+    assert {"ix_profiles_owner_created", "ix_profiles_owner_source"} <= indexes["integration_profiles"]
+    assert {"ix_posts_status_created", "ix_posts_author_created"} <= indexes["posts"]

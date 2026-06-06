@@ -10,6 +10,7 @@
 - 자동화는 수동 실행과 `POST /api/automations/scheduler/tick` 예약 tick을 모두 지원하고, 입력 변경이 없으면 외부 API 실행을 skip합니다.
 - 통합 활동 로그는 `limit`, `offset`, `total`, `nextOffset`, `hasMore` 기반 페이지네이션과 UI 더보기를 지원합니다.
 - 통합 활동 로그는 `dry_run=true/false` 필터와 `Real-write audit` 프리셋으로 실제 외부 쓰기만 감시할 수 있습니다.
+- 활동 로그, RAG 지식자료, 자동화 실행 이력에는 owner/filter/sort 기준 복합 인덱스를 적용해 고용량 조회를 대비합니다.
 
 ## 운영 Secret/KMS 설정
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Table, Text, func
+from sqlalchemy import Column, DateTime, ForeignKey, Index, String, Table, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -42,6 +42,10 @@ class User(Base):
 
 class Post(Base):
     __tablename__ = "posts"
+    __table_args__ = (
+        Index("ix_posts_status_created", "status", "created_at"),
+        Index("ix_posts_author_created", "author_id", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(180), index=True)
@@ -60,6 +64,7 @@ class Post(Base):
 
 class Comment(Base):
     __tablename__ = "comments"
+    __table_args__ = (Index("ix_comments_post_created", "post_id", "created_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     content: Mapped[str] = mapped_column(Text)
@@ -80,6 +85,10 @@ class Tag(Base):
 
 class KnowledgeSource(Base):
     __tablename__ = "knowledge_sources"
+    __table_args__ = (
+        Index("ix_knowledge_owner_created", "owner_id", "created_at"),
+        Index("ix_knowledge_owner_type_file", "owner_id", "source_type", "file_name"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
@@ -96,6 +105,10 @@ class KnowledgeSource(Base):
 
 class IntegrationProfile(Base):
     __tablename__ = "integration_profiles"
+    __table_args__ = (
+        Index("ix_profiles_owner_created", "owner_id", "created_at"),
+        Index("ix_profiles_owner_source", "owner_id", "source_kind"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
@@ -126,6 +139,11 @@ class IntegrationProfile(Base):
 
 class AutomationTask(Base):
     __tablename__ = "automation_tasks"
+    __table_args__ = (
+        Index("ix_tasks_owner_created", "owner_id", "created_at"),
+        Index("ix_tasks_owner_status_created", "owner_id", "status", "created_at"),
+        Index("ix_tasks_status_created", "status", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(160), index=True)
@@ -167,6 +185,10 @@ class AutomationTask(Base):
 
 class AutomationRun(Base):
     __tablename__ = "automation_runs"
+    __table_args__ = (
+        Index("ix_runs_task_created", "task_id", "created_at"),
+        Index("ix_runs_owner_created", "owner_id", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     task_id: Mapped[int] = mapped_column(ForeignKey("automation_tasks.id", ondelete="CASCADE"))
@@ -179,6 +201,14 @@ class AutomationRun(Base):
 
 class IntegrationActivity(Base):
     __tablename__ = "integration_activities"
+    __table_args__ = (
+        Index("ix_activities_owner_created", "owner_id", "created_at", "id"),
+        Index("ix_activities_owner_event_created", "owner_id", "event_type", "created_at"),
+        Index("ix_activities_owner_provider_event", "owner_id", "provider", "event_type"),
+        Index("ix_activities_owner_status_created", "owner_id", "status", "created_at"),
+        Index("ix_activities_owner_task_created", "owner_id", "automation_task_id", "created_at"),
+        Index("ix_activities_owner_profile_created", "owner_id", "integration_profile_id", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))

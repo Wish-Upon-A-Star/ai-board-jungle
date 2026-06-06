@@ -163,3 +163,25 @@ def init_db() -> None:
                 )
                 """
             ))
+            index_statements = [
+                "CREATE INDEX IF NOT EXISTS ix_posts_status_created ON posts(status, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_posts_author_created ON posts(author_id, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_comments_post_created ON comments(post_id, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_owner_created ON knowledge_sources(owner_id, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_owner_type_file ON knowledge_sources(owner_id, source_type, file_name)",
+                "CREATE INDEX IF NOT EXISTS ix_profiles_owner_created ON integration_profiles(owner_id, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_profiles_owner_source ON integration_profiles(owner_id, source_kind)",
+                "CREATE INDEX IF NOT EXISTS ix_tasks_owner_created ON automation_tasks(owner_id, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_tasks_owner_status_created ON automation_tasks(owner_id, status, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_tasks_status_created ON automation_tasks(status, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_runs_task_created ON automation_runs(task_id, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_runs_owner_created ON automation_runs(owner_id, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_activities_owner_created ON integration_activities(owner_id, created_at, id)",
+                "CREATE INDEX IF NOT EXISTS ix_activities_owner_event_created ON integration_activities(owner_id, event_type, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_activities_owner_provider_event ON integration_activities(owner_id, provider, event_type)",
+                "CREATE INDEX IF NOT EXISTS ix_activities_owner_status_created ON integration_activities(owner_id, status, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_activities_owner_task_created ON integration_activities(owner_id, automation_task_id, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_activities_owner_profile_created ON integration_activities(owner_id, integration_profile_id, created_at)",
+            ]
+            for statement in index_statements:
+                conn.execute(text(statement))
