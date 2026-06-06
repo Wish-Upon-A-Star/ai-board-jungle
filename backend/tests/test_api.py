@@ -284,7 +284,12 @@ def test_full_fastapi_flow(monkeypatch):
         assert created.status_code == 200
         post_id = created.json()["post"]["id"]
 
-        assert client.get("/api/posts?q=GitHub").json()["total"] >= 1
+        post_page = client.get("/api/posts?q=GitHub&limit=1&offset=0").json()
+        assert post_page["total"] >= 1
+        assert post_page["limit"] == 1
+        assert post_page["offset"] == 0
+        assert post_page["nextOffset"] == len(post_page["posts"])
+        assert "hasMore" in post_page
         assert client.post(f"/api/posts/{post_id}/comments", headers=headers, json={"content": "checked"}).status_code == 200
         assert client.post("/api/ai/rag", json={"question": "GitHub Notion integration"}).status_code == 200
 

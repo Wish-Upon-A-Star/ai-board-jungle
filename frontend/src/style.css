@@ -72,6 +72,7 @@ a:hover { color: #0086d1; }
 .post-link.shared span::before { content: "AUTO "; color: #2563eb; font-size: 10px; font-weight: 700; }
 .post-link:hover { background: transparent; color: #007d61; text-decoration: underline; }
 .post-link small { color: #6aaed6; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; }
+.post-page-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; color: #666; font-size: 12px; }
 
 .write-form { display: grid; gap: 7px; }
 .write-form button { width: 64px; }

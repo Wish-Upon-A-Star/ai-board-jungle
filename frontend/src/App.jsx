@@ -178,6 +178,7 @@ function App() {
   const [authMode, setAuthMode] = useState("login");
   const [authForm, setAuthForm] = useState({ email: "admin@example.com", name: "새 사용자", password: "password123" });
   const [posts, setPosts] = useState([]);
+  const [postPage, setPostPage] = useState({ total: 0, limit: 8, offset: 0, nextOffset: 0, hasMore: false });
   const [tasks, setTasks] = useState([]);
   const [runHistory, setRunHistory] = useState({});
   const [expandedRuns, setExpandedRuns] = useState({});
@@ -356,7 +357,7 @@ function App() {
   async function loadAll(query = q, filters = activityFilters) {
     const activityPath = activityQuery(filters, 0);
     const [postData, taskData, knowledgeData, profileData, readinessData, activityData] = await Promise.all([
-      api(`/api/posts?q=${encodeURIComponent(query)}`),
+      api(`/api/posts?q=${encodeURIComponent(query)}&limit=${postPage.limit}&offset=0`),
       api("/api/automations"),
       api("/api/knowledge"),
       api("/api/integration-profiles"),
@@ -364,6 +365,13 @@ function App() {
       api(`/api/integration-activities${activityPath ? `?${activityPath}` : ""}`),
     ]);
     setPosts(postData.posts);
+    setPostPage({
+      total: postData.total || 0,
+      limit: postData.limit || postPage.limit,
+      offset: postData.offset || 0,
+      nextOffset: postData.nextOffset || 0,
+      hasMore: Boolean(postData.hasMore),
+    });
     setTasks(taskData.tasks);
     setDeleteConfirmTaskId((current) => (current && !taskData.tasks.some((task) => task.id === current) ? null : current));
     setKnowledgeSources(knowledgeData.sources);
@@ -381,6 +389,18 @@ function App() {
       if (!postData.posts.length) return null;
       if (!current) return postData.posts[0];
       return postData.posts.find((post) => post.id === current.id) || postData.posts[0];
+    });
+  }
+
+  async function loadMorePosts() {
+    const postData = await api(`/api/posts?q=${encodeURIComponent(q)}&limit=${postPage.limit}&offset=${postPage.nextOffset}`);
+    setPosts((current) => [...current, ...postData.posts]);
+    setPostPage({
+      total: postData.total || 0,
+      limit: postData.limit || postPage.limit,
+      offset: postData.offset || 0,
+      nextOffset: postData.nextOffset || 0,
+      hasMore: Boolean(postData.hasMore),
     });
   }
 
@@ -436,6 +456,7 @@ function App() {
     setProfileSettings(null);
     setTasks([]);
     setPosts([]);
+    setPostPage({ total: 0, limit: 8, offset: 0, nextOffset: 0, hasMore: false });
     setSelected(null);
     clearRunUiState();
     setDeleteConfirmTaskId(null);
@@ -1172,6 +1193,10 @@ function App() {
                     <small>{post.author.name} {post.tags.map((t) => `#${t.tag.name}`).join(" ")}</small>
                   </button>
                 ))}
+              </div>
+              <div className="post-page-row">
+                <span>{posts.length} / {postPage.total}</span>
+                {postPage.hasMore ? <button type="button" className="load-more" onClick={loadMorePosts}>Load more posts</button> : null}
               </div>
             </article>
           </section>

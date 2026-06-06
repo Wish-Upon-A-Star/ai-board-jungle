@@ -530,9 +530,21 @@ def write_integration_profile(profile_id: int, data: LiveWriteIn, user: User = D
 
 
 @app.get("/api/posts")
-def list_posts(q: str = "", page: int = 1, db: Session = Depends(get_db)) -> dict:
-    posts, total = search_posts(db, q, max(page, 1), 8)
-    return {"posts": [serialize_post(post) for post in posts], "total": total, "page": page, "take": 8}
+def list_posts(q: str = "", page: int = 1, limit: int = 8, offset: int | None = None, db: Session = Depends(get_db)) -> dict:
+    safe_limit = max(1, min(limit, 50))
+    safe_offset = max(0, offset if offset is not None else (max(page, 1) - 1) * safe_limit)
+    posts, total = search_posts(db, q, safe_offset, safe_limit)
+    next_offset = safe_offset + len(posts)
+    return {
+        "posts": [serialize_post(post) for post in posts],
+        "total": total,
+        "page": (safe_offset // safe_limit) + 1,
+        "take": safe_limit,
+        "limit": safe_limit,
+        "offset": safe_offset,
+        "nextOffset": next_offset,
+        "hasMore": next_offset < total,
+    }
 
 
 @app.post("/api/posts")

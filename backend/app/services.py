@@ -4,7 +4,7 @@ import json
 import re
 from hashlib import sha256
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from .cache import cache_get, cache_set
@@ -284,13 +284,16 @@ async def instruction_hub(instruction: str) -> dict:
     }
 
 
-def search_posts(db: Session, q: str, page: int, take: int) -> tuple[list[Post], int]:
+def search_posts(db: Session, q: str, offset: int, take: int) -> tuple[list[Post], int]:
     stmt = select(Post).order_by(Post.created_at.desc())
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(Post.title.ilike(like), Post.content.ilike(like)))
-    posts = db.scalars(stmt.offset((page - 1) * take).limit(take)).all()
-    all_count = len(db.scalars(stmt).all())
+    posts = db.scalars(stmt.offset(offset).limit(take)).all()
+    count_stmt = select(func.count()).select_from(Post)
+    if q:
+        count_stmt = count_stmt.where(or_(Post.title.ilike(like), Post.content.ilike(like)))
+    all_count = db.scalar(count_stmt) or 0
     return list(posts), all_count
 
 

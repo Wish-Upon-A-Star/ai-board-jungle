@@ -125,6 +125,9 @@ async function main() {
   const activityPageApi = await apiJson("/api/integration-activities?limit=1&offset=0").then(
     (data) => Array.isArray(data.activities) && data.limit === 1 && typeof data.total === "number" && typeof data.hasMore === "boolean"
   );
+  const postPageApi = await apiJson("/api/posts?limit=1&offset=0").then(
+    (data) => Array.isArray(data.posts) && data.limit === 1 && typeof data.total === "number" && typeof data.hasMore === "boolean"
+  );
   const realWriteAuditApi = await apiJson("/api/integration-activities?event_type=integration_profile.write&dry_run=false").then((data) =>
     Array.isArray(data.activities)
   );
@@ -201,6 +204,7 @@ async function main() {
     activityApi,
     activityFilterApi,
     activityPageApi,
+    postPageApi,
     realWriteAuditApi,
     schedulerApi,
     automationRunsApi,
@@ -225,6 +229,7 @@ async function main() {
     !activityApi ||
     !activityFilterApi ||
     !activityPageApi ||
+    !postPageApi ||
     !realWriteAuditApi ||
     !schedulerApi ||
     !automationRunsApi ||
