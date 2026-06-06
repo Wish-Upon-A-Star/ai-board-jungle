@@ -13,7 +13,7 @@ from .db import get_db, init_db
 from .live_writers import execute_profile_write
 from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, User
 from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LiveWriteIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
-from .security import create_token, current_user, hash_password, protect_secret, reveal_secret, secret_preview, verify_password
+from .security import create_token, current_user, hash_password, protect_secret, reveal_secret, secret_preview, secret_storage_type, verify_password
 from .services import agent_review, automation_fingerprint, automation_plan, get_or_create_tags, instruction_hub, rag_answer, result_to_text, search_posts, summarize
 
 app = FastAPI(title="AI Board API", description="React + FastAPI + PostgreSQL + Redis AI board API.")
@@ -130,7 +130,7 @@ def serialize_integration_profile(profile: IntegrationProfile) -> dict:
         "tokenName": profile.token_name,
         "hasToken": bool(token_plain),
         "tokenPreview": secret_preview(profile.token_value),
-        "tokenStorage": "encrypted" if profile.token_value.startswith("enc:v1:") else "legacy" if profile.token_value else "empty",
+        "tokenStorage": secret_storage_type(profile.token_value),
         "aiProvider": profile.ai_provider,
         "aiModel": profile.ai_model,
         "aiApiBase": profile.ai_api_base,
@@ -210,7 +210,7 @@ def provider_readiness(user: User, db: Session) -> list[dict]:
                     "sourceKind": profile.source_kind,
                     "hasToken": bool(reveal_secret(profile.token_value)),
                     "hasUrl": bool(profile_urls.get(profile.id)),
-                    "tokenStorage": "encrypted" if profile.token_value.startswith("enc:v1:") else "legacy" if profile.token_value else "empty",
+                    "tokenStorage": secret_storage_type(profile.token_value),
                     "customConnections": [item.get("service", "custom") for item in parse_connections(profile.custom_connections)],
                 }
                 for profile in matches

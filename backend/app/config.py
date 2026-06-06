@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/demo-fastapi.db"
     jwt_secret: str = "local-dev-secret-change-me"
     token_encryption_secret: str = ""
+    token_secret_provider: str = "local"
+    token_secret_command: str = ""
     openai_api_key: str = ""
     openai_chat_model: str = "gpt-4o-mini"
     openai_embedding_model: str = "text-embedding-3-small"

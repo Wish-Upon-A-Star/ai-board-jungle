@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from datetime import datetime, timedelta, timezone
 
 os.environ["AI_BOARD_DATABASE_URL"] = "sqlite:///:memory:"
@@ -8,6 +9,7 @@ os.environ["AI_BOARD_DATABASE_URL"] = "sqlite:///:memory:"
 from fastapi.testclient import TestClient
 
 from app.collectors import CollectedItem
+from app.config import settings
 from app.db import SessionLocal
 from app.main import app
 from app.models import AutomationTask, IntegrationProfile
@@ -464,3 +466,62 @@ def test_regular_user_only_sees_own_automations():
             },
         )
         assert forbidden_profile_use.status_code == 403
+
+
+def test_command_secret_provider_stores_external_references(monkeypatch, tmp_path):
+    script = tmp_path / "secret_command.py"
+    script.write_text(
+        "\n".join(
+            [
+                "import base64, json, sys",
+                "payload = json.loads(sys.stdin.read())",
+                "if payload['action'] == 'protect':",
+                "    value = 'vault:' + base64.urlsafe_b64encode(payload['value'].encode()).decode()",
+                "elif payload['action'] == 'reveal':",
+                "    value = base64.urlsafe_b64decode(payload['value'].removeprefix('vault:').encode()).decode()",
+                "else:",
+                "    raise SystemExit(2)",
+                "print(json.dumps({'value': value}))",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AI_BOARD_TOKEN_SECRET_PROVIDER", "command")
+    monkeypatch.setenv("AI_BOARD_TOKEN_SECRET_COMMAND", f'"{sys.executable}" "{script}"')
+    settings.cache_clear()
+    try:
+        with TestClient(app) as client:
+            register = client.post(
+                "/api/auth/register",
+                json={"email": "vault@example.com", "name": "Vault User", "password": "password123"},
+            )
+            assert register.status_code == 200
+            headers = {"Authorization": f"Bearer {register.json()['token']}"}
+            created = client.post(
+                "/api/integration-profiles",
+                headers=headers,
+                json={
+                    "name": "Vault GitHub",
+                    "source_kind": "github",
+                    "base_url": "https://github.com/acme/private-repo",
+                    "api_provider": "GitHub REST API",
+                    "token_name": "GITHUB_TOKEN",
+                    "token_value": "vault_secret_value",
+                    "rag_targets": ["issues"],
+                },
+            )
+            assert created.status_code == 200
+            profile = created.json()["profile"]
+            assert profile["tokenStorage"] == "external"
+            assert profile["hasToken"] is True
+            assert "vault_secret_value" not in str(profile)
+            with SessionLocal() as db:
+                stored = db.get(IntegrationProfile, profile["id"])
+                assert stored is not None
+                assert stored.token_value.startswith("cmd:v1:")
+                assert "vault_secret_value" not in stored.token_value
+                assert reveal_secret(stored.token_value) == "vault_secret_value"
+    finally:
+        monkeypatch.setenv("AI_BOARD_TOKEN_SECRET_PROVIDER", "local")
+        monkeypatch.delenv("AI_BOARD_TOKEN_SECRET_COMMAND", raising=False)
+        settings.cache_clear()

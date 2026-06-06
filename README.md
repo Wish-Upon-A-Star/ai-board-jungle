@@ -1,5 +1,43 @@
 # AI Board
 
+## 현재 구현 상태 요약
+
+- React 프론트엔드, FastAPI 백엔드, PostgreSQL-ready SQLAlchemy 모델, Redis 캐시 옵션을 사용합니다.
+- 사용자는 서버 DB에 자기 계정별 연동 프로필, 토큰, AI provider/model/API base, RAG 수집 범위, 자동화별 템플릿을 저장합니다.
+- GitHub issues/commits/pull requests와 Notion database/pages는 사용자별 연동 프로필 토큰으로 수집되어 RAG 지식자료에 저장됩니다.
+- Figma comment와 Google Calendar event는 live write API가 있으며 기본은 `dry_run=true`입니다.
+- 자동화는 수동 실행과 `POST /api/automations/scheduler/tick` 예약 tick을 모두 지원하고, 입력 변경이 없으면 외부 API 실행을 skip합니다.
+
+## 운영 Secret/KMS 설정
+
+기본값은 로컬 암호화입니다.
+
+```env
+AI_BOARD_TOKEN_SECRET_PROVIDER="local"
+AI_BOARD_TOKEN_ENCRYPTION_SECRET="replace-with-a-separate-long-random-secret"
+```
+
+운영 환경에서 Vault, KMS, 사내 secret service를 쓰려면 command provider를 사용할 수 있습니다. 서버가 토큰을 저장할 때 command에 JSON stdin을 보내고, command는 JSON stdout으로 보호된 값 또는 복원된 값을 반환합니다.
+
+```env
+AI_BOARD_TOKEN_SECRET_PROVIDER="command"
+AI_BOARD_TOKEN_SECRET_COMMAND="python C:/secure/ai-board-secret-adapter.py"
+```
+
+Command stdin:
+
+```json
+{"action":"protect","value":"plain-token"}
+```
+
+Command stdout:
+
+```json
+{"value":"vault-or-kms-reference"}
+```
+
+`reveal` action은 저장된 reference를 다시 실제 API 토큰으로 복원해야 합니다. API 응답은 원문 토큰을 반환하지 않고 `hasToken`, `tokenPreview`, `tokenStorage`만 반환합니다. `tokenStorage` 값은 `encrypted`, `external`, `legacy`, `empty` 중 하나입니다.
+
 React, FastAPI, PostgreSQL-ready SQLAlchemy, Redis 캐시를 기반으로 만든 AI 자동화 게시판입니다. 단순 게시판에 AI 버튼만 붙인 구조가 아니라, 사용자가 GitHub, Notion, Google Calendar, Figma뿐 아니라 Jira, Slack, Sheets, 사내 API 같은 임의의 외부 업무 흐름을 자동화 작업으로 등록하고 실행 결과를 게시판에 공유하는 방식으로 구성했습니다.
 
 ## 주요 사용 흐름

@@ -6,6 +6,7 @@ import hmac
 import json
 import os
 import secrets
+import subprocess
 import time
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -16,11 +17,48 @@ from .models import User
 
 
 SECRET_PREFIX = "enc:v1:"
+COMMAND_SECRET_PREFIX = "cmd:v1:"
 
 
 def secret_key() -> bytes:
     raw = settings().token_encryption_secret or settings().jwt_secret
     return hashlib.sha256(raw.encode()).digest()
+
+
+def secret_storage_type(value: str) -> str:
+    if not value:
+        return "empty"
+    if value.startswith(SECRET_PREFIX):
+        return "encrypted"
+    if value.startswith(COMMAND_SECRET_PREFIX):
+        return "external"
+    return "legacy"
+
+
+def command_secret(action: str, value: str) -> str:
+    command = settings().token_secret_command.strip()
+    if not command:
+        raise ValueError("AI_BOARD_TOKEN_SECRET_COMMAND is required when token_secret_provider=command")
+    payload = json.dumps({"action": action, "value": value}, separators=(",", ":"))
+    completed = subprocess.run(
+        command,
+        input=payload,
+        text=True,
+        capture_output=True,
+        shell=True,
+        timeout=5,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise ValueError((completed.stderr or "secret command failed").strip())
+    try:
+        data = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError("secret command must return JSON") from exc
+    result = data.get("value")
+    if not isinstance(result, str):
+        raise ValueError("secret command JSON must include a string value")
+    return result
 
 
 def secret_stream(nonce: bytes, length: int) -> bytes:
@@ -35,8 +73,12 @@ def secret_stream(nonce: bytes, length: int) -> bytes:
 
 
 def protect_secret(value: str) -> str:
-    if not value or value.startswith(SECRET_PREFIX):
+    if not value or value.startswith(SECRET_PREFIX) or value.startswith(COMMAND_SECRET_PREFIX):
         return value
+    if settings().token_secret_provider.lower() == "command":
+        protected = command_secret("protect", value)
+        payload = base64.urlsafe_b64encode(protected.encode()).decode()
+        return f"{COMMAND_SECRET_PREFIX}{payload}"
     raw = value.encode()
     nonce = secrets.token_bytes(16)
     stream = secret_stream(nonce, len(raw))
@@ -47,7 +89,16 @@ def protect_secret(value: str) -> str:
 
 
 def reveal_secret(value: str) -> str:
-    if not value or not value.startswith(SECRET_PREFIX):
+    if not value:
+        return ""
+    if value.startswith(COMMAND_SECRET_PREFIX):
+        try:
+            payload = value.removeprefix(COMMAND_SECRET_PREFIX)
+            protected = base64.urlsafe_b64decode(payload.encode()).decode()
+            return command_secret("reveal", protected)
+        except Exception:
+            return ""
+    if not value.startswith(SECRET_PREFIX):
         return value or ""
     payload = value.removeprefix(SECRET_PREFIX)
     try:
