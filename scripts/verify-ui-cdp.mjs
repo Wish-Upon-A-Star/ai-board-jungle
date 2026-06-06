@@ -1,3 +1,5 @@
+import net from "node:net";
+
 const port = process.env.CDP_PORT || "9223";
 const appUrl = process.env.APP_URL || "http://127.0.0.1:3000";
 const apiBase = process.env.API_BASE || "http://127.0.0.1:8000";
@@ -5,6 +7,77 @@ const cdpProfileName = "CDP Figma dry-run profile";
 const cdpKnowledgeTitle = "CDP verification document";
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+  let timeout;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeout = setTimeout(() => reject(new Error("timeout")), timeoutMs);
+    timeout.unref?.();
+  });
+  try {
+    return await Promise.race([fetch(url, options), timeoutPromise]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function preflight() {
+  const checkTcpPort = (host, targetPort, timeoutMs = 4000) =>
+    new Promise((resolve, reject) => {
+      const socket = net.createConnection({ host, port: targetPort });
+      const timeout = setTimeout(() => {
+        socket.destroy();
+        reject(new Error("timeout"));
+      }, timeoutMs);
+      timeout.unref?.();
+      socket.once("connect", () => {
+        clearTimeout(timeout);
+        socket.end();
+        resolve(true);
+      });
+      socket.once("error", (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+    });
+  const checks = [
+    {
+      name: "FastAPI backend",
+      url: `${apiBase}/api/health`,
+      fix: "Run `npm run verify:fastapi` for managed verification or `npm start` before CDP smoke.",
+    },
+    {
+      name: "React frontend",
+      url: appUrl,
+      fix: "Run `npm --prefix frontend run dev` with VITE_API_BASE pointing at the backend.",
+    },
+    {
+      name: "Chrome CDP",
+      url: `http://127.0.0.1:${port}/json/version`,
+      tcpPort: Number(port),
+      fix: "Start Chrome/Edge with remote debugging on the selected CDP_PORT, for example port 9223.",
+    },
+  ];
+  const failures = [];
+  for (const check of checks) {
+    try {
+      if (check.tcpPort) {
+        await checkTcpPort("127.0.0.1", check.tcpPort);
+      } else {
+        const response = await fetchWithTimeout(check.url, {}, 4000);
+        if (!response.ok) failures.push({ ...check, status: response.status });
+      }
+    } catch (error) {
+      failures.push({ ...check, status: error.message });
+    }
+  }
+  if (failures.length) {
+    const message = failures
+      .map((failure) => `- ${failure.name} unavailable at ${failure.url} (${failure.status}). ${failure.fix}`)
+      .join("\n");
+    throw new Error(`CDP preflight failed:\n${message}`);
+  }
+}
 
 async function connect(wsUrl) {
   const ws = new WebSocket(wsUrl);
@@ -35,12 +108,13 @@ async function connect(wsUrl) {
 }
 
 async function main() {
-  const version = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
+  await preflight();
+  const version = await (await fetchWithTimeout(`http://127.0.0.1:${port}/json/version`)).json();
   const browser = await connect(version.webSocketDebuggerUrl);
   await browser.call("Target.createTarget", { url: appUrl });
   await wait(2500);
 
-  const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+  const targets = await (await fetchWithTimeout(`http://127.0.0.1:${port}/json/list`)).json();
   const appHost = new URL(appUrl).host;
   const target = targets.find((item) => item.url.includes(appHost));
   if (!target) throw new Error("UI target was not created");
@@ -67,7 +141,7 @@ async function main() {
   const token = loginJson.token;
   const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
   const apiJson = async (path, options = {}) => {
-    const response = await fetch(`${apiBase}${path}`, { ...options, headers: { ...headers, ...(options.headers || {}) } });
+    const response = await fetchWithTimeout(`${apiBase}${path}`, { ...options, headers: { ...headers, ...(options.headers || {}) } });
     if (!response.ok) throw new Error(`${path} failed: ${response.status}`);
     return response.json();
   };
@@ -192,13 +266,13 @@ async function main() {
   const knowledgeDeleted = knowledgeCreate.source
     ? await apiJson(`/api/knowledge/${knowledgeCreate.source.id}`, { method: "DELETE" }).then((data) => data.ok === true)
     : false;
-  const healthOk = await fetch(`${apiBase}/api/health`).then((response) => response.ok);
-  const mcpOk = await fetch(`${apiBase}/mcp/rpc`, {
+  const healthOk = await fetchWithTimeout(`${apiBase}/api/health`).then((response) => response.ok);
+  const mcpOk = await fetchWithTimeout(`${apiBase}/mcp/rpc`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "weather.lookup", params: { location: "Seoul" } }),
   }).then((response) => response.ok);
-  const hubOk = await fetch(`${apiBase}/api/integrations/hub/run`, {
+  const hubOk = await fetchWithTimeout(`${apiBase}/api/integrations/hub/run`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ instruction: "Summarize GitHub Notion automation status" }),
@@ -293,9 +367,10 @@ async function main() {
 
   page.close();
   browser.close();
+  process.exit(0);
 }
 
 main().catch((error) => {
   console.error(error);
-  process.exit(1);
+  process.exitCode = 1;
 });

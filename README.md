@@ -22,7 +22,7 @@
 - 게시글 검색/목록 API는 `limit`, `offset`, `total`, `nextOffset`, `hasMore`를 반환하고 UI는 `Load more posts`로 긴 게시판을 이어서 탐색합니다.
 - 게시글 더보기 로딩/오류 상태는 게시판 목록 바로 아래에 표시해 실패 원인을 해당 작업 맥락에서 확인할 수 있습니다.
 - 게시글 더보기는 이미 화면에 있는 게시글 id를 중복 추가하지 않아, 새 게시글 생성이나 검색 결과 변동 중에도 같은 행이 반복 표시되지 않습니다.
-- CDP 스모크 검증은 `CDP Figma dry-run profile`을 재사용하고 중복 프로필을 정리하며, 임시 RAG 지식자료는 저장/삭제까지 확인해 반복 실행 오염을 줄입니다.
+- CDP 스모크 검증은 실행 전 FastAPI, React, Chrome CDP 연결을 preflight로 확인하고, `CDP Figma dry-run profile` 재사용/중복 정리와 임시 RAG 지식자료 저장/삭제까지 검증합니다.
 
 ## 운영 Secret/KMS 설정
 
@@ -362,6 +362,14 @@ npm run dev
 ```powershell
 npm run seed
 ```
+
+UI CDP smoke:
+
+```powershell
+npm run smoke:ui
+```
+
+`smoke:ui` preflight checks FastAPI at `API_BASE` (default `http://127.0.0.1:8000`), React at `APP_URL` (default `http://127.0.0.1:3000`), and Chrome/Edge CDP at `CDP_PORT` (default `9223`). If one is missing, the script prints the failed service and the setup action before running any destructive verification step.
 
 PostgreSQL + Redis:
 
