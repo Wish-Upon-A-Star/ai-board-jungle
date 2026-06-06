@@ -146,16 +146,20 @@ function parseRunResult(result) {
 
 function summarizeRunResult(result) {
   const data = parseRunResult(result);
-  const status = data.status || data.run?.status || data.raw || "unknown";
   const agent = data.agent || data.aiAgent || "agent";
   const route = data.route || [data.source, data.destination].filter(Boolean).join(" -> ");
   const targetCount = Array.isArray(data.targets) ? data.targets.length : 0;
   const ragCount = Array.isArray(data.externalRagSources) ? data.externalRagSources.length : 0;
-  const parts = [`status: ${status}`, agent];
+  const parts = [agent];
   if (route) parts.push(route);
   if (targetCount) parts.push(`${targetCount} targets`);
   if (ragCount) parts.push(`${ragCount} RAG sources`);
   return parts.join(" / ");
+}
+
+function getRunStatus(result) {
+  const data = parseRunResult(result);
+  return String(data.status || data.run?.status || data.raw || "unknown").toLowerCase();
 }
 
 function prettyRunResult(result) {
@@ -720,7 +724,9 @@ function App() {
                             <div className="run-row-main">
                               <span>#{run.id}</span>
                               <span>{run.createdAt}</span>
+                              <span className={`run-status ${getRunStatus(run.result)}`}>{getRunStatus(run.result)}</span>
                               <p>{summarizeRunResult(run.result)}</p>
+                              <button type="button" className="inline-link retry" onClick={() => runTask(task)}>Retry</button>
                               <button type="button" className="inline-link" onClick={() => setExpandedRuns((current) => ({ ...current, [run.id]: !current[run.id] }))}>
                                 {expandedRuns[run.id] ? "Hide details" : "Details"}
                               </button>

@@ -170,9 +170,17 @@ async function main() {
     return true;
   })()`);
   await wait(500);
+  const retryClicked = await evalJs(`(() => {
+    const button = Array.from(document.querySelectorAll("button")).find((item) => item.innerText.includes("Retry"));
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`);
+  await wait(1200);
   text = await bodyText();
   const runHistoryVisible = runClicked && text.includes("Run history");
-  const runDetailsVisible = detailClicked && text.includes("Hide details") && text.includes("status:");
+  const runDetailsVisible = detailClicked && text.includes("Hide details") && text.includes("status");
+  const runRetryVisible = retryClicked && text.includes("Retry");
 
   const result = {
     missing,
@@ -192,6 +200,7 @@ async function main() {
     hubOk,
     runHistoryVisible,
     runDetailsVisible,
+    runRetryVisible,
     sample: text.slice(0, 1200),
   };
   console.log(JSON.stringify(result, null, 2));
@@ -213,7 +222,8 @@ async function main() {
     !mcpOk ||
     !hubOk ||
     !runHistoryVisible ||
-    !runDetailsVisible
+    !runDetailsVisible ||
+    !runRetryVisible
   ) {
     throw new Error("CDP verification failed");
   }
