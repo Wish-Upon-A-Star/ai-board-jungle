@@ -121,6 +121,10 @@ const customPreset = {
   custom_connections: [{ ...blankConnection }],
 };
 
+const activityProviders = ["github", "notion", "figma", "google_calendar", "custom", "board", "GitHub REST API + Notion API", "GitHub REST API + 사용자 지정 업무 DB API"];
+const activityStatuses = ["ok", "changed", "skipped", "ready", "failed", "blocked", "collected", "unchanged", "no-data"];
+const activityEvents = ["integration_profile.created", "integration_profile.collect", "integration_profile.write", "automation.created", "automation.run", "automation.shared"];
+
 function Badge({ role }) {
   const admin = role === "ADMIN";
   return <span className={admin ? "role admin" : "role user"}>{admin ? "관리자" : "사용자"}</span>;
@@ -140,6 +144,7 @@ function App() {
   const [integrationProfiles, setIntegrationProfiles] = useState([]);
   const [providerReadiness, setProviderReadiness] = useState([]);
   const [integrationActivities, setIntegrationActivities] = useState([]);
+  const [activityFilters, setActivityFilters] = useState({ provider: "", status: "", event_type: "", automation_task_id: "", integration_profile_id: "" });
   const [knowledgeSources, setKnowledgeSources] = useState([]);
   const [selected, setSelected] = useState(null);
   const [q, setQ] = useState("");
@@ -254,14 +259,34 @@ function App() {
     }
   }
 
-  async function loadAll(query = q) {
+  function activityQuery(filters = activityFilters) {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== "" && value !== null && value !== undefined) params.set(key, value);
+    });
+    return params.toString();
+  }
+
+  async function loadActivities(filters = activityFilters) {
+    const query = activityQuery(filters);
+    const activityData = await api(`/api/integration-activities${query ? `?${query}` : ""}`);
+    setIntegrationActivities(activityData.activities);
+  }
+
+  async function updateActivityFilters(nextFilters) {
+    setActivityFilters(nextFilters);
+    await loadActivities(nextFilters);
+  }
+
+  async function loadAll(query = q, filters = activityFilters) {
+    const activityPath = activityQuery(filters);
     const [postData, taskData, knowledgeData, profileData, readinessData, activityData] = await Promise.all([
       api(`/api/posts?q=${encodeURIComponent(query)}`),
       api("/api/automations"),
       api("/api/knowledge"),
       api("/api/integration-profiles"),
       api("/api/provider-readiness"),
-      api("/api/integration-activities"),
+      api(`/api/integration-activities${activityPath ? `?${activityPath}` : ""}`),
     ]);
     setPosts(postData.posts);
     setTasks(taskData.tasks);
@@ -773,7 +798,32 @@ function App() {
                   ))}
                 </div>
                 <div className="activity-log">
-                  <strong>Integration Activity Log</strong>
+                  <div className="activity-head">
+                    <strong>Integration Activity Log</strong>
+                    <button type="button" onClick={() => updateActivityFilters({ provider: "", status: "", event_type: "", automation_task_id: "", integration_profile_id: "" })}>Reset filters</button>
+                  </div>
+                  <div className="activity-filters">
+                    <select value={activityFilters.provider} onChange={(e) => updateActivityFilters({ ...activityFilters, provider: e.target.value })}>
+                      <option value="">All providers</option>
+                      {[...new Set([...activityProviders, activityFilters.provider].filter(Boolean))].map((provider) => <option key={provider} value={provider}>{provider}</option>)}
+                    </select>
+                    <select value={activityFilters.status} onChange={(e) => updateActivityFilters({ ...activityFilters, status: e.target.value })}>
+                      <option value="">All statuses</option>
+                      {activityStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                    </select>
+                    <select value={activityFilters.event_type} onChange={(e) => updateActivityFilters({ ...activityFilters, event_type: e.target.value })}>
+                      <option value="">All events</option>
+                      {activityEvents.map((eventType) => <option key={eventType} value={eventType}>{eventType}</option>)}
+                    </select>
+                    <select value={activityFilters.automation_task_id} onChange={(e) => updateActivityFilters({ ...activityFilters, automation_task_id: e.target.value })}>
+                      <option value="">All automations</option>
+                      {tasks.map((task) => <option key={task.id} value={task.id}>{task.name}</option>)}
+                    </select>
+                    <select value={activityFilters.integration_profile_id} onChange={(e) => updateActivityFilters({ ...activityFilters, integration_profile_id: e.target.value })}>
+                      <option value="">All profiles</option>
+                      {integrationProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+                    </select>
+                  </div>
                   {integrationActivities.slice(0, 8).map((activity) => (
                     <div key={activity.id} className={`activity-row ${activity.status}`}>
                       <span>{activity.eventType}</span>
@@ -782,6 +832,7 @@ function App() {
                       <p>{activity.summary}</p>
                     </div>
                   ))}
+                  {!integrationActivities.length ? <p className="empty-state">No activity matches these filters.</p> : null}
                 </div>
                 {integrationProfiles.map((profile) => (
                   <div key={profile.id} className="knowledge-item">

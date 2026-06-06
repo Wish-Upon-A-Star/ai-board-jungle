@@ -323,6 +323,18 @@ def test_full_fastapi_flow(monkeypatch):
         assert any(item["eventType"] == "automation.run" and item["status"] == "changed" for item in run_activities)
         assert any(item["eventType"] == "automation.run" and item["status"] == "skipped" for item in run_activities)
         assert any(item["eventType"] == "automation.shared" for item in run_activities)
+        changed_runs = client.get("/api/integration-activities?event_type=automation.run&status=changed", headers=headers).json()["activities"]
+        assert changed_runs
+        assert all(item["eventType"] == "automation.run" and item["status"] == "changed" for item in changed_runs)
+        provider_writes = client.get("/api/integration-activities?provider=figma&event_type=integration_profile.write", headers=headers).json()["activities"]
+        assert provider_writes
+        assert all(item["provider"] == "figma" and item["eventType"] == "integration_profile.write" for item in provider_writes)
+        task_filtered = client.get(f"/api/integration-activities?automation_task_id={task_id}", headers=headers).json()["activities"]
+        assert task_filtered
+        assert all(item["automationTaskId"] == task_id for item in task_filtered)
+        profile_filtered = client.get(f"/api/integration-activities?integration_profile_id={profile_json['id']}&limit=2", headers=headers).json()["activities"]
+        assert 1 <= len(profile_filtered) <= 2
+        assert all(item["integrationProfileId"] == profile_json["id"] for item in profile_filtered)
         assert client.delete(f"/api/automations/{task_id}", headers=headers).status_code == 200
 
         hub = client.post(

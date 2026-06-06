@@ -91,6 +91,7 @@ async function main() {
     "커스텀 출력 템플릿",
     "Live Write Readiness",
     "Integration Activity Log",
+    "Reset filters",
     "Google Calendar",
     "Figma Review",
     "GitHub Repo URL",
@@ -206,6 +207,14 @@ async function main() {
     const data = await response.json();
     return response.ok && Array.isArray(data.activities) && data.activities.some((item) => item.eventType === "integration_profile.created");
   })()`);
+  const activityFilterApi = await evalJs(`(async () => {
+    const token = localStorage.getItem("ai-board-token");
+    const response = await fetch("http://127.0.0.1:8000/api/integration-activities?provider=figma&event_type=integration_profile.write&limit=5", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const data = await response.json();
+    return response.ok && Array.isArray(data.activities) && data.activities.every((item) => item.provider === "figma" && item.eventType === "integration_profile.write");
+  })()`);
 
   await page.call("Runtime.evaluate", {
     expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('지식자료 저장')).click()",
@@ -269,9 +278,9 @@ async function main() {
   page.close();
   browser.close();
 
-  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, liveWriteApi, activityApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
+  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, liveWriteApi, activityApi, activityFilterApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
   console.log(JSON.stringify(result, null, 2));
-  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !liveWriteApi || !activityApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
+  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !liveWriteApi || !activityApi || !activityFilterApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
     process.exit(1);
   }
 }

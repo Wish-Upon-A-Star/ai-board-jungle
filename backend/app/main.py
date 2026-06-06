@@ -349,13 +349,29 @@ def list_provider_readiness(user: User = Depends(current_user), db: Session = De
 
 
 @app.get("/api/integration-activities")
-def list_integration_activities(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    stmt = (
-        select(IntegrationActivity)
-        .where(IntegrationActivity.owner_id == user.id)
-        .order_by(IntegrationActivity.created_at.desc())
-        .limit(50)
-    )
+def list_integration_activities(
+    provider: str = "",
+    status: str = "",
+    event_type: str = "",
+    automation_task_id: int | None = None,
+    integration_profile_id: int | None = None,
+    limit: int = 50,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    filters = [IntegrationActivity.owner_id == user.id]
+    if provider:
+        filters.append(IntegrationActivity.provider == provider)
+    if status:
+        filters.append(IntegrationActivity.status == status)
+    if event_type:
+        filters.append(IntegrationActivity.event_type == event_type)
+    if automation_task_id is not None:
+        filters.append(IntegrationActivity.automation_task_id == automation_task_id)
+    if integration_profile_id is not None:
+        filters.append(IntegrationActivity.integration_profile_id == integration_profile_id)
+    safe_limit = max(1, min(limit, 100))
+    stmt = select(IntegrationActivity).where(*filters).order_by(IntegrationActivity.created_at.desc()).limit(safe_limit)
     return {"activities": [serialize_activity(activity) for activity in db.scalars(stmt).all()]}
 
 
