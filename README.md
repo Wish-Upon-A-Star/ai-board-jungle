@@ -29,6 +29,7 @@
 - `verify:fastapi`도 시작할 때 `data/fastapi-verify.db`와 SQLite sidecar 파일을 초기화하고 종료 시 3000/8000 포트를 정리합니다.
 - `verify:fastapi` runs the Vite dev server directly and kills the spawned process tree on Windows, so repeated smoke checks do not leave orphaned local servers.
 - Local verification resolves npm through `npm-cli.js` under the active Node install and runs short commands without shell argument concatenation.
+- `scripts/verify-helpers.mjs` centralizes local verification process spawning, port cleanup, URL waiting, and SQLite DB reset helpers used by both `verify:fastapi` and `verify:full`.
 
 ## 운영 Secret/KMS 설정
 
