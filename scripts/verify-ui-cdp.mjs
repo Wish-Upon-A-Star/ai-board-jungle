@@ -94,6 +94,8 @@ async function main() {
     "Dry-run write",
     "Actual write",
     "Integration Activity Log",
+    "Real-write audit",
+    "Actual writes",
     "Reset filters",
     "Google Calendar",
     "Figma Review",
@@ -232,6 +234,14 @@ async function main() {
     }).then((response) => response.json());
     return first.limit === 1 && first.offset === 0 && first.nextOffset === 1 && second.offset === 1;
   })()`);
+  const realWriteAuditApi = await evalJs(`(async () => {
+    const token = localStorage.getItem("ai-board-token");
+    const response = await fetch("http://127.0.0.1:8000/api/integration-activities?event_type=integration_profile.write&dry_run=false&limit=5", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const data = await response.json();
+    return response.ok && Array.isArray(data.activities) && data.activities.every((item) => item.eventType === "integration_profile.write" && item.details && item.details.dryRun === false);
+  })()`);
   const schedulerApi = await evalJs(`(async () => {
     const token = localStorage.getItem("ai-board-token");
     const response = await fetch("http://127.0.0.1:8000/api/automations/scheduler/tick?limit=3", {
@@ -304,9 +314,9 @@ async function main() {
   page.close();
   browser.close();
 
-  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, liveWriteApi, activityApi, activityFilterApi, activityPageApi, schedulerApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
+  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, liveWriteApi, activityApi, activityFilterApi, activityPageApi, realWriteAuditApi, schedulerApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
   console.log(JSON.stringify(result, null, 2));
-  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !liveWriteApi || !activityApi || !activityFilterApi || !activityPageApi || !schedulerApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
+  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !liveWriteApi || !activityApi || !activityFilterApi || !activityPageApi || !realWriteAuditApi || !schedulerApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
     process.exit(1);
   }
 }

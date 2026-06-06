@@ -355,6 +355,7 @@ def list_integration_activities(
     event_type: str = "",
     automation_task_id: int | None = None,
     integration_profile_id: int | None = None,
+    dry_run: bool | None = None,
     limit: int = 50,
     offset: int = 0,
     user: User = Depends(current_user),
@@ -371,6 +372,8 @@ def list_integration_activities(
         filters.append(IntegrationActivity.automation_task_id == automation_task_id)
     if integration_profile_id is not None:
         filters.append(IntegrationActivity.integration_profile_id == integration_profile_id)
+    if dry_run is not None:
+        filters.append(IntegrationActivity.details_json.contains(f'"dryRun": {str(dry_run).lower()}'))
     safe_limit = max(1, min(limit, 100))
     safe_offset = max(0, offset)
     total = db.scalar(select(func.count()).select_from(IntegrationActivity).where(*filters)) or 0

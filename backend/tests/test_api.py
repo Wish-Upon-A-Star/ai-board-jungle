@@ -344,6 +344,11 @@ def test_full_fastapi_flow(monkeypatch):
         provider_writes = client.get("/api/integration-activities?provider=figma&event_type=integration_profile.write", headers=headers).json()["activities"]
         assert provider_writes
         assert all(item["provider"] == "figma" and item["eventType"] == "integration_profile.write" for item in provider_writes)
+        dry_run_writes = client.get("/api/integration-activities?event_type=integration_profile.write&dry_run=true", headers=headers).json()["activities"]
+        assert dry_run_writes
+        assert all(item["details"]["dryRun"] is True for item in dry_run_writes)
+        live_write_audit = client.get("/api/integration-activities?event_type=integration_profile.write&dry_run=false", headers=headers).json()["activities"]
+        assert live_write_audit == []
         task_filtered = client.get(f"/api/integration-activities?automation_task_id={task_id}", headers=headers).json()["activities"]
         assert task_filtered
         assert all(item["automationTaskId"] == task_id for item in task_filtered)

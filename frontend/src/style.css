@@ -118,6 +118,8 @@ a:hover { color: #0086d1; }
 .activity-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .activity-head span { color: #666; font-size: 12px; }
 .activity-head button { width: auto; min-height: 28px; padding: 4px 8px; border-color: #cfcfcf; color: #555; }
+.activity-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.activity-actions button:first-child { border-color: #b91c1c; color: #b91c1c; }
 .activity-filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .activity-filters select { min-width: 0; height: 30px; }
 .activity-row { display: grid; grid-template-columns: 142px 96px 72px minmax(0, 1fr); gap: 6px; align-items: center; border-top: 1px solid #f0f0f0; padding-top: 5px; color: #555; }
@@ -194,6 +196,7 @@ pre { margin: 0; padding: 10px; border: 1px solid #e2e2e2; background: #fafafa; 
   .grid2, .grid3, .grid3.wide { grid-template-columns: 1fr; }
   .provider-grid { grid-template-columns: 1fr; }
   .activity-head { align-items: flex-start; flex-direction: column; }
+  .activity-actions { justify-content: flex-start; }
   .activity-filters { grid-template-columns: 1fr; }
   .activity-row { grid-template-columns: 1fr; }
   .scheduler-bar { align-items: flex-start; flex-direction: column; }

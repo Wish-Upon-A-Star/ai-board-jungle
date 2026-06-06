@@ -9,6 +9,7 @@
 - 실제 외부 쓰기(`dry_run=false`)는 UI와 API 모두 확인 문구 `WRITE LIVE`가 있어야 실행됩니다.
 - 자동화는 수동 실행과 `POST /api/automations/scheduler/tick` 예약 tick을 모두 지원하고, 입력 변경이 없으면 외부 API 실행을 skip합니다.
 - 통합 활동 로그는 `limit`, `offset`, `total`, `nextOffset`, `hasMore` 기반 페이지네이션과 UI 더보기를 지원합니다.
+- 통합 활동 로그는 `dry_run=true/false` 필터와 `Real-write audit` 프리셋으로 실제 외부 쓰기만 감시할 수 있습니다.
 
 ## 운영 Secret/KMS 설정
 

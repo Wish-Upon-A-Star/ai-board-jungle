@@ -145,7 +145,7 @@ function App() {
   const [providerReadiness, setProviderReadiness] = useState([]);
   const [integrationActivities, setIntegrationActivities] = useState([]);
   const [activityPage, setActivityPage] = useState({ total: 0, limit: 12, offset: 0, nextOffset: 0, hasMore: false });
-  const [activityFilters, setActivityFilters] = useState({ provider: "", status: "", event_type: "", automation_task_id: "", integration_profile_id: "" });
+  const [activityFilters, setActivityFilters] = useState({ provider: "", status: "", event_type: "", automation_task_id: "", integration_profile_id: "", dry_run: "" });
   const [knowledgeSources, setKnowledgeSources] = useState([]);
   const [selected, setSelected] = useState(null);
   const [q, setQ] = useState("");
@@ -849,7 +849,10 @@ function App() {
                   <div className="activity-head">
                     <strong>Integration Activity Log</strong>
                     <span>{integrationActivities.length} / {activityPage.total} shown</span>
-                    <button type="button" onClick={() => updateActivityFilters({ provider: "", status: "", event_type: "", automation_task_id: "", integration_profile_id: "" })}>Reset filters</button>
+                    <div className="activity-actions">
+                      <button type="button" onClick={() => updateActivityFilters({ provider: "", status: "", event_type: "integration_profile.write", automation_task_id: "", integration_profile_id: "", dry_run: "false" })}>Real-write audit</button>
+                      <button type="button" onClick={() => updateActivityFilters({ provider: "", status: "", event_type: "", automation_task_id: "", integration_profile_id: "", dry_run: "" })}>Reset filters</button>
+                    </div>
                   </div>
                   <div className="activity-filters">
                     <select value={activityFilters.provider} onChange={(e) => updateActivityFilters({ ...activityFilters, provider: e.target.value })}>
@@ -863,6 +866,11 @@ function App() {
                     <select value={activityFilters.event_type} onChange={(e) => updateActivityFilters({ ...activityFilters, event_type: e.target.value })}>
                       <option value="">All events</option>
                       {activityEvents.map((eventType) => <option key={eventType} value={eventType}>{eventType}</option>)}
+                    </select>
+                    <select value={activityFilters.dry_run} onChange={(e) => updateActivityFilters({ ...activityFilters, dry_run: e.target.value })}>
+                      <option value="">All write modes</option>
+                      <option value="true">Dry-run writes</option>
+                      <option value="false">Actual writes</option>
                     </select>
                     <select value={activityFilters.automation_task_id} onChange={(e) => updateActivityFilters({ ...activityFilters, automation_task_id: e.target.value })}>
                       <option value="">All automations</option>
