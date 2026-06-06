@@ -177,6 +177,7 @@ function App() {
   const [tasks, setTasks] = useState([]);
   const [runHistory, setRunHistory] = useState({});
   const [expandedRuns, setExpandedRuns] = useState({});
+  const [retryRunState, setRetryRunState] = useState({});
   const [integrationProfiles, setIntegrationProfiles] = useState([]);
   const [providerReadiness, setProviderReadiness] = useState([]);
   const [integrationActivities, setIntegrationActivities] = useState([]);
@@ -431,6 +432,20 @@ function App() {
     await loadAll();
     if (options.refreshRuns || runHistory[task.id]) {
       await loadTaskRuns(task);
+    }
+  }
+
+  async function retryTaskFromRun(task, run) {
+    setRetryRunState((current) => ({ ...current, [run.id]: { status: "running", message: "Retrying..." } }));
+    setError("");
+    try {
+      await runTask(task, { refreshRuns: true });
+      setRetryRunState((current) => ({ ...current, [run.id]: { status: "ok", message: "Retry updated" } }));
+    } catch (err) {
+      setError(err.message);
+      setApiResult({ called: "automation.retry", error: err.message, runId: run.id, taskId: task.id });
+      setSideTab("api");
+      setRetryRunState((current) => ({ ...current, [run.id]: { status: "failed", message: err.message } }));
     }
   }
 
@@ -723,21 +738,27 @@ function App() {
                           <strong>Run history</strong>
                           <span>{runHistory[task.id].runs.length} / {runHistory[task.id].total} · Updated {runHistory[task.id].loadedAt}</span>
                         </div>
-                        {runHistory[task.id].runs.map((run) => (
-                          <div key={run.id} className="run-row">
-                            <div className="run-row-main">
-                              <span>#{run.id}</span>
-                              <span>{run.createdAt}</span>
-                              <span className={`run-status ${getRunStatus(run.result)}`}>{getRunStatus(run.result)}</span>
-                              <p>{summarizeRunResult(run.result)}</p>
-                              <button type="button" className="inline-link retry" onClick={() => runTask(task, { refreshRuns: true })}>Retry</button>
-                              <button type="button" className="inline-link" onClick={() => setExpandedRuns((current) => ({ ...current, [run.id]: !current[run.id] }))}>
-                                {expandedRuns[run.id] ? "Hide details" : "Details"}
-                              </button>
+                        {runHistory[task.id].runs.map((run) => {
+                          const retryState = retryRunState[run.id];
+                          return (
+                            <div key={run.id} className="run-row">
+                              <div className="run-row-main">
+                                <span>#{run.id}</span>
+                                <span>{run.createdAt}</span>
+                                <span className={`run-status ${getRunStatus(run.result)}`}>{getRunStatus(run.result)}</span>
+                                <p>{summarizeRunResult(run.result)}</p>
+                                <button type="button" className="inline-link retry" disabled={retryState?.status === "running"} onClick={() => retryTaskFromRun(task, run)}>
+                                  {retryState?.status === "running" ? "Retrying" : "Retry"}
+                                </button>
+                                <button type="button" className="inline-link" onClick={() => setExpandedRuns((current) => ({ ...current, [run.id]: !current[run.id] }))}>
+                                  {expandedRuns[run.id] ? "Hide details" : "Details"}
+                                </button>
+                              </div>
+                              {retryState?.message ? <div className={`run-retry-message ${retryState.status}`}>{retryState.message}</div> : null}
+                              {expandedRuns[run.id] ? <pre className="run-json">{prettyRunResult(run.result)}</pre> : null}
                             </div>
-                            {expandedRuns[run.id] ? <pre className="run-json">{prettyRunResult(run.result)}</pre> : null}
-                          </div>
-                        ))}
+                          );
+                        })}
                         {runHistory[task.id].hasMore ? (
                           <button type="button" className="load-more" onClick={() => loadTaskRuns(task, runHistory[task.id].nextOffset, true)}>Load more runs</button>
                         ) : null}
