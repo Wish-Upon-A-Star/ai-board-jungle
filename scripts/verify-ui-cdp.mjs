@@ -180,7 +180,7 @@ async function main() {
   text = await bodyText();
   const runHistoryVisible = runClicked && text.includes("Run history");
   const runDetailsVisible = detailClicked && text.includes("Hide details") && text.includes("status");
-  const runRetryVisible = retryClicked && text.includes("Retry");
+  const runRetryVisible = retryClicked && text.includes("Retry") && text.includes("Updated");
 
   const result = {
     missing,

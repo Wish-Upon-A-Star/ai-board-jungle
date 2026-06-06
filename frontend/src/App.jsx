@@ -423,12 +423,15 @@ function App() {
     }
   }
 
-  async function runTask(task) {
+  async function runTask(task, options = {}) {
     const data = await api(`/api/automations/${task.id}/run`, { method: "POST" });
     setResult(data);
     setApiResult(data);
     setSideTab("api");
     await loadAll();
+    if (options.refreshRuns || runHistory[task.id]) {
+      await loadTaskRuns(task);
+    }
   }
 
   async function shareTask(task) {
@@ -462,6 +465,7 @@ function App() {
         [task.id]: {
           ...data,
           runs: append ? [...(current[task.id]?.runs || []), ...data.runs] : data.runs,
+          loadedAt: new Date().toLocaleTimeString(),
         },
       }));
       setApiResult({ called: "automation.runs", response: data });
@@ -717,7 +721,7 @@ function App() {
                       <div className="run-history">
                         <div className="run-history-head">
                           <strong>Run history</strong>
-                          <span>{runHistory[task.id].runs.length} / {runHistory[task.id].total}</span>
+                          <span>{runHistory[task.id].runs.length} / {runHistory[task.id].total} · Updated {runHistory[task.id].loadedAt}</span>
                         </div>
                         {runHistory[task.id].runs.map((run) => (
                           <div key={run.id} className="run-row">
@@ -726,7 +730,7 @@ function App() {
                               <span>{run.createdAt}</span>
                               <span className={`run-status ${getRunStatus(run.result)}`}>{getRunStatus(run.result)}</span>
                               <p>{summarizeRunResult(run.result)}</p>
-                              <button type="button" className="inline-link retry" onClick={() => runTask(task)}>Retry</button>
+                              <button type="button" className="inline-link retry" onClick={() => runTask(task, { refreshRuns: true })}>Retry</button>
                               <button type="button" className="inline-link" onClick={() => setExpandedRuns((current) => ({ ...current, [run.id]: !current[run.id] }))}>
                                 {expandedRuns[run.id] ? "Hide details" : "Details"}
                               </button>
