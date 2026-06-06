@@ -12,6 +12,7 @@
     "test:live-integrations": "node scripts/test-live-integrations.mjs",
     "verify:auto": "node scripts/verify-fastapi.mjs",
     "verify:fastapi": "node scripts/verify-fastapi.mjs",
+    "verify:full": "node scripts/verify-full.mjs",
     "smoke:ui": "node scripts/verify-ui-cdp.mjs",
     "smoke:http": "node scripts/smoke-fastapi.mjs"
   },
