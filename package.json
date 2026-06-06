@@ -1,0 +1,18 @@
+{
+  "name": "ai-board",
+  "version": "1.0.0",
+  "description": "React, FastAPI, PostgreSQL AI board with RAG, MCP, Agent, and GitHub/Notion-centered automation.",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev-fastapi.mjs",
+    "build": "npm --prefix frontend run build",
+    "start": "python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000",
+    "seed": "python scripts/seed-fastapi.py",
+    "test": "python -m pytest backend/tests",
+    "test:live-integrations": "node scripts/test-live-integrations.mjs",
+    "verify:auto": "node scripts/verify-fastapi.mjs",
+    "verify:fastapi": "node scripts/verify-fastapi.mjs",
+    "smoke:http": "node scripts/smoke-fastapi.mjs"
+  },
+  "license": "ISC"
+}

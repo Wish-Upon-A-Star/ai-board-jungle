@@ -1,0 +1,17 @@
+node_modules/
+frontend/node_modules/
+.next/
+dist/
+frontend/dist/
+.pytest_cache/
+.chrome-verify/
+__pycache__/
+*.pyc
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.pid
+.env
+.DS_Store

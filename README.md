@@ -1,9 +1,174 @@
-﻿# AI Board Codex Live Test
+# AI Board
 
-Created at: 2026-06-06T16:18:44.0414780+09:00
+React, FastAPI, PostgreSQL-ready SQLAlchemy, Redis 캐시를 기반으로 만든 AI 자동화 게시판입니다. 단순 게시판에 AI 버튼만 붙인 구조가 아니라, 사용자가 GitHub, Notion, Google Calendar, Figma 같은 외부 업무 흐름을 자동화 작업으로 등록하고 실행 결과를 게시판에 공유하는 방식으로 구성했습니다.
 
-This repository verifies:
-- repository creation
-- local git commit
-- git push
-- GitHub issue creation
+## 주요 사용 흐름
+
+1. 사용자가 회원가입 또는 로그인합니다.
+2. 자동화 작업에 `몇 분마다`, `어디에서`, `어디로`, `지침`, `결과 템플릿`, `사용 API`, `AI Agent`를 입력합니다.
+3. Agent가 지침을 분석해 GitHub, Notion, Google Calendar, Figma, 게시판 중 필요한 대상과 API를 선택합니다.
+4. 사용자는 작업 카드의 `실행` 버튼으로 자동화 계획을 실행하고, `게시판 공유` 버튼으로 결과를 게시글로 남깁니다.
+5. `API 실행 콘솔`에서 Health, RAG, MCP, Agent Hub 버튼을 눌러 실제 FastAPI API 호출 결과를 확인할 수 있습니다.
+
+## 사용자와 권한
+
+- 새 사용자는 홈페이지에서 직접 회원가입할 수 있습니다.
+- 일반 사용자는 자기 자동화 작업만 조회, 실행, 공유할 수 있습니다.
+- 관리자는 전체 사용자의 자동화 작업을 볼 수 있습니다.
+- 데모 계정:
+  - 관리자: `admin@example.com / password123`
+  - 일반 사용자: `user@example.com / password123`
+
+## 기술 스택
+
+- Frontend: React + Vite
+- Backend: FastAPI
+- Database: PostgreSQL-ready SQLAlchemy 모델, 로컬 검증용 SQLite fallback
+- Cache: Redis 기반 RAG 검색 결과 캐시
+- AI/RAG: 게시글과 자동화 공유글 기반 유사 기록 검색 및 요약
+- MCP: `/mcp/rpc` JSON-RPC endpoint
+- Agent: `SyncPlannerAgent`, `ReviewRouteAgent`, `AutomationPlannerAgent`
+- External API 대상: GitHub REST/CLI, Notion API/MCP, Google Calendar API, Figma API/MCP
+
+## 구현 기능
+
+- 회원가입 / 로그인
+- 역할 기반 사용자 표시
+- 게시글 생성, 조회, 삭제
+- 댓글
+- 태그
+- 페이징과 검색
+- 사용자별 자동화 작업 등록
+- 자동화 작업 실행
+- 자동화 실행 결과 게시판 공유
+- 실제 API 실행 콘솔
+- RAG 검색/요약
+- MCP JSON-RPC 호출
+- Agent 기반 도구 선택
+- Redis 캐시
+- PostgreSQL 전환 준비
+
+## AI 기능이 사이트에 녹아든 방식
+
+### RAG
+
+게시글과 자동화 공유글을 지식 베이스로 사용합니다. 사용자가 질문하거나 Agent가 중복/유사성을 판단할 때 기존 게시글을 검색하고, 관련 근거와 요약을 반환합니다.
+
+관련 API:
+
+- `POST /api/ai/rag`
+
+### MCP
+
+FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automation.describe`, `weather.lookup` 메서드가 있으며, 외부 시스템을 도구처럼 호출하는 구조를 과제 요구사항에 맞게 보여줍니다.
+
+관련 API:
+
+- `POST /mcp/rpc`
+
+### AI Agent
+
+자동화 작업의 source, destination, instruction, api_provider를 읽고 필요한 도구를 선택합니다. GitHub, Notion, Google Calendar, Figma, Board 중 대상 API를 고르고, 무한 루프 방지를 위해 max tool calls, timeout, retry 제한을 결과에 포함합니다.
+
+관련 API:
+
+- `POST /api/automations/{task_id}/run`
+- `POST /api/integrations/hub/run`
+- `POST /api/ai/agent/moderate`
+
+## API 실행 콘솔
+
+홈페이지의 `API 실행 콘솔` 버튼은 실제 API를 호출합니다.
+
+- `Health`: `GET /api/health`
+- `RAG`: `POST /api/ai/rag`
+- `MCP`: `POST /mcp/rpc`
+- `Agent Hub`: `POST /api/integrations/hub/run`
+
+응답은 우측 `API` 탭에 JSON으로 표시됩니다.
+
+## 아키텍처
+
+```mermaid
+flowchart LR
+  User["사용자"] --> React["React UI"]
+  React --> FastAPI["FastAPI"]
+  FastAPI --> Auth["JWT Auth"]
+  FastAPI --> DB["PostgreSQL / SQLite"]
+  FastAPI --> Redis["Redis Cache"]
+  FastAPI --> RAG["RAG Service"]
+  FastAPI --> Agent["Automation Agent"]
+  FastAPI --> MCP["MCP JSON-RPC"]
+  Agent --> GitHub["GitHub API/CLI"]
+  Agent --> Notion["Notion API/MCP"]
+  Agent --> Calendar["Google Calendar API"]
+  Agent --> Figma["Figma API/MCP"]
+  Agent --> Board["게시판 공유"]
+```
+
+## 실행 방법
+
+검증:
+
+```powershell
+npm run verify:fastapi
+```
+
+개발 서버:
+
+```powershell
+npm run dev
+```
+
+접속:
+
+- UI: `http://127.0.0.1:3000`
+- API Docs: `http://127.0.0.1:8000/docs`
+
+같은 네트워크의 다른 사용자가 접속해야 하면 실행 중인 컴퓨터의 LAN IP를 사용합니다.
+
+- UI: `http://<서버-LAN-IP>:3000`
+- API Docs: `http://<서버-LAN-IP>:8000/docs`
+
+프론트엔드는 별도 `VITE_API_BASE`가 없으면 현재 접속한 hostname의 8000 포트를 API 서버로 사용합니다. 예를 들어 사용자가 `http://192.168.0.10:3000`으로 접속하면 API도 `http://192.168.0.10:8000`으로 호출합니다.
+
+시드 데이터 생성:
+
+```powershell
+npm run seed
+```
+
+PostgreSQL + Redis:
+
+```powershell
+docker compose up -d
+$env:AI_BOARD_DATABASE_URL="postgresql://ai_board:ai_board@localhost:5432/ai_board"
+$env:AI_BOARD_REDIS_URL="redis://localhost:6379/0"
+npm run seed
+npm run dev
+```
+
+## 실제 외부 연동 검증 기록
+
+이미 실제로 검증한 항목:
+
+- Figma 파일 생성 및 UI 레이아웃 추가: `https://www.figma.com/design/SAinYC2KXnsHP5puWxTR12`
+- Notion 페이지 생성 및 GitHub 결과 업데이트: `https://app.notion.com/p/3777051c2f998169a87ad8131c2b055b`
+- GitHub 레포 생성, commit, push, issue 생성:
+  - Repo: `https://github.com/Wish-Upon-A-Star/ai-board-codex-live-test-20260606-161841`
+  - Issue: `https://github.com/Wish-Upon-A-Star/ai-board-codex-live-test-20260606-161841/issues/1`
+
+토큰 기반 live test:
+
+```powershell
+npm run test:live-integrations
+```
+
+이 명령은 `.env`에 실제 GitHub, Notion, Google Calendar, Figma 토큰이 있을 때 외부 서비스에 직접 변경을 생성합니다.
+
+## 한계와 개선 아이디어
+
+- 현재 자동화 실행은 계획/도구 선택과 게시판 공유까지 구현되어 있으며, 실제 주기 실행은 Celery, RQ, APScheduler 같은 워커를 붙이면 됩니다.
+- Google Calendar는 OAuth access token이 있어야 실제 이벤트 생성까지 가능합니다.
+- 운영 배포 시 refresh token, webhook signature verification, rate limit, audit log를 추가해야 합니다.
+- PostgreSQL과 Redis는 Docker Compose로 준비되어 있고, 로컬 기본값은 SQLite fallback입니다.
