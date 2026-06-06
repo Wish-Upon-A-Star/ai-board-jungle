@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { rmSync } from "node:fs";
 
 function mergedEnv(patch = {}) {
   return Object.fromEntries(
@@ -54,10 +55,18 @@ function stopLocalServers() {
   ], { timeout: 30000 });
 }
 
-const env = { PYTHONPATH: "backend", AI_BOARD_DATABASE_URL: "sqlite:///./data/full-verify.db" };
+const verifyDbPath = "data/full-verify.db";
+const env = { PYTHONPATH: "backend", AI_BOARD_DATABASE_URL: `sqlite:///./${verifyDbPath}` };
 const skipInstall = process.argv.includes("--skip-install");
 
+function resetVerifyDb() {
+  for (const path of [verifyDbPath, `${verifyDbPath}-shm`, `${verifyDbPath}-wal`]) {
+    rmSync(path, { force: true });
+  }
+}
+
 stopLocalServers();
+resetVerifyDb();
 run("python", ["-m", "py_compile", "backend/app/main.py", "backend/app/services.py"]);
 if (!skipInstall) {
   run("python", ["-m", "pip", "install", "-r", "backend/requirements.txt"], { timeout: 180000 });
