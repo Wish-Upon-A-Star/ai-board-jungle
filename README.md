@@ -24,7 +24,7 @@
 | RAG 기능 | [RAG](#rag) | 게시글/자동화/사용자 지식자료/외부 GitHub-Notion 수집 기반 검색/요약 |
 | MCP 기능 | [MCP](#mcp) | FastAPI `POST /mcp/rpc` JSON-RPC endpoint, CDP smoke `mcpOk: true` |
 | Agent 기능 | [AI Agent](#ai-agent) | 자동화 지침과 연결 칸을 분석해 대상/API/템플릿을 선택하는 Agent 흐름 |
-| 데모/스크린샷 | [실행 방법](#실행-방법), [실제 외부 연동 검증 기록](#실제-외부-연동-검증-기록) | `npm run verify:full:quick`, CDP UI smoke, GitHub push 기록 |
+| 데모/스크린샷 | [실행 방법](#실행-방법), [실제 외부 연동 검증 기록](#실제-외부-연동-검증-기록) | `docs/demo-screenshot.png`, `npm run verify:full:quick`, CDP UI smoke, GitHub push 기록 |
 | 회고/한계/개선 | [한계와 개선 아이디어](#한계와-개선-아이디어) | 실제 외부 API 권한, 운영 KMS, 배포 환경 개선 항목 |
 
 ## 현재 구현 상태 요약
@@ -62,6 +62,7 @@
 - MCP is served by the FastAPI app at `POST /mcp/rpc`; the old standalone TypeScript MCP prototype was removed so users do not need a second MCP process.
 - `npm run verify:readme` checks that the submitted README still contains the required React/FastAPI/PostgreSQL/RAG/MCP/Agent/verification sections and no obvious UTF-8 mojibake markers.
 - Iterative quality reports are stored in `docs/evaluation-reports` with functionality, UI/design, security/privacy, performance, tests, docs, and next-risk scores.
+- `npm run demo:screenshot` captures the committed demo image at `docs/demo-screenshot.png` through Chrome CDP after logging in as the admin demo user.
 
 ## 운영 Secret/KMS 설정
 
@@ -437,6 +438,8 @@ npm run dev
 ```
 
 ## 실제 외부 연동 검증 기록
+
+![AI Board automation dashboard demo](docs/demo-screenshot.png)
 
 이미 실제로 검증한 항목:
 

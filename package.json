@@ -8,6 +8,7 @@
     "build": "npm --prefix frontend run build",
     "start": "python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000",
     "seed": "python scripts/seed-fastapi.py",
+    "demo:screenshot": "node scripts/capture-demo-screenshot.mjs",
     "test": "python -m pytest backend/tests",
     "test:live-integrations": "node scripts/test-live-integrations.mjs",
     "verify:readme": "node scripts/verify-readme.mjs",
