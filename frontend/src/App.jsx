@@ -179,6 +179,8 @@ function App() {
   const [authForm, setAuthForm] = useState({ email: "admin@example.com", name: "새 사용자", password: "password123" });
   const [posts, setPosts] = useState([]);
   const [postPage, setPostPage] = useState({ total: 0, limit: 8, offset: 0, nextOffset: 0, hasMore: false });
+  const [postLoading, setPostLoading] = useState(false);
+  const [postError, setPostError] = useState("");
   const [tasks, setTasks] = useState([]);
   const [runHistory, setRunHistory] = useState({});
   const [expandedRuns, setExpandedRuns] = useState({});
@@ -355,6 +357,7 @@ function App() {
   }
 
   async function loadAll(query = q, filters = activityFilters) {
+    setPostError("");
     const activityPath = activityQuery(filters, 0);
     const [postData, taskData, knowledgeData, profileData, readinessData, activityData] = await Promise.all([
       api(`/api/posts?q=${encodeURIComponent(query)}&limit=${postPage.limit}&offset=0`),
@@ -393,15 +396,26 @@ function App() {
   }
 
   async function loadMorePosts() {
-    const postData = await api(`/api/posts?q=${encodeURIComponent(q)}&limit=${postPage.limit}&offset=${postPage.nextOffset}`);
-    setPosts((current) => [...current, ...postData.posts]);
-    setPostPage({
-      total: postData.total || 0,
-      limit: postData.limit || postPage.limit,
-      offset: postData.offset || 0,
-      nextOffset: postData.nextOffset || 0,
-      hasMore: Boolean(postData.hasMore),
-    });
+    setPostLoading(true);
+    setPostError("");
+    try {
+      const postData = await api(`/api/posts?q=${encodeURIComponent(q)}&limit=${postPage.limit}&offset=${postPage.nextOffset}`);
+      setPosts((current) => [...current, ...postData.posts]);
+      setPostPage({
+        total: postData.total || 0,
+        limit: postData.limit || postPage.limit,
+        offset: postData.offset || 0,
+        nextOffset: postData.nextOffset || 0,
+        hasMore: Boolean(postData.hasMore),
+      });
+    } catch (err) {
+      setPostError(err.message);
+      setError(err.message);
+      setApiResult({ called: "posts.loadMore", error: err.message });
+      setSideTab("api");
+    } finally {
+      setPostLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -457,6 +471,8 @@ function App() {
     setTasks([]);
     setPosts([]);
     setPostPage({ total: 0, limit: 8, offset: 0, nextOffset: 0, hasMore: false });
+    setPostLoading(false);
+    setPostError("");
     setSelected(null);
     clearRunUiState();
     setDeleteConfirmTaskId(null);
@@ -1196,8 +1212,9 @@ function App() {
               </div>
               <div className="post-page-row">
                 <span>{posts.length} / {postPage.total}</span>
-                {postPage.hasMore ? <button type="button" className="load-more" onClick={loadMorePosts}>Load more posts</button> : null}
+                {postPage.hasMore ? <button type="button" className="load-more" disabled={postLoading} onClick={loadMorePosts}>{postLoading ? "Loading posts" : "Load more posts"}</button> : null}
               </div>
+              {postError ? <div className="post-inline-error">{postError}</div> : null}
             </article>
           </section>
 
