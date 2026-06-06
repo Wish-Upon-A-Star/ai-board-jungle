@@ -507,6 +507,79 @@ def test_regular_user_only_sees_own_automations():
         assert forbidden_profile_use.status_code == 403
 
 
+def test_custom_connection_validation_rejects_incomplete_entries():
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "validation@example.com", "name": "Validation User", "password": "password123"},
+        )
+        assert register.status_code == 200
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+
+        invalid_connection = {
+            "label": "Broken target",
+            "service": "notion",
+            "url": "https://www.notion.so/workspace/db",
+            "api": "",
+            "auth_key_name": " ",
+            "operation": "",
+            "template": "title: {title}",
+        }
+        expected_missing = "api, auth_key_name, operation"
+
+        profile_settings = client.put(
+            "/api/profile/settings",
+            headers=headers,
+            json={
+                "ai_provider": "OpenAI",
+                "ai_model": "gpt-4o-mini",
+                "ai_api_base": "https://api.openai.com/v1",
+                "api_key_strategy": "Use private user token references.",
+                "template_preset": "custom",
+                "custom_template": "title: {title}",
+                "custom_connections": [invalid_connection],
+            },
+        )
+        assert profile_settings.status_code == 422
+        assert expected_missing in str(profile_settings.json())
+
+        integration_profile = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Broken integration profile",
+                "source_kind": "custom",
+                "base_url": "",
+                "api_provider": "Custom API",
+                "token_name": "CUSTOM_API_KEY",
+                "token_value": "secret",
+                "rag_targets": [],
+                "custom_template": "title: {title}",
+                "custom_connections": [invalid_connection],
+            },
+        )
+        assert integration_profile.status_code == 422
+        assert expected_missing in str(integration_profile.json())
+
+        automation = client.post(
+            "/api/automations",
+            headers=headers,
+            json={
+                "name": "Broken automation",
+                "source": "Custom source",
+                "destination": "Custom target",
+                "interval_minutes": 5,
+                "instruction": "Reject incomplete custom connection metadata.",
+                "template": "title / action",
+                "api_provider": "Custom API",
+                "ai_agent": "CustomWorkflowAgent",
+                "custom_connections": [invalid_connection],
+            },
+        )
+        assert automation.status_code == 422
+        assert expected_missing in str(automation.json())
+
+
 def test_command_secret_provider_stores_external_references(monkeypatch, tmp_path):
     script = tmp_path / "secret_command.py"
     script.write_text(

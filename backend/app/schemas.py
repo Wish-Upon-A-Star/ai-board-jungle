@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class RegisterIn(BaseModel):
@@ -57,6 +57,17 @@ class CustomConnectionIn(BaseModel):
     auth_key_name: str = Field(default="", max_length=120)
     operation: str = Field(default="", max_length=160)
     template: str = Field(default="", max_length=4000)
+
+    @model_validator(mode="after")
+    def require_executable_connection_fields(self) -> "CustomConnectionIn":
+        missing = [
+            field
+            for field in ("service", "api", "auth_key_name", "operation")
+            if not str(getattr(self, field, "")).strip()
+        ]
+        if missing:
+            raise ValueError(f"custom connection is missing required fields: {', '.join(missing)}")
+        return self
 
 
 class IntegrationProfileIn(BaseModel):

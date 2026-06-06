@@ -19,6 +19,14 @@ async function call(path, options = {}, token = "") {
   return data;
 }
 
+async function callStatus(path, options = {}, token = "") {
+  const headers = { "content-type": "application/json", ...(options.headers || {}) };
+  if (token) headers.authorization = `Bearer ${token}`;
+  const response = await fetch(`${API}${path}`, { ...options, headers });
+  const data = await response.json().catch(() => ({}));
+  return { status: response.status, data };
+}
+
 let token = "";
 let profileId = null;
 let taskId = null;
@@ -41,6 +49,62 @@ try {
   for (const provider of readiness.providers) {
     assertKeys(provider, ["key", "name", "ready", "profileCount", "readyCount", "profiles", "nextAction"], "provider readiness item");
     assert(Array.isArray(provider.profiles), "provider readiness profiles must be an array");
+  }
+
+  const invalidConnection = {
+    label: "Broken target",
+    service: "notion",
+    url: "https://www.notion.so/workspace/db",
+    api: "",
+    auth_key_name: " ",
+    operation: "",
+    template: "title: {title}",
+  };
+  for (const [path, body] of [
+    [
+      "/api/profile/settings",
+      {
+        ai_provider: "OpenAI",
+        ai_model: "gpt-4o-mini",
+        ai_api_base: "https://api.openai.com/v1",
+        api_key_strategy: "Use private user token references.",
+        template_preset: "custom",
+        custom_template: "title: {title}",
+        custom_connections: [invalidConnection],
+      },
+    ],
+    [
+      "/api/integration-profiles",
+      {
+        name: "Broken contract profile",
+        source_kind: "custom",
+        base_url: "",
+        api_provider: "Custom API",
+        token_name: "CUSTOM_API_KEY",
+        token_value: "secret",
+        rag_targets: [],
+        custom_template: "title: {title}",
+        custom_connections: [invalidConnection],
+      },
+    ],
+    [
+      "/api/automations",
+      {
+        name: "Broken contract automation",
+        source: "Custom source",
+        destination: "Custom target",
+        interval_minutes: 5,
+        instruction: "Reject incomplete custom connection metadata.",
+        template: "title / action",
+        api_provider: "Custom API",
+        ai_agent: "CustomWorkflowAgent",
+        custom_connections: [invalidConnection],
+      },
+    ],
+  ]) {
+    const rejected = await callStatus(path, { method: path === "/api/profile/settings" ? "PUT" : "POST", body: JSON.stringify(body) }, token);
+    assert(rejected.status === 422, `${path} must reject incomplete custom connection fields`);
+    assert(JSON.stringify(rejected.data).includes("api, auth_key_name, operation"), `${path} validation detail changed`);
   }
 
   const createdProfile = await call(
@@ -205,6 +269,7 @@ try {
       "integration_activities",
       "mcp_rpc",
       "token_redaction",
+      "custom_connection_validation",
     ],
     profileId,
     taskId,
