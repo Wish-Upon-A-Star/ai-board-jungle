@@ -66,6 +66,7 @@ def init_db() -> None:
                 "github_issue_template": "TEXT DEFAULT ''",
                 "notion_template": "TEXT DEFAULT ''",
                 "figma_template": "TEXT DEFAULT ''",
+                "last_input_hash": "VARCHAR(80) DEFAULT ''",
             }
             for column, ddl in task_additions.items():
                 if column not in task_columns:

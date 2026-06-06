@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
@@ -9,7 +11,7 @@ from .db import get_db, init_db
 from .models import AutomationRun, AutomationTask, Comment, Post, User
 from .schemas import AutomationIn, CommentIn, InstructionIn, LoginIn, PostIn, QuestionIn, RegisterIn
 from .security import create_token, current_user, hash_password, verify_password
-from .services import agent_review, automation_plan, get_or_create_tags, instruction_hub, rag_answer, result_to_text, search_posts, summarize
+from .services import agent_review, automation_fingerprint, automation_plan, get_or_create_tags, instruction_hub, rag_answer, result_to_text, search_posts, summarize
 
 app = FastAPI(title="AI Board API", description="React + FastAPI + PostgreSQL + Redis AI board API.")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -66,6 +68,7 @@ def serialize_task(task: AutomationTask) -> dict:
         "figmaTemplate": task.figma_template,
         "status": task.status,
         "lastResult": task.last_result,
+        "lastInputHash": task.last_input_hash,
         "lastRunAt": str(task.last_run_at) if task.last_run_at else None,
         "createdAt": str(task.created_at),
         "runs": [{"id": run.id, "result": run.result, "createdPostId": run.created_post_id, "createdAt": str(run.created_at)} for run in task.runs[-5:]],
@@ -196,8 +199,44 @@ def run_automation(task_id: int, user: User = Depends(current_user), db: Session
         raise HTTPException(status_code=404, detail="자동화 작업을 찾을 수 없습니다.")
     if task.owner_id != user.id and user.role != "ADMIN":
         raise HTTPException(status_code=403, detail="실행 권한이 없습니다.")
+    current_hash = automation_fingerprint(task)
+    if task.last_input_hash == current_hash:
+        result = {
+            "taskId": task.id,
+            "status": "skipped",
+            "reason": "감시 대상 입력값이 이전 실행과 같아서 외부 API 실행을 건너뜁니다.",
+            "changeHash": current_hash,
+            "watchedFields": [
+                "source",
+                "destination",
+                "instruction",
+                "template",
+                "api_provider",
+                "ai_agent",
+                "github_repo_url",
+                "github_project_url",
+                "notion_database_url",
+                "figma_file_url",
+                "calendar_id",
+                "ai_provider",
+                "ai_model",
+                "ai_api_base",
+                "request_template",
+                "github_issue_template",
+                "notion_template",
+                "figma_template",
+            ],
+        }
+        task.last_result = result_to_text(result)
+        task.last_run_at = datetime.now(timezone.utc)
+        db.commit()
+        return {"task": serialize_task(task), "run": {"id": None, "result": result, "createdPostId": None}}
     result = automation_plan(task)
+    result["status"] = "changed"
+    result["changeHash"] = current_hash
     task.last_result = result_to_text(result)
+    task.last_input_hash = current_hash
+    task.last_run_at = datetime.now(timezone.utc)
     run = AutomationRun(task_id=task.id, owner_id=task.owner_id, result=task.last_result)
     db.add(run)
     db.commit()

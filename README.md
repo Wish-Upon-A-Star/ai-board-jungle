@@ -59,6 +59,8 @@ React, FastAPI, PostgreSQL-ready SQLAlchemy, Redis 캐시를 기반으로 만든
 
 게시글과 자동화 공유글을 지식 베이스로 사용합니다. 사용자가 질문하거나 Agent가 중복/유사성을 판단할 때 기존 게시글을 검색하고, 관련 근거와 요약을 반환합니다.
 
+RAG는 Retrieval-Augmented Generation의 약자입니다. LLM이 기억만으로 답하는 대신, 먼저 우리 서비스의 게시글/자동화 결과에서 관련 기록을 검색하고 그 검색 결과를 근거로 답변하게 만드는 방식입니다. 이 프로젝트에서는 `backend/app/services.py`의 `similar_posts()`와 `rag_answer()`가 그 역할을 하며, `/api/ai/rag` API와 API 실행 콘솔의 `RAG` 버튼으로 확인할 수 있습니다.
+
 관련 API:
 
 - `POST /api/ai/rag`
@@ -87,6 +89,26 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 - `POST /api/automations/{task_id}/run`
 - `POST /api/integrations/hub/run`
 - `POST /api/ai/agent/moderate`
+
+### 변경 감지 실행
+
+자동화는 매번 무조건 외부 API를 때리지 않습니다. 실행할 때 아래 감시 대상 값을 SHA-256 해시로 계산하고, 이전 실행의 해시와 같으면 `status: "skipped"`로 응답합니다.
+
+감시 대상:
+
+- source, destination, instruction, template
+- api_provider, ai_agent
+- GitHub repo/project URL
+- Notion DB URL
+- Figma file URL
+- Calendar ID
+- AI provider, AI model, AI API base
+- 요청/일정 템플릿
+- GitHub 이슈 템플릿
+- Notion 반영 템플릿
+- Figma 작업 템플릿
+
+즉 지침, 대상 사이트, 템플릿, AI 모델 같은 값이 바뀐 경우에만 `status: "changed"`로 실제 실행 계획을 만들고 실행 기록을 저장합니다.
 
 ## API 실행 콘솔
 

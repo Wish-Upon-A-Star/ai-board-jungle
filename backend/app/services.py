@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from hashlib import sha256
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -142,6 +143,32 @@ def automation_plan(task: AutomationTask) -> dict:
             },
         },
     }
+
+
+def automation_fingerprint(task: AutomationTask) -> str:
+    watched = {
+        "source": task.source,
+        "destination": task.destination,
+        "instruction": task.instruction,
+        "template": task.template,
+        "api_provider": task.api_provider,
+        "ai_agent": task.ai_agent,
+        "github_repo_url": task.github_repo_url,
+        "github_project_url": task.github_project_url,
+        "notion_database_url": task.notion_database_url,
+        "figma_file_url": task.figma_file_url,
+        "calendar_id": task.calendar_id,
+        "ai_provider": task.ai_provider,
+        "ai_model": task.ai_model,
+        "ai_api_base": task.ai_api_base,
+        "api_key_strategy": task.api_key_strategy,
+        "request_template": task.request_template,
+        "github_issue_template": task.github_issue_template,
+        "notion_template": task.notion_template,
+        "figma_template": task.figma_template,
+    }
+    payload = json.dumps(watched, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return sha256(payload.encode("utf-8")).hexdigest()
 
 
 async def instruction_hub(instruction: str) -> dict:

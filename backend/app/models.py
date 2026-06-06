@@ -94,6 +94,7 @@ class AutomationTask(Base):
     figma_template: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(20), default="ACTIVE")
     last_result: Mapped[str] = mapped_column(Text, default="")
+    last_input_hash: Mapped[str] = mapped_column(String(80), default="")
     last_run_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
     owner: Mapped[User] = relationship(back_populates="automations")

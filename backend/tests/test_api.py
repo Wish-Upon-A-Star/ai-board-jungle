@@ -52,7 +52,12 @@ def test_full_fastapi_flow():
         assert automation.status_code == 200
         task_id = automation.json()["task"]["id"]
         assert client.get("/api/automations", headers=headers).json()["tasks"]
-        assert client.post(f"/api/automations/{task_id}/run", headers=headers).status_code == 200
+        first_run = client.post(f"/api/automations/{task_id}/run", headers=headers)
+        assert first_run.status_code == 200
+        assert first_run.json()["run"]["result"]["status"] == "changed"
+        second_run = client.post(f"/api/automations/{task_id}/run", headers=headers)
+        assert second_run.status_code == 200
+        assert second_run.json()["run"]["result"]["status"] == "skipped"
         assert client.post(f"/api/automations/{task_id}/share", headers=headers).status_code == 200
         assert client.delete(f"/api/automations/{task_id}", headers=headers).status_code == 200
 
