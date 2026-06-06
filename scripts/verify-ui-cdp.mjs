@@ -78,6 +78,7 @@ async function main() {
     "연동 프로필 목록",
     "RAG가 볼 대상",
     "연동 프로필 저장",
+    "RAG 수집 실행",
     "RAG 지식자료",
     "어디에 어떻게 작성/사용할지",
     "지식자료 저장",
@@ -134,6 +135,21 @@ async function main() {
     });
     const data = await response.json();
     return response.ok && data.profile.hasToken && data.profile.ragTargets.includes("pull_requests") && !JSON.stringify(data).includes("secret-ui-token");
+  })()`);
+  const collectorApi = await evalJs(`(async () => {
+    const token = localStorage.getItem("ai-board-token");
+    const list = await fetch("http://127.0.0.1:8000/api/integration-profiles", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const data = await list.json();
+    const profile = data.profiles[0];
+    if (!profile) return false;
+    const response = await fetch("http://127.0.0.1:8000/api/integration-profiles/" + profile.id + "/collect", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token }
+    });
+    const collected = await response.json();
+    return response.ok && ["collected", "unchanged", "no-data"].includes(collected.status);
   })()`);
 
   await page.call("Runtime.evaluate", {
@@ -198,9 +214,9 @@ async function main() {
   page.close();
   browser.close();
 
-  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
+  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
   console.log(JSON.stringify(result, null, 2));
-  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
+  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
     process.exit(1);
   }
 }

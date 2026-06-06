@@ -110,6 +110,7 @@ a:hover { color: #0086d1; }
 .knowledge-item strong { display: block; color: #333; margin-bottom: 4px; }
 .knowledge-item span { display: block; color: #2780c2; margin-bottom: 5px; }
 .knowledge-item p { margin: 0; color: #555; line-height: 1.5; }
+.knowledge-item button { margin-top: 7px; width: 104px; border-color: #1687c9; color: #1687c9; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
 .api-console { display: grid; gap: 8px; padding: 10px; }
 .api-console textarea { min-height: 68px; }
 .api-buttons { display: flex; flex-wrap: wrap; gap: 6px; }

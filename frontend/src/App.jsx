@@ -440,6 +440,20 @@ function App() {
     }
   }
 
+  async function collectIntegrationProfile(profile) {
+    setError("");
+    try {
+      const data = await api(`/api/integration-profiles/${profile.id}/collect`, { method: "POST" });
+      setApiResult({ called: "integration-profile.collect", response: data });
+      setSideTab("api");
+      await loadAll();
+    } catch (err) {
+      setError(err.message);
+      setApiResult({ called: "integration-profile.collect", error: err.message });
+      setSideTab("api");
+    }
+  }
+
   if (!token || !user) {
     return (
       <main className="login-page">
@@ -715,6 +729,7 @@ function App() {
                     <strong>{profile.name}</strong>
                     <span>{profile.sourceKind} / {profile.apiProvider} / {profile.aiModel} / token {profile.hasToken ? "저장됨" : "없음"}</span>
                     <p>{profile.baseUrl} / RAG: {profile.ragTargets.join(", ") || "미설정"}</p>
+                    <button type="button" onClick={() => collectIntegrationProfile(profile)}><Search size={14} /> RAG 수집 실행</button>
                   </div>
                 ))}
               </div>

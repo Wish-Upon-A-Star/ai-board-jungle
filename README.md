@@ -97,6 +97,9 @@ RAG에 넣을만한 자료:
 - 기타: Jira, Slack, GitLab, 사내 REST API 등은 `custom` 연동 프로필로 등록하고 대상 이름을 자유롭게 넣을 수 있습니다.
 - 자동화 실행 결과에는 `externalRagSources`가 포함되어 어떤 외부 소스를 어떤 API와 토큰 상태로 읽을지 표시합니다.
 - 실제 외부 fetch는 사용자가 저장한 연동 프로필의 `source_kind`, `base_url`, `api_provider`, `token_name/token_value`, `rag_targets`를 기준으로 붙이면 됩니다.
+- GitHub/Notion은 `/api/integration-profiles/{profile_id}/collect`로 실제 수집기가 연결되어 있습니다. 토큰이 저장된 프로필이면 GitHub issues/commits/pull requests, Notion database/page를 읽어 `knowledge_sources`에 저장합니다.
+- 같은 사용자에게 이미 저장된 외부 URL과 소스 타입은 중복 저장하지 않고 `unchanged`와 `skippedDuplicates`로 반환합니다. 반복 자동화가 같은 항목을 계속 쌓지 않도록 변경분 중심으로 동작합니다.
+- 토큰이 없는 프로필이면 수집을 중단하고 `warnings`에 필요한 토큰 정보를 반환합니다.
 - 다른 사용자의 연동 프로필 ID를 자동화에 넣으면 403으로 차단합니다.
 
 관련 API:

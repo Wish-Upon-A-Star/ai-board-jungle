@@ -6,10 +6,24 @@ os.environ["AI_BOARD_DATABASE_URL"] = "sqlite:///:memory:"
 
 from fastapi.testclient import TestClient
 
+from app.collectors import CollectedItem
 from app.main import app
 
 
-def test_full_fastapi_flow():
+def test_full_fastapi_flow(monkeypatch):
+    def fake_collect(profile, limit=8):
+        return [
+            CollectedItem(
+                title="Mock issue from GitHub",
+                source_type="github_issue",
+                url="https://github.com/acme/private-repo/issues/1",
+                text="Mock issue body for design review and Notion task sync",
+                tags=["github", "issue"],
+            )
+        ], []
+
+    monkeypatch.setattr("app.main.collect_profile_items", fake_collect)
+
     with TestClient(app) as client:
         register = client.post(
             "/api/auth/register",
@@ -80,6 +94,14 @@ def test_full_fastapi_flow():
         assert profile_json["hasToken"] is True
         assert "ghp_secret_value" not in str(profile_json)
         assert "pull_requests" in profile_json["ragTargets"]
+        collected = client.post(f"/api/integration-profiles/{profile_json['id']}/collect", headers=headers)
+        assert collected.status_code == 200
+        assert collected.json()["status"] == "collected"
+        assert collected.json()["saved"][0]["sourceType"] == "github_issue"
+        collected_again = client.post(f"/api/integration-profiles/{profile_json['id']}/collect", headers=headers)
+        assert collected_again.status_code == 200
+        assert collected_again.json()["status"] == "unchanged"
+        assert collected_again.json()["skippedDuplicates"] == 1
 
         knowledge = client.post(
             "/api/knowledge",
@@ -93,7 +115,8 @@ def test_full_fastapi_flow():
             },
         )
         assert knowledge.status_code == 200
-        assert client.get("/api/knowledge", headers=headers).json()["sources"][0]["sourceType"] == "audio"
+        source_types = {source["sourceType"] for source in client.get("/api/knowledge", headers=headers).json()["sources"]}
+        assert {"audio", "github_issue"} <= source_types
         user_rag = client.post("/api/knowledge/rag", headers=headers, json={"question": "design review Figma calendar"}).json()
         assert "Audio meeting automation guide" in user_rag["sources"]
 

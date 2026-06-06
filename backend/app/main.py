@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .collectors import collect_profile_items, save_collected_items
 from .db import get_db, init_db
 from .models import AutomationRun, AutomationTask, Comment, IntegrationProfile, KnowledgeSource, Post, User
 from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
@@ -245,6 +246,26 @@ def delete_integration_profile(profile_id: int, user: User = Depends(current_use
     db.delete(profile)
     db.commit()
     return {"ok": True}
+
+
+@app.post("/api/integration-profiles/{profile_id}/collect")
+def collect_integration_profile(profile_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    profile = db.get(IntegrationProfile, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="연동 프로필을 찾을 수 없습니다.")
+    if profile.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 수집할 수 없습니다.")
+    items, warnings = collect_profile_items(profile)
+    saved = save_collected_items(db, user, profile, items) if items else []
+    status = "collected" if saved else "unchanged" if items else "no-data"
+    return {
+        "profile": serialize_integration_profile(profile),
+        "collected": len(items),
+        "saved": [serialize_knowledge(source) for source in saved],
+        "skippedDuplicates": max(len(items) - len(saved), 0),
+        "warnings": warnings,
+        "status": status,
+    }
 
 
 @app.get("/api/posts")
