@@ -63,6 +63,7 @@
 - `npm run verify:readme` checks that the submitted README still contains the required React/FastAPI/PostgreSQL/RAG/MCP/Agent/verification sections and no obvious UTF-8 mojibake markers.
 - Iterative quality reports are stored in `docs/evaluation-reports` with functionality, UI/design, security/privacy, performance, tests, docs, and next-risk scores.
 - `npm run demo:screenshot` captures the committed demo image at `docs/demo-screenshot.png` through Chrome CDP after logging in as the admin demo user.
+- Final submission checks are summarized in `docs/submission-checklist.md`, including when to refresh the screenshot and which verification commands to run.
 
 ## 운영 Secret/KMS 설정
 
