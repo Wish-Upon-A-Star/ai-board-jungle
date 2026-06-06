@@ -226,6 +226,23 @@ function App() {
   const sharedCount = posts.filter((post) => post.automationTaskId).length;
   const connectionCount = form.custom_connections?.length || 0;
 
+  function clearRunUiState(taskId = null) {
+    if (taskId === null) {
+      setRunHistory({});
+      setExpandedRuns({});
+      setRetryRunState({});
+      return;
+    }
+    const prefix = `${taskId}:`;
+    setRunHistory((current) => {
+      const next = { ...current };
+      delete next[taskId];
+      return next;
+    });
+    setExpandedRuns((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(prefix))));
+    setRetryRunState((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(prefix))));
+  }
+
   function applyPreset(nextPreset) {
     setForm({
       ...nextPreset,
@@ -412,6 +429,7 @@ function App() {
     setProfileSettings(null);
     setTasks([]);
     setPosts([]);
+    clearRunUiState();
   }
 
   async function createAutomation(event) {
@@ -460,6 +478,22 @@ function App() {
     setApiResult(data);
     setSideTab("api");
     await loadAll();
+  }
+
+  async function deleteTask(task) {
+    setError("");
+    try {
+      const data = await api(`/api/automations/${task.id}`, { method: "DELETE" });
+      setResult(data);
+      setApiResult({ called: "automation.delete", response: data, taskId: task.id });
+      setSideTab("api");
+      clearRunUiState(task.id);
+      await loadAll();
+    } catch (err) {
+      setError(err.message);
+      setApiResult({ called: "automation.delete", error: err.message, taskId: task.id });
+      setSideTab("api");
+    }
   }
 
   async function schedulerTick() {
@@ -736,6 +770,7 @@ function App() {
                       <button onClick={() => runTask(task)}><Play size={14} /> Run</button>
                       <button onClick={() => shareTask(task)} className="secondary"><Share2 size={14} /> Share</button>
                       <button onClick={() => loadTaskRuns(task)} className="secondary"><Database size={14} /> Run history</button>
+                      <button onClick={() => deleteTask(task)} className="danger"><Trash2 size={14} /> Delete</button>
                     </div>
                     {runHistory[task.id] ? (
                       <div className="run-history">

@@ -81,6 +81,7 @@ async function main() {
     "PostgreSQL",
     "Dry-run write",
     "Actual write",
+    "Delete",
     "Integration Activity Log",
     "Real-write audit",
     "Google Calendar",

@@ -168,6 +168,7 @@ a:hover { color: #0086d1; }
 .task-actions { display: flex; gap: 6px; margin-top: 10px; }
 .task-actions button:first-child { border-color: #1687c9; color: #1687c9; }
 .task-actions .secondary { color: #555; }
+.task-actions .danger { color: #b42318; border-color: #f1b6b6; }
 .run-history { display: grid; gap: 6px; margin-top: 10px; border-top: 1px solid #f0f0f0; padding-top: 8px; }
 .run-history-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #444; }
 .run-history-head span { color: #666; font-size: 12px; }
