@@ -7,7 +7,10 @@ os.environ["AI_BOARD_DATABASE_URL"] = "sqlite:///:memory:"
 from fastapi.testclient import TestClient
 
 from app.collectors import CollectedItem
+from app.db import SessionLocal
 from app.main import app
+from app.models import IntegrationProfile
+from app.security import reveal_secret
 
 
 def test_full_fastapi_flow(monkeypatch):
@@ -94,8 +97,15 @@ def test_full_fastapi_flow(monkeypatch):
         assert integration_profile.status_code == 200
         profile_json = integration_profile.json()["profile"]
         assert profile_json["hasToken"] is True
+        assert profile_json["tokenStorage"] == "encrypted"
         assert "ghp_secret_value" not in str(profile_json)
         assert "pull_requests" in profile_json["ragTargets"]
+        with SessionLocal() as db:
+            stored_profile = db.get(IntegrationProfile, profile_json["id"])
+            assert stored_profile is not None
+            assert stored_profile.token_value.startswith("enc:v1:")
+            assert "ghp_secret_value" not in stored_profile.token_value
+            assert reveal_secret(stored_profile.token_value) == "ghp_secret_value"
         collected = client.post(f"/api/integration-profiles/{profile_json['id']}/collect?limit=20&pages=2", headers=headers)
         assert collected.status_code == 200
         assert collected.json()["status"] == "collected"

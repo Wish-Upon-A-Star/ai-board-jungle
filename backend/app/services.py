@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from .cache import cache_get, cache_set
 from .config import settings
 from .models import AutomationTask, KnowledgeSource, Post, Tag
+from .security import reveal_secret
 
 
 WORD_RE = re.compile(r"[a-zA-Z0-9가-힣]+")
@@ -115,6 +116,7 @@ def agent_review(db: Session, title: str, content: str) -> dict:
 
 def automation_plan(task: AutomationTask) -> dict:
     targets = []
+    profile_token_ready = bool(reveal_secret(task.integration_profile.token_value)) if task.integration_profile else False
     try:
         custom_connections = json.loads(task.custom_connections or "[]")
     except json.JSONDecodeError:
@@ -179,7 +181,7 @@ def automation_plan(task: AutomationTask) -> dict:
             "sourceKind": task.integration_profile.source_kind,
             "baseUrl": task.integration_profile.base_url,
             "ragTargets": json.loads(task.integration_profile.rag_targets_json or "[]"),
-            "hasToken": bool(task.integration_profile.token_value),
+            "hasToken": profile_token_ready,
         } if task.integration_profile else None,
         "ai": {"provider": task.ai_provider, "model": task.ai_model, "apiBase": task.ai_api_base, "keyStrategy": task.api_key_strategy},
         "intervalMinutes": task.interval_minutes,
@@ -196,7 +198,7 @@ def automation_plan(task: AutomationTask) -> dict:
                 "target": target,
                 "api": task.integration_profile.api_provider,
                 "baseUrl": task.integration_profile.base_url,
-                "mode": "live-token-ready" if task.integration_profile.token_value else "token-required",
+                "mode": "live-token-ready" if profile_token_ready else "token-required",
             }
             for target in (json.loads(task.integration_profile.rag_targets_json or "[]") if task.integration_profile else [])
         ],

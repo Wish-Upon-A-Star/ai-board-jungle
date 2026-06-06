@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "AI Board API"
     database_url: str = "sqlite:///./data/demo-fastapi.db"
     jwt_secret: str = "local-dev-secret-change-me"
+    token_encryption_secret: str = ""
     openai_api_key: str = ""
     openai_chat_model: str = "gpt-4o-mini"
     openai_embedding_model: str = "text-embedding-3-small"

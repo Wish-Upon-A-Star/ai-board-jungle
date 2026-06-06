@@ -195,8 +195,9 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 - 각 프로필은 `종류`, `Base URL`, `요청 API`, `토큰 이름`, `토큰/API Key`, `AI 제공자`, `AI 모델`, `AI API Base`, `RAG가 볼 대상`, `프로필 템플릿`을 가집니다.
 - 자동화 등록 화면에서 `저장된 연동 프로필`을 선택하면 해당 프로필의 API/AI/연결/RAG 설정이 자동화에 복사됩니다.
 - 같은 사용자라도 자동화 A는 GitHub + gpt-4o-mini, 자동화 B는 Notion + 사내 모델처럼 다르게 선택할 수 있습니다.
-- API 응답은 토큰 원문을 반환하지 않고 `hasToken`, `tokenPreview`만 반환합니다.
-- 운영 환경에서는 `token_value`를 DB 암호화 또는 KMS/secret manager로 대체하는 것이 권장됩니다.
+- API 응답은 토큰 원문을 반환하지 않고 `hasToken`, `tokenPreview`, `tokenStorage`만 반환합니다.
+- 새로 저장되는 `token_value`는 `enc:v1:` 형식으로 DB에 암호화 저장됩니다. 운영 환경에서는 `AI_BOARD_TOKEN_ENCRYPTION_SECRET`을 `AI_BOARD_JWT_SECRET`과 다른 긴 랜덤 값으로 설정하십시오.
+- 기존 데모 DB의 평문 토큰은 읽기 호환을 위해 `tokenStorage: legacy`로 표시되며, 새로 저장하는 프로필부터 암호화됩니다.
 
 RAG 지식자료:
 

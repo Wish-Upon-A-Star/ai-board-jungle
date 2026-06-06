@@ -136,7 +136,7 @@ async function main() {
       })
     });
     const data = await response.json();
-    return response.ok && data.profile.hasToken && data.profile.ragTargets.includes("pull_requests") && !JSON.stringify(data).includes("secret-ui-token");
+    return response.ok && data.profile.hasToken && data.profile.tokenStorage === "encrypted" && data.profile.ragTargets.includes("pull_requests") && !JSON.stringify(data).includes("secret-ui-token");
   })()`);
   const collectorApi = await evalJs(`(async () => {
     const token = localStorage.getItem("ai-board-token");

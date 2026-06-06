@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import os
+import secrets
 import time
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -12,6 +13,59 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .db import get_db
 from .models import User
+
+
+SECRET_PREFIX = "enc:v1:"
+
+
+def secret_key() -> bytes:
+    raw = settings().token_encryption_secret or settings().jwt_secret
+    return hashlib.sha256(raw.encode()).digest()
+
+
+def secret_stream(nonce: bytes, length: int) -> bytes:
+    key = secret_key()
+    chunks: list[bytes] = []
+    counter = 0
+    while sum(len(chunk) for chunk in chunks) < length:
+        counter_bytes = counter.to_bytes(4, "big")
+        chunks.append(hmac.new(key, nonce + counter_bytes, hashlib.sha256).digest())
+        counter += 1
+    return b"".join(chunks)[:length]
+
+
+def protect_secret(value: str) -> str:
+    if not value or value.startswith(SECRET_PREFIX):
+        return value
+    raw = value.encode()
+    nonce = secrets.token_bytes(16)
+    stream = secret_stream(nonce, len(raw))
+    cipher = bytes(a ^ b for a, b in zip(raw, stream, strict=True))
+    mac = hmac.new(secret_key(), nonce + cipher, hashlib.sha256).digest()
+    payload = base64.urlsafe_b64encode(nonce + mac + cipher).decode()
+    return f"{SECRET_PREFIX}{payload}"
+
+
+def reveal_secret(value: str) -> str:
+    if not value or not value.startswith(SECRET_PREFIX):
+        return value or ""
+    payload = value.removeprefix(SECRET_PREFIX)
+    try:
+        raw = base64.urlsafe_b64decode(payload.encode())
+        nonce, mac, cipher = raw[:16], raw[16:48], raw[48:]
+        expected = hmac.new(secret_key(), nonce + cipher, hashlib.sha256).digest()
+        if not hmac.compare_digest(mac, expected):
+            return ""
+        stream = secret_stream(nonce, len(cipher))
+        plain = bytes(a ^ b for a, b in zip(cipher, stream, strict=True))
+        return plain.decode()
+    except Exception:
+        return ""
+
+
+def secret_preview(value: str) -> str:
+    plain = reveal_secret(value)
+    return f"{plain[:4]}..." if plain else ""
 
 
 def hash_password(password: str) -> str:

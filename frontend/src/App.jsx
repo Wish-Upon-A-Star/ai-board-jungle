@@ -727,7 +727,7 @@ function App() {
                 {integrationProfiles.map((profile) => (
                   <div key={profile.id} className="knowledge-item">
                     <strong>{profile.name}</strong>
-                    <span>{profile.sourceKind} / {profile.apiProvider} / {profile.aiModel} / token {profile.hasToken ? "저장됨" : "없음"}</span>
+                    <span>{profile.sourceKind} / {profile.apiProvider} / {profile.aiModel} / token {profile.hasToken ? "저장됨" : "없음"} / {profile.tokenStorage || "empty"}</span>
                     <p>{profile.baseUrl} / RAG: {profile.ragTargets.join(", ") || "미설정"}</p>
                     <div className={`collect-status ${profile.lastCollect?.status || "idle"}`}>
                       <b>최근 수집</b>

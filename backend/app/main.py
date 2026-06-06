@@ -12,7 +12,7 @@ from .collectors import collect_profile_items, save_collected_items
 from .db import get_db, init_db
 from .models import AutomationRun, AutomationTask, Comment, IntegrationProfile, KnowledgeSource, Post, User
 from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
-from .security import create_token, current_user, hash_password, verify_password
+from .security import create_token, current_user, hash_password, protect_secret, reveal_secret, secret_preview, verify_password
 from .services import agent_review, automation_fingerprint, automation_plan, get_or_create_tags, instruction_hub, rag_answer, result_to_text, search_posts, summarize
 
 app = FastAPI(title="AI Board API", description="React + FastAPI + PostgreSQL + Redis AI board API.")
@@ -71,6 +71,7 @@ def serialize_knowledge(source: KnowledgeSource) -> dict:
 
 
 def serialize_integration_profile(profile: IntegrationProfile) -> dict:
+    token_plain = reveal_secret(profile.token_value)
     return {
         "id": profile.id,
         "name": profile.name,
@@ -78,8 +79,9 @@ def serialize_integration_profile(profile: IntegrationProfile) -> dict:
         "baseUrl": profile.base_url,
         "apiProvider": profile.api_provider,
         "tokenName": profile.token_name,
-        "hasToken": bool(profile.token_value),
-        "tokenPreview": f"{profile.token_value[:4]}..." if profile.token_value else "",
+        "hasToken": bool(token_plain),
+        "tokenPreview": secret_preview(profile.token_value),
+        "tokenStorage": "encrypted" if profile.token_value.startswith("enc:v1:") else "legacy" if profile.token_value else "empty",
         "aiProvider": profile.ai_provider,
         "aiModel": profile.ai_model,
         "aiApiBase": profile.ai_api_base,
@@ -230,7 +232,7 @@ def create_integration_profile(data: IntegrationProfileIn, user: User = Depends(
         base_url=data.base_url,
         api_provider=data.api_provider,
         token_name=data.token_name,
-        token_value=data.token_value,
+        token_value=protect_secret(data.token_value),
         ai_provider=data.ai_provider,
         ai_model=data.ai_model,
         ai_api_base=data.ai_api_base,

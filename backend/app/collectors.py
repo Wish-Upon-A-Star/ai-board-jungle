@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import IntegrationProfile, KnowledgeSource, User
+from .security import reveal_secret
 from .services import summarize
 
 
@@ -53,7 +54,8 @@ def collect_github(profile: IntegrationProfile, limit: int = 20, pages: int = 2)
     repo = parse_github_repo(profile.base_url)
     if not repo:
         return [], ["GitHub base URL은 https://github.com/<owner>/<repo> 형식이어야 합니다."]
-    if not profile.token_value:
+    token = reveal_secret(profile.token_value)
+    if not token:
         return [], ["GitHub token이 없어 실제 API 수집을 건너뜁니다."]
 
     owner, name = repo
@@ -63,7 +65,7 @@ def collect_github(profile: IntegrationProfile, limit: int = 20, pages: int = 2)
     items: list[CollectedItem] = []
     warnings: list[str] = []
 
-    with httpx.Client(headers=github_headers(profile.token_value), timeout=15.0) as client:
+    with httpx.Client(headers=github_headers(token), timeout=15.0) as client:
         if "issues" in targets:
             for page in range(1, page_count + 1):
                 response = client.get(f"https://api.github.com/repos/{owner}/{name}/issues", params={"state": "all", "per_page": per_page, "page": page})
@@ -137,7 +139,8 @@ def notion_title(properties: dict) -> str:
 
 
 def collect_notion(profile: IntegrationProfile, limit: int = 20, pages: int = 2) -> tuple[list[CollectedItem], list[str]]:
-    if not profile.token_value:
+    token = reveal_secret(profile.token_value)
+    if not token:
         return [], ["Notion token이 없어 실제 API 수집을 건너뜁니다."]
 
     targets = parse_targets(profile.rag_targets_json)
@@ -147,7 +150,7 @@ def collect_notion(profile: IntegrationProfile, limit: int = 20, pages: int = 2)
     items: list[CollectedItem] = []
     warnings: list[str] = []
 
-    with httpx.Client(headers=notion_headers(profile.token_value), timeout=15.0) as client:
+    with httpx.Client(headers=notion_headers(token), timeout=15.0) as client:
         if "notion_database" in targets:
             cursor = None
             for page_number in range(1, page_count + 1):
