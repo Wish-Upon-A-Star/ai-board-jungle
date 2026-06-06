@@ -381,6 +381,20 @@ function App() {
     await loadAll();
   }
 
+  async function schedulerTick() {
+    setError("");
+    try {
+      const data = await api("/api/automations/scheduler/tick", { method: "POST" });
+      setApiResult({ called: "scheduler.tick", response: data });
+      setSideTab("api");
+      await loadAll();
+    } catch (err) {
+      setError(err.message);
+      setApiResult({ called: "scheduler.tick", error: err.message });
+      setSideTab("api");
+    }
+  }
+
   async function callApiDemo(kind) {
     setError("");
     try {
@@ -583,7 +597,11 @@ function App() {
           <section className="main-column">
             <article id="automations" className="panel">
               <div className="panel-title">사용자별 자동화 작업</div>
-              <div className="task-list">
+                <div className="task-list">
+                <div className="scheduler-bar">
+                  <button type="button" onClick={schedulerTick}><CalendarClock size={14} /> Scheduler tick</button>
+                  <span>Runs due active automations and skips unchanged inputs.</span>
+                </div>
                 {tasks.map((task) => (
                   <section key={task.id} className="task-card">
                     <div className="task-head">

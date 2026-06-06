@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -682,6 +682,68 @@ def create_automation(data: AutomationIn, user: User = Depends(current_user), db
     return {"task": serialize_task(task), "plan": automation_plan(task)}
 
 
+def task_due(task: AutomationTask, now: datetime | None = None) -> bool:
+    if task.status != "ACTIVE":
+        return False
+    if not task.last_run_at:
+        return True
+    current_time = now or datetime.now(timezone.utc)
+    last_run = task.last_run_at
+    if last_run.tzinfo is None:
+        last_run = last_run.replace(tzinfo=timezone.utc)
+    return last_run + timedelta(minutes=max(task.interval_minutes, 1)) <= current_time
+
+
+def execute_scheduled_task(db: Session, task: AutomationTask, actor: User) -> dict:
+    current_hash = automation_fingerprint(task)
+    if task.last_input_hash == current_hash:
+        result = {
+            "taskId": task.id,
+            "status": "skipped",
+            "reason": "Watched automation input did not change since the previous run.",
+            "changeHash": current_hash,
+            "scheduled": True,
+        }
+        task.last_result = result_to_text(result)
+        task.last_run_at = datetime.now(timezone.utc)
+        log_activity(
+            db,
+            actor,
+            "automation.run",
+            task.api_provider,
+            "skipped",
+            f"Skipped automation {task.name}: no watched input changes",
+            {"taskId": task.id, "changeHash": current_hash, "scheduled": True},
+            task_id=task.id,
+            profile_id=task.integration_profile_id,
+        )
+        db.commit()
+        return {"task": serialize_task(task), "run": {"id": None, "result": result, "createdPostId": None}}
+    result = automation_plan(task)
+    result["status"] = "changed"
+    result["changeHash"] = current_hash
+    result["scheduled"] = True
+    task.last_result = result_to_text(result)
+    task.last_input_hash = current_hash
+    task.last_run_at = datetime.now(timezone.utc)
+    run = AutomationRun(task_id=task.id, owner_id=task.owner_id, result=task.last_result)
+    db.add(run)
+    log_activity(
+        db,
+        actor,
+        "automation.run",
+        task.api_provider,
+        "changed",
+        f"Ran automation {task.name}",
+        {"taskId": task.id, "changeHash": current_hash, "targets": result.get("targets", []), "scheduled": True},
+        task_id=task.id,
+        profile_id=task.integration_profile_id,
+    )
+    db.commit()
+    db.refresh(run)
+    return {"task": serialize_task(task), "run": {"id": run.id, "result": result, "createdPostId": None}}
+
+
 @app.post("/api/automations/{task_id}/run")
 def run_automation(task_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     task = db.get(AutomationTask, task_id)
@@ -758,6 +820,31 @@ def run_automation(task_id: int, user: User = Depends(current_user), db: Session
     db.commit()
     db.refresh(run)
     return {"task": serialize_task(task), "run": {"id": run.id, "result": result, "createdPostId": None}}
+
+
+@app.post("/api/automations/scheduler/tick")
+def tick_automations(limit: int = 20, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    safe_limit = max(1, min(limit, 100))
+    stmt = select(AutomationTask).where(AutomationTask.status == "ACTIVE").order_by(AutomationTask.created_at.asc())
+    if user.role != "ADMIN":
+        stmt = stmt.where(AutomationTask.owner_id == user.id)
+    tasks = db.scalars(stmt.limit(200)).all()
+    due_tasks = [task for task in tasks if task_due(task)][:safe_limit]
+    results = [execute_scheduled_task(db, task, task.owner) for task in due_tasks]
+    return {
+        "checked": len(tasks),
+        "due": len(due_tasks),
+        "limit": safe_limit,
+        "results": [
+            {
+                "taskId": item["task"]["id"],
+                "taskName": item["task"]["name"],
+                "status": item["run"]["result"]["status"],
+                "runId": item["run"]["id"],
+            }
+            for item in results
+        ],
+    }
 
 
 @app.post("/api/automations/{task_id}/share")

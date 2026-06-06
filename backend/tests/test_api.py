@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timedelta, timezone
 
 os.environ["AI_BOARD_DATABASE_URL"] = "sqlite:///:memory:"
 
@@ -9,7 +10,7 @@ from fastapi.testclient import TestClient
 from app.collectors import CollectedItem
 from app.db import SessionLocal
 from app.main import app
-from app.models import IntegrationProfile
+from app.models import AutomationTask, IntegrationProfile
 from app.security import reveal_secret
 
 
@@ -335,6 +336,34 @@ def test_full_fastapi_flow(monkeypatch):
         profile_filtered = client.get(f"/api/integration-activities?integration_profile_id={profile_json['id']}&limit=2", headers=headers).json()["activities"]
         assert 1 <= len(profile_filtered) <= 2
         assert all(item["integrationProfileId"] == profile_json["id"] for item in profile_filtered)
+
+        scheduled = client.post(
+            "/api/automations",
+            headers=headers,
+            json={
+                "name": "Scheduled due task",
+                "source": "Board",
+                "destination": "Notion",
+                "interval_minutes": 1,
+                "instruction": "Run when scheduler sees this task due.",
+                "template": "title / summary",
+                "api_provider": "FastAPI scheduler",
+                "ai_agent": "SchedulerAgent",
+            },
+        )
+        assert scheduled.status_code == 200
+        scheduled_task_id = scheduled.json()["task"]["id"]
+        first_tick = client.post("/api/automations/scheduler/tick?limit=5", headers=headers)
+        assert first_tick.status_code == 200
+        assert any(item["taskId"] == scheduled_task_id and item["status"] == "changed" for item in first_tick.json()["results"])
+        with SessionLocal() as db:
+            scheduled_task = db.get(AutomationTask, scheduled_task_id)
+            assert scheduled_task is not None
+            scheduled_task.last_run_at = datetime.now(timezone.utc) - timedelta(minutes=5)
+            db.commit()
+        second_tick = client.post("/api/automations/scheduler/tick?limit=5", headers=headers)
+        assert second_tick.status_code == 200
+        assert any(item["taskId"] == scheduled_task_id and item["status"] == "skipped" for item in second_tick.json()["results"])
         assert client.delete(f"/api/automations/{task_id}", headers=headers).status_code == 200
 
         hub = client.post(
@@ -401,6 +430,10 @@ def test_regular_user_only_sees_own_automations():
 
         visible_to_user = client.get("/api/automations", headers=user_headers).json()["tasks"]
         assert [task["name"] for task in visible_to_user] == ["User Calendar task"]
+        user_tick = client.post("/api/automations/scheduler/tick", headers=user_headers)
+        assert user_tick.status_code == 200
+        assert user_tick.json()["results"]
+        assert {item["taskId"] for item in user_tick.json()["results"]} == {user_task.json()["task"]["id"]}
         user_activities = client.get("/api/integration-activities", headers=user_headers).json()["activities"]
         assert user_activities
         assert all(activity["ownerId"] == user.json()["user"]["id"] for activity in user_activities)

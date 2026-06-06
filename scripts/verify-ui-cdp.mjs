@@ -67,6 +67,7 @@ async function main() {
   text = await bodyText();
   const required = [
     "사용자별 자동화 작업",
+    "Scheduler tick",
     "GitHub",
     "Notion",
     "자동화 등록",
@@ -215,6 +216,15 @@ async function main() {
     const data = await response.json();
     return response.ok && Array.isArray(data.activities) && data.activities.every((item) => item.provider === "figma" && item.eventType === "integration_profile.write");
   })()`);
+  const schedulerApi = await evalJs(`(async () => {
+    const token = localStorage.getItem("ai-board-token");
+    const response = await fetch("http://127.0.0.1:8000/api/automations/scheduler/tick?limit=3", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token }
+    });
+    const data = await response.json();
+    return response.ok && typeof data.checked === "number" && Array.isArray(data.results);
+  })()`);
 
   await page.call("Runtime.evaluate", {
     expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('지식자료 저장')).click()",
@@ -278,9 +288,9 @@ async function main() {
   page.close();
   browser.close();
 
-  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, liveWriteApi, activityApi, activityFilterApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
+  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, liveWriteApi, activityApi, activityFilterApi, schedulerApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
   console.log(JSON.stringify(result, null, 2));
-  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !liveWriteApi || !activityApi || !activityFilterApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
+  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !liveWriteApi || !activityApi || !activityFilterApi || !schedulerApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
     process.exit(1);
   }
 }

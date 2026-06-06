@@ -141,6 +141,7 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 관련 API:
 
 - `POST /api/automations/{task_id}/run`
+- `POST /api/automations/scheduler/tick`
 - `POST /api/integrations/hub/run`
 - `POST /api/ai/agent/moderate`
 - `GET /api/profile/settings`
@@ -172,6 +173,13 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 ## API 실행 콘솔
 
 홈페이지의 `API 실행 콘솔` 버튼은 실제 API를 호출합니다.
+
+Scheduler tick:
+
+- `POST /api/automations/scheduler/tick` finds due ACTIVE automations by `last_run_at + interval_minutes`.
+- Normal users run only their own due automations. Admin users can tick all due automations.
+- Each scheduled run uses the same no-change guard as manual run. If watched input is unchanged, the run is recorded as `skipped`.
+- In production, call this endpoint from cron, Windows Task Scheduler, systemd timer, Vercel Cron, or CI schedule.
 
 - `Health`: `GET /api/health`
 - `RAG`: `POST /api/ai/rag`
