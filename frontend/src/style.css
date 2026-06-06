@@ -111,6 +111,13 @@ a:hover { color: #0086d1; }
 .knowledge-item span { display: block; color: #2780c2; margin-bottom: 5px; }
 .knowledge-item p { margin: 0; color: #555; line-height: 1.5; }
 .knowledge-item button { margin-top: 7px; width: 104px; border-color: #1687c9; color: #1687c9; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.collect-status { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 7px; color: #555; }
+.collect-status b, .collect-status span { display: inline-flex; align-items: center; min-height: 20px; margin: 0; padding: 2px 6px; border: 1px solid #e1e1e1; background: #fafafa; color: #555; font-weight: 400; }
+.collect-status b { color: #333; font-weight: 700; background: #fff; }
+.collect-status.collected span:first-of-type { color: #008767; border-color: #b7ead8; background: #f0fdf8; }
+.collect-status.unchanged span:first-of-type { color: #7a5a00; border-color: #eadca8; background: #fffaf0; }
+.collect-status.no-data span:first-of-type { color: #b91c1c; border-color: #ffd4d4; background: #fff5f5; }
+.warning-line { margin-top: 6px !important; color: #b91c1c !important; }
 .api-console { display: grid; gap: 8px; padding: 10px; }
 .api-console textarea { min-height: 68px; }
 .api-buttons { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -86,6 +86,14 @@ def serialize_integration_profile(profile: IntegrationProfile) -> dict:
         "ragTargets": parse_string_list(profile.rag_targets_json),
         "customConnections": parse_connections(profile.custom_connections),
         "customTemplate": profile.custom_template,
+        "lastCollect": {
+            "status": profile.last_collect_status,
+            "collected": profile.last_collect_count,
+            "saved": profile.last_collect_saved,
+            "skippedDuplicates": profile.last_collect_duplicates,
+            "warnings": parse_string_list(profile.last_collect_warnings),
+            "at": str(profile.last_collected_at) if profile.last_collected_at else "",
+        },
         "createdAt": str(profile.created_at),
     }
 
@@ -258,11 +266,21 @@ def collect_integration_profile(profile_id: int, user: User = Depends(current_us
     items, warnings = collect_profile_items(profile)
     saved = save_collected_items(db, user, profile, items) if items else []
     status = "collected" if saved else "unchanged" if items else "no-data"
+    skipped_duplicates = max(len(items) - len(saved), 0)
+    profile.last_collect_status = status
+    profile.last_collect_count = len(items)
+    profile.last_collect_saved = len(saved)
+    profile.last_collect_duplicates = skipped_duplicates
+    profile.last_collect_warnings = json.dumps(warnings, ensure_ascii=False)
+    profile.last_collected_at = datetime.now(timezone.utc)
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
     return {
         "profile": serialize_integration_profile(profile),
         "collected": len(items),
         "saved": [serialize_knowledge(source) for source in saved],
-        "skippedDuplicates": max(len(items) - len(saved), 0),
+        "skippedDuplicates": skipped_duplicates,
         "warnings": warnings,
         "status": status,
     }

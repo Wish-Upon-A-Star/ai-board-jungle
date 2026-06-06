@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import Column, DateTime, ForeignKey, String, Table, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -108,6 +110,12 @@ class IntegrationProfile(Base):
     rag_targets_json: Mapped[str] = mapped_column(Text, default="[]")
     custom_connections: Mapped[str] = mapped_column(Text, default="[]")
     custom_template: Mapped[str] = mapped_column(Text, default="")
+    last_collect_status: Mapped[str] = mapped_column(String(40), default="")
+    last_collect_count: Mapped[int] = mapped_column(default=0)
+    last_collect_saved: Mapped[int] = mapped_column(default=0)
+    last_collect_duplicates: Mapped[int] = mapped_column(default=0)
+    last_collect_warnings: Mapped[str] = mapped_column(Text, default="[]")
+    last_collected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
     owner: Mapped[User] = relationship(back_populates="integration_profiles")
     automations: Mapped[list["AutomationTask"]] = relationship(back_populates="integration_profile")

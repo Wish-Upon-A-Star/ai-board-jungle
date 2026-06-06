@@ -729,6 +729,15 @@ function App() {
                     <strong>{profile.name}</strong>
                     <span>{profile.sourceKind} / {profile.apiProvider} / {profile.aiModel} / token {profile.hasToken ? "저장됨" : "없음"}</span>
                     <p>{profile.baseUrl} / RAG: {profile.ragTargets.join(", ") || "미설정"}</p>
+                    <div className={`collect-status ${profile.lastCollect?.status || "idle"}`}>
+                      <b>최근 수집</b>
+                      <span>{profile.lastCollect?.status || "대기"}</span>
+                      <span>읽음 {profile.lastCollect?.collected || 0}</span>
+                      <span>저장 {profile.lastCollect?.saved || 0}</span>
+                      <span>중복 {profile.lastCollect?.skippedDuplicates || 0}</span>
+                      {profile.lastCollect?.at ? <span>{profile.lastCollect.at}</span> : null}
+                    </div>
+                    {profile.lastCollect?.warnings?.length ? <p className="warning-line">{profile.lastCollect.warnings.join(" / ")}</p> : null}
                     <button type="button" onClick={() => collectIntegrationProfile(profile)}><Search size={14} /> RAG 수집 실행</button>
                   </div>
                 ))}

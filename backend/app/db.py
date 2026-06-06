@@ -121,7 +121,25 @@ def init_db() -> None:
                     rag_targets_json TEXT DEFAULT '[]' NOT NULL,
                     custom_connections TEXT DEFAULT '[]' NOT NULL,
                     custom_template TEXT DEFAULT '' NOT NULL,
+                    last_collect_status VARCHAR(40) DEFAULT '' NOT NULL,
+                    last_collect_count INTEGER DEFAULT 0 NOT NULL,
+                    last_collect_saved INTEGER DEFAULT 0 NOT NULL,
+                    last_collect_duplicates INTEGER DEFAULT 0 NOT NULL,
+                    last_collect_warnings TEXT DEFAULT '[]' NOT NULL,
+                    last_collected_at DATETIME,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             ))
+            integration_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(integration_profiles)")).fetchall()}
+            integration_additions = {
+                "last_collect_status": "VARCHAR(40) DEFAULT '' NOT NULL",
+                "last_collect_count": "INTEGER DEFAULT 0 NOT NULL",
+                "last_collect_saved": "INTEGER DEFAULT 0 NOT NULL",
+                "last_collect_duplicates": "INTEGER DEFAULT 0 NOT NULL",
+                "last_collect_warnings": "TEXT DEFAULT '[]' NOT NULL",
+                "last_collected_at": "DATETIME",
+            }
+            for column, ddl in integration_additions.items():
+                if column not in integration_columns:
+                    conn.execute(text(f"ALTER TABLE integration_profiles ADD COLUMN {column} {ddl}"))
