@@ -55,12 +55,19 @@ function stopLocalServers() {
 }
 
 const env = { PYTHONPATH: "backend", AI_BOARD_DATABASE_URL: "sqlite:///./data/full-verify.db" };
+const skipInstall = process.argv.includes("--skip-install");
 
 stopLocalServers();
 run("python", ["-m", "py_compile", "backend/app/main.py", "backend/app/services.py"]);
-run("python", ["-m", "pip", "install", "-r", "backend/requirements.txt"], { timeout: 180000 });
+if (!skipInstall) {
+  run("python", ["-m", "pip", "install", "-r", "backend/requirements.txt"], { timeout: 180000 });
+} else {
+  console.log("\n== skip dependency install ==");
+}
 run("python", ["-m", "pytest", "backend/tests"], { env });
-run("npm", ["--prefix", "frontend", "install"], { timeout: 180000 });
+if (!skipInstall) {
+  run("npm", ["--prefix", "frontend", "install"], { timeout: 180000 });
+}
 run("npm", ["--prefix", "frontend", "run", "build"]);
 run("python", ["scripts/seed-fastapi.py"], { env });
 

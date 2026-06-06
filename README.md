@@ -24,6 +24,7 @@
 - 게시글 더보기는 이미 화면에 있는 게시글 id를 중복 추가하지 않아, 새 게시글 생성이나 검색 결과 변동 중에도 같은 행이 반복 표시되지 않습니다.
 - CDP 스모크 검증은 실행 전 FastAPI, React, Chrome CDP 연결을 preflight로 확인하고, `CDP Figma dry-run profile` 재사용/중복 정리와 임시 RAG 지식자료 저장/삭제까지 검증합니다.
 - 전체 로컬 검증은 `npm run verify:full`로 FastAPI/React 서버를 한 번만 띄운 뒤 HTTP smoke와 UI CDP smoke를 순차 실행해 포트 경합을 피합니다.
+- 의존성이 이미 설치된 반복 개발 상황에서는 `npm run verify:full:quick`으로 pip/npm install 단계를 건너뛰고 같은 전체 smoke를 빠르게 실행할 수 있습니다.
 
 ## 운영 Secret/KMS 설정
 
@@ -379,6 +380,14 @@ npm run verify:full
 ```
 
 `verify:full` starts managed FastAPI/React servers once, runs backend tests, frontend build, HTTP smoke, then UI CDP smoke in order. Use this instead of running `verify:fastapi` and `smoke:ui` in parallel.
+
+Fast full verification for repeat iterations:
+
+```powershell
+npm run verify:full:quick
+```
+
+`verify:full:quick` uses the same flow as `verify:full` but skips `pip install` and `npm install`, so use it after dependencies are already installed.
 
 PostgreSQL + Redis:
 
