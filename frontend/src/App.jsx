@@ -377,7 +377,11 @@ function App() {
       nextOffset: activityData.nextOffset || 0,
       hasMore: Boolean(activityData.hasMore),
     });
-    if (!selected && postData.posts[0]) setSelected(postData.posts[0]);
+    setSelected((current) => {
+      if (!postData.posts.length) return null;
+      if (!current) return postData.posts[0];
+      return postData.posts.find((post) => post.id === current.id) || postData.posts[0];
+    });
   }
 
   useEffect(() => {
@@ -432,6 +436,7 @@ function App() {
     setProfileSettings(null);
     setTasks([]);
     setPosts([]);
+    setSelected(null);
     clearRunUiState();
     setDeleteConfirmTaskId(null);
   }
