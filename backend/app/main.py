@@ -257,13 +257,15 @@ def delete_integration_profile(profile_id: int, user: User = Depends(current_use
 
 
 @app.post("/api/integration-profiles/{profile_id}/collect")
-def collect_integration_profile(profile_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+def collect_integration_profile(profile_id: int, limit: int = 20, pages: int = 2, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     profile = db.get(IntegrationProfile, profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="연동 프로필을 찾을 수 없습니다.")
     if profile.owner_id != user.id:
         raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 수집할 수 없습니다.")
-    items, warnings = collect_profile_items(profile)
+    safe_limit = max(1, min(limit, 100))
+    safe_pages = max(1, min(pages, 5))
+    items, warnings = collect_profile_items(profile, limit=safe_limit, pages=safe_pages)
     saved = save_collected_items(db, user, profile, items) if items else []
     status = "collected" if saved else "unchanged" if items else "no-data"
     skipped_duplicates = max(len(items) - len(saved), 0)
@@ -283,6 +285,7 @@ def collect_integration_profile(profile_id: int, user: User = Depends(current_us
         "skippedDuplicates": skipped_duplicates,
         "warnings": warnings,
         "status": status,
+        "request": {"limit": safe_limit, "pages": safe_pages},
     }
 
 

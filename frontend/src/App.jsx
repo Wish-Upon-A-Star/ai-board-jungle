@@ -443,7 +443,7 @@ function App() {
   async function collectIntegrationProfile(profile) {
     setError("");
     try {
-      const data = await api(`/api/integration-profiles/${profile.id}/collect`, { method: "POST" });
+      const data = await api(`/api/integration-profiles/${profile.id}/collect?limit=20&pages=2`, { method: "POST" });
       setApiResult({ called: "integration-profile.collect", response: data });
       setSideTab("api");
       await loadAll();
@@ -735,6 +735,7 @@ function App() {
                       <span>읽음 {profile.lastCollect?.collected || 0}</span>
                       <span>저장 {profile.lastCollect?.saved || 0}</span>
                       <span>중복 {profile.lastCollect?.skippedDuplicates || 0}</span>
+                      <span>범위 20 x 2p</span>
                       {profile.lastCollect?.at ? <span>{profile.lastCollect.at}</span> : null}
                     </div>
                     {profile.lastCollect?.warnings?.length ? <p className="warning-line">{profile.lastCollect.warnings.join(" / ")}</p> : null}

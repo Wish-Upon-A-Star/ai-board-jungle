@@ -11,7 +11,9 @@ from app.main import app
 
 
 def test_full_fastapi_flow(monkeypatch):
-    def fake_collect(profile, limit=8):
+    def fake_collect(profile, limit=20, pages=2):
+        assert limit == 20
+        assert pages == 2
         return [
             CollectedItem(
                 title="Mock issue from GitHub",
@@ -94,14 +96,15 @@ def test_full_fastapi_flow(monkeypatch):
         assert profile_json["hasToken"] is True
         assert "ghp_secret_value" not in str(profile_json)
         assert "pull_requests" in profile_json["ragTargets"]
-        collected = client.post(f"/api/integration-profiles/{profile_json['id']}/collect", headers=headers)
+        collected = client.post(f"/api/integration-profiles/{profile_json['id']}/collect?limit=20&pages=2", headers=headers)
         assert collected.status_code == 200
         assert collected.json()["status"] == "collected"
+        assert collected.json()["request"] == {"limit": 20, "pages": 2}
         assert collected.json()["saved"][0]["sourceType"] == "github_issue"
         after_collect_profile = client.get("/api/integration-profiles", headers=headers).json()["profiles"][0]
         assert after_collect_profile["lastCollect"]["status"] == "collected"
         assert after_collect_profile["lastCollect"]["saved"] == 1
-        collected_again = client.post(f"/api/integration-profiles/{profile_json['id']}/collect", headers=headers)
+        collected_again = client.post(f"/api/integration-profiles/{profile_json['id']}/collect?limit=20&pages=2", headers=headers)
         assert collected_again.status_code == 200
         assert collected_again.json()["status"] == "unchanged"
         assert collected_again.json()["skippedDuplicates"] == 1

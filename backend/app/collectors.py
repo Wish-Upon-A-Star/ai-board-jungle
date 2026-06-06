@@ -22,6 +22,18 @@ class CollectedItem:
     tags: list[str]
 
 
+def clamp(value: int, minimum: int, maximum: int) -> int:
+    return max(minimum, min(value, maximum))
+
+
+def parse_targets(raw: str) -> set[str]:
+    try:
+        value = json.loads(raw or "[]")
+        return {str(item) for item in value} if isinstance(value, list) else set()
+    except json.JSONDecodeError:
+        return set()
+
+
 def parse_github_repo(url: str) -> tuple[str, str] | None:
     parsed = urlparse(url)
     parts = [part for part in parsed.path.strip("/").split("/") if part]
@@ -37,7 +49,7 @@ def github_headers(token: str) -> dict:
     return headers
 
 
-def collect_github(profile: IntegrationProfile, limit: int = 8) -> tuple[list[CollectedItem], list[str]]:
+def collect_github(profile: IntegrationProfile, limit: int = 20, pages: int = 2) -> tuple[list[CollectedItem], list[str]]:
     repo = parse_github_repo(profile.base_url)
     if not repo:
         return [], ["GitHub base URL은 https://github.com/<owner>/<repo> 형식이어야 합니다."]
@@ -45,47 +57,58 @@ def collect_github(profile: IntegrationProfile, limit: int = 8) -> tuple[list[Co
         return [], ["GitHub token이 없어 실제 API 수집을 건너뜁니다."]
 
     owner, name = repo
-    targets = set(json.loads(profile.rag_targets_json or "[]"))
-    issues_url = f"https://api.github.com/repos/{owner}/{name}/issues?state=all&per_page={limit}"
-    commits_url = f"https://api.github.com/repos/{owner}/{name}/commits?per_page={limit}"
-    pulls_url = f"https://api.github.com/repos/{owner}/{name}/pulls?state=all&per_page={limit}"
+    targets = parse_targets(profile.rag_targets_json)
+    per_page = clamp(limit, 1, 100)
+    page_count = clamp(pages, 1, 5)
     items: list[CollectedItem] = []
     warnings: list[str] = []
 
     with httpx.Client(headers=github_headers(profile.token_value), timeout=15.0) as client:
         if "issues" in targets:
-            response = client.get(issues_url)
-            if response.is_success:
-                for issue in response.json():
+            for page in range(1, page_count + 1):
+                response = client.get(f"https://api.github.com/repos/{owner}/{name}/issues", params={"state": "all", "per_page": per_page, "page": page})
+                if not response.is_success:
+                    warnings.append(f"GitHub issues 수집 실패: {response.status_code} page={page}")
+                    break
+                rows = response.json()
+                if not rows:
+                    break
+                for issue in rows:
                     if "pull_request" in issue:
                         continue
                     labels = [label.get("name", "") for label in issue.get("labels", [])]
                     text = f"{issue.get('title', '')}\n{issue.get('body') or ''}\nstate: {issue.get('state')}\nlabels: {', '.join(labels)}"
                     items.append(CollectedItem(issue.get("title", "GitHub issue"), "github_issue", issue.get("html_url", ""), text, ["github", "issue", *labels]))
-            else:
-                warnings.append(f"GitHub issues 수집 실패: {response.status_code}")
 
         if "commits" in targets:
-            response = client.get(commits_url)
-            if response.is_success:
-                for commit in response.json():
+            for page in range(1, page_count + 1):
+                response = client.get(f"https://api.github.com/repos/{owner}/{name}/commits", params={"per_page": per_page, "page": page})
+                if not response.is_success:
+                    warnings.append(f"GitHub commits 수집 실패: {response.status_code} page={page}")
+                    break
+                rows = response.json()
+                if not rows:
+                    break
+                for commit in rows:
                     info = commit.get("commit", {})
                     message = info.get("message", "")
                     sha = commit.get("sha", "")[:12]
                     author = (info.get("author") or {}).get("name", "")
                     text = f"{message}\nsha: {sha}\nauthor: {author}\nurl: {commit.get('html_url', '')}"
                     items.append(CollectedItem(f"Commit {sha}: {message.splitlines()[0] if message else 'no message'}", "github_commit", commit.get("html_url", ""), text, ["github", "commit"]))
-            else:
-                warnings.append(f"GitHub commits 수집 실패: {response.status_code}")
 
         if "pull_requests" in targets:
-            response = client.get(pulls_url)
-            if response.is_success:
-                for pull in response.json():
+            for page in range(1, page_count + 1):
+                response = client.get(f"https://api.github.com/repos/{owner}/{name}/pulls", params={"state": "all", "per_page": per_page, "page": page})
+                if not response.is_success:
+                    warnings.append(f"GitHub pull requests 수집 실패: {response.status_code} page={page}")
+                    break
+                rows = response.json()
+                if not rows:
+                    break
+                for pull in rows:
                     text = f"{pull.get('title', '')}\n{pull.get('body') or ''}\nstate: {pull.get('state')}\nmerged: {pull.get('merged_at') is not None}"
                     items.append(CollectedItem(pull.get("title", "GitHub pull request"), "github_pull_request", pull.get("html_url", ""), text, ["github", "pull_request"]))
-            else:
-                warnings.append(f"GitHub pull requests 수집 실패: {response.status_code}")
 
     return items, warnings
 
@@ -113,33 +136,57 @@ def notion_title(properties: dict) -> str:
     return "Notion page"
 
 
-def collect_notion(profile: IntegrationProfile, limit: int = 8) -> tuple[list[CollectedItem], list[str]]:
+def collect_notion(profile: IntegrationProfile, limit: int = 20, pages: int = 2) -> tuple[list[CollectedItem], list[str]]:
     if not profile.token_value:
         return [], ["Notion token이 없어 실제 API 수집을 건너뜁니다."]
 
-    targets = set(json.loads(profile.rag_targets_json or "[]"))
+    targets = parse_targets(profile.rag_targets_json)
     notion_id = extract_notion_id(profile.base_url)
+    page_size = clamp(limit, 1, 100)
+    page_count = clamp(pages, 1, 5)
     items: list[CollectedItem] = []
     warnings: list[str] = []
 
     with httpx.Client(headers=notion_headers(profile.token_value), timeout=15.0) as client:
         if "notion_database" in targets:
-            response = client.post(f"https://api.notion.com/v1/databases/{notion_id}/query", json={"page_size": limit})
-            if response.is_success:
-                for page in response.json().get("results", []):
+            cursor = None
+            for page_number in range(1, page_count + 1):
+                payload = {"page_size": page_size}
+                if cursor:
+                    payload["start_cursor"] = cursor
+                response = client.post(f"https://api.notion.com/v1/databases/{notion_id}/query", json=payload)
+                if not response.is_success:
+                    warnings.append(f"Notion database 수집 실패: {response.status_code} page={page_number}")
+                    break
+                data = response.json()
+                for page in data.get("results", []):
                     title = notion_title(page.get("properties", {}))
                     text = json.dumps(page.get("properties", {}), ensure_ascii=False)
                     items.append(CollectedItem(title, "notion_database_page", page.get("url", ""), text, ["notion", "database"]))
-            else:
-                warnings.append(f"Notion database 수집 실패: {response.status_code}")
+                if not data.get("has_more") or not data.get("next_cursor"):
+                    break
+                cursor = data["next_cursor"]
 
         if "notion_pages" in targets:
             page_response = client.get(f"https://api.notion.com/v1/pages/{notion_id}")
-            block_response = client.get(f"https://api.notion.com/v1/blocks/{notion_id}/children?page_size={limit}")
             if page_response.is_success:
                 page = page_response.json()
                 title = notion_title(page.get("properties", {}))
-                blocks = block_response.json().get("results", []) if block_response.is_success else []
+                blocks = []
+                cursor = None
+                for page_number in range(1, page_count + 1):
+                    params = {"page_size": page_size}
+                    if cursor:
+                        params["start_cursor"] = cursor
+                    block_response = client.get(f"https://api.notion.com/v1/blocks/{notion_id}/children", params=params)
+                    if not block_response.is_success:
+                        warnings.append(f"Notion page block 수집 실패: {block_response.status_code} page={page_number}")
+                        break
+                    data = block_response.json()
+                    blocks.extend(data.get("results", []))
+                    if not data.get("has_more") or not data.get("next_cursor"):
+                        break
+                    cursor = data["next_cursor"]
                 block_text = json.dumps(blocks, ensure_ascii=False)
                 items.append(CollectedItem(title, "notion_page", page.get("url", ""), block_text, ["notion", "page"]))
             else:
@@ -148,11 +195,11 @@ def collect_notion(profile: IntegrationProfile, limit: int = 8) -> tuple[list[Co
     return items, warnings
 
 
-def collect_profile_items(profile: IntegrationProfile, limit: int = 8) -> tuple[list[CollectedItem], list[str]]:
+def collect_profile_items(profile: IntegrationProfile, limit: int = 20, pages: int = 2) -> tuple[list[CollectedItem], list[str]]:
     if profile.source_kind == "github":
-        return collect_github(profile, limit)
+        return collect_github(profile, limit, pages)
     if profile.source_kind == "notion":
-        return collect_notion(profile, limit)
+        return collect_notion(profile, limit, pages)
     return [], [f"{profile.source_kind} 수집기는 아직 커스텀 API 계획만 지원합니다."]
 
 

@@ -80,6 +80,7 @@ async function main() {
     "연동 프로필 저장",
     "RAG 수집 실행",
     "최근 수집",
+    "범위 20 x 2p",
     "RAG 지식자료",
     "어디에 어떻게 작성/사용할지",
     "지식자료 저장",
@@ -145,12 +146,12 @@ async function main() {
     const data = await list.json();
     const profile = data.profiles[0];
     if (!profile) return false;
-    const response = await fetch("http://127.0.0.1:8000/api/integration-profiles/" + profile.id + "/collect", {
+    const response = await fetch("http://127.0.0.1:8000/api/integration-profiles/" + profile.id + "/collect?limit=20&pages=2", {
       method: "POST",
       headers: { Authorization: "Bearer " + token }
     });
     const collected = await response.json();
-    return response.ok && ["collected", "unchanged", "no-data"].includes(collected.status);
+    return response.ok && collected.request.limit === 20 && collected.request.pages === 2 && ["collected", "unchanged", "no-data"].includes(collected.status);
   })()`);
 
   await page.call("Runtime.evaluate", {
