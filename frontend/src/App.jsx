@@ -134,6 +134,36 @@ function Field({ label, children }) {
   return <label className="field"><span>{label}</span>{children}</label>;
 }
 
+function parseRunResult(result) {
+  if (!result) return {};
+  if (typeof result === "object") return result;
+  try {
+    return JSON.parse(result);
+  } catch {
+    return { raw: String(result) };
+  }
+}
+
+function summarizeRunResult(result) {
+  const data = parseRunResult(result);
+  const status = data.status || data.run?.status || data.raw || "unknown";
+  const agent = data.agent || data.aiAgent || "agent";
+  const route = data.route || [data.source, data.destination].filter(Boolean).join(" -> ");
+  const targetCount = Array.isArray(data.targets) ? data.targets.length : 0;
+  const ragCount = Array.isArray(data.externalRagSources) ? data.externalRagSources.length : 0;
+  const parts = [`status: ${status}`, agent];
+  if (route) parts.push(route);
+  if (targetCount) parts.push(`${targetCount} targets`);
+  if (ragCount) parts.push(`${ragCount} RAG sources`);
+  return parts.join(" / ");
+}
+
+function prettyRunResult(result) {
+  const data = parseRunResult(result);
+  if (data.raw) return data.raw;
+  return JSON.stringify(data, null, 2);
+}
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem("ai-board-token") || "");
   const [user, setUser] = useState(null);
@@ -142,6 +172,7 @@ function App() {
   const [posts, setPosts] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [runHistory, setRunHistory] = useState({});
+  const [expandedRuns, setExpandedRuns] = useState({});
   const [integrationProfiles, setIntegrationProfiles] = useState([]);
   const [providerReadiness, setProviderReadiness] = useState([]);
   const [integrationActivities, setIntegrationActivities] = useState([]);
@@ -686,9 +717,15 @@ function App() {
                         </div>
                         {runHistory[task.id].runs.map((run) => (
                           <div key={run.id} className="run-row">
-                            <span>#{run.id}</span>
-                            <span>{run.createdAt}</span>
-                            <p>{run.result}</p>
+                            <div className="run-row-main">
+                              <span>#{run.id}</span>
+                              <span>{run.createdAt}</span>
+                              <p>{summarizeRunResult(run.result)}</p>
+                              <button type="button" className="inline-link" onClick={() => setExpandedRuns((current) => ({ ...current, [run.id]: !current[run.id] }))}>
+                                {expandedRuns[run.id] ? "Hide details" : "Details"}
+                              </button>
+                            </div>
+                            {expandedRuns[run.id] ? <pre className="run-json">{prettyRunResult(run.result)}</pre> : null}
                           </div>
                         ))}
                         {runHistory[task.id].hasMore ? (
