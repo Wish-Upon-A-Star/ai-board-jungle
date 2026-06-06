@@ -70,6 +70,9 @@ async function main() {
     "Notion",
     "자동화 등록",
     "AI 모델",
+    "프로필 기본값",
+    "프로필 불러오기",
+    "현재 설정 프로필 저장",
     "템플릿 선택",
     "커스텀 모델/API",
     "커스텀 연결 칸",
@@ -93,6 +96,13 @@ async function main() {
   await wait(500);
   const afterAddConnection = await bodyText();
   const customConnectionAdded = afterAddConnection.includes("새 연결 3") || afterAddConnection.includes("새 연결");
+
+  await page.call("Runtime.evaluate", {
+    expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('현재 설정 프로필 저장')).click()",
+  });
+  await wait(900);
+  const afterProfileSave = await bodyText();
+  const profileSaved = afterProfileSave.includes("profile.save") || afterProfileSave.includes("profileSettings");
 
   await page.call("Runtime.evaluate", {
     expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('Health')).click()",
@@ -125,9 +135,9 @@ async function main() {
   page.close();
   browser.close();
 
-  const result = { missing, customConnectionAdded, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
+  const result = { missing, customConnectionAdded, profileSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
   console.log(JSON.stringify(result, null, 2));
-  if (missing.length || !customConnectionAdded || !healthOk || !mcpOk || !hubOk || !ran) {
+  if (missing.length || !customConnectionAdded || !profileSaved || !healthOk || !mcpOk || !hubOk || !ran) {
     process.exit(1);
   }
 }

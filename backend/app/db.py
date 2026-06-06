@@ -51,6 +51,19 @@ def init_db() -> None:
             post_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(posts)")).fetchall()}
             if "automation_task_id" not in post_columns:
                 conn.execute(text("ALTER TABLE posts ADD COLUMN automation_task_id INTEGER REFERENCES automation_tasks(id)"))
+            user_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(users)")).fetchall()}
+            user_additions = {
+                "profile_ai_provider": "VARCHAR(80) DEFAULT 'OpenAI'",
+                "profile_ai_model": "VARCHAR(120) DEFAULT 'gpt-4o-mini'",
+                "profile_ai_api_base": "VARCHAR(240) DEFAULT 'https://api.openai.com/v1'",
+                "profile_api_key_strategy": "TEXT DEFAULT '사용자별 환경변수 또는 서버 비밀 저장소에 보관'",
+                "profile_template_preset": "VARCHAR(80) DEFAULT 'github_notion'",
+                "profile_custom_template": "TEXT DEFAULT ''",
+                "profile_custom_connections": "TEXT DEFAULT '[]'",
+            }
+            for column, ddl in user_additions.items():
+                if column not in user_columns:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {column} {ddl}"))
             task_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(automation_tasks)")).fetchall()}
             task_additions = {
                 "github_repo_url": "VARCHAR(300) DEFAULT ''",

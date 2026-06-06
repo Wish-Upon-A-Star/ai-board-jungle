@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from .db import get_db, init_db
 from .models import AutomationRun, AutomationTask, Comment, Post, User
-from .schemas import AutomationIn, CommentIn, InstructionIn, LoginIn, PostIn, QuestionIn, RegisterIn
+from .schemas import AutomationIn, CommentIn, InstructionIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
 from .security import create_token, current_user, hash_password, verify_password
 from .services import agent_review, automation_fingerprint, automation_plan, get_or_create_tags, instruction_hub, rag_answer, result_to_text, search_posts, summarize
 
@@ -25,6 +25,26 @@ def startup() -> None:
 
 def serialize_user(user: User) -> dict:
     return {"id": user.id, "email": user.email, "name": user.name, "role": user.role}
+
+
+def parse_connections(raw: str) -> list[dict]:
+    try:
+        value = json.loads(raw or "[]")
+        return value if isinstance(value, list) else []
+    except json.JSONDecodeError:
+        return []
+
+
+def serialize_profile_settings(user: User) -> dict:
+    return {
+        "aiProvider": user.profile_ai_provider,
+        "aiModel": user.profile_ai_model,
+        "aiApiBase": user.profile_ai_api_base,
+        "apiKeyStrategy": user.profile_api_key_strategy,
+        "templatePreset": user.profile_template_preset,
+        "customTemplate": user.profile_custom_template,
+        "customConnections": parse_connections(user.profile_custom_connections),
+    }
 
 
 def serialize_post(post: Post) -> dict:
@@ -43,10 +63,7 @@ def serialize_post(post: Post) -> dict:
 
 
 def serialize_task(task: AutomationTask) -> dict:
-    try:
-        custom_connections = json.loads(task.custom_connections or "[]")
-    except json.JSONDecodeError:
-        custom_connections = []
+    custom_connections = parse_connections(task.custom_connections)
     return {
         "id": task.id,
         "name": task.name,
@@ -109,7 +126,26 @@ def login(data: LoginIn, db: Session = Depends(get_db)) -> dict:
 
 @app.get("/api/auth/me")
 def me(user: User = Depends(current_user)) -> dict:
-    return {"user": serialize_user(user)}
+    return {"user": serialize_user(user), "profileSettings": serialize_profile_settings(user)}
+
+
+@app.get("/api/profile/settings")
+def get_profile_settings(user: User = Depends(current_user)) -> dict:
+    return {"profileSettings": serialize_profile_settings(user)}
+
+
+@app.put("/api/profile/settings")
+def update_profile_settings(data: ProfileSettingsIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    user.profile_ai_provider = data.ai_provider
+    user.profile_ai_model = data.ai_model
+    user.profile_ai_api_base = data.ai_api_base
+    user.profile_api_key_strategy = data.api_key_strategy
+    user.profile_template_preset = data.template_preset
+    user.profile_custom_template = data.custom_template
+    user.profile_custom_connections = json.dumps([item.model_dump() for item in data.custom_connections], ensure_ascii=False)
+    db.commit()
+    db.refresh(user)
+    return {"profileSettings": serialize_profile_settings(user)}
 
 
 @app.get("/api/posts")

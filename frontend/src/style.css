@@ -84,11 +84,14 @@ a:hover { color: #0086d1; }
 .preset-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .preset-actions button { padding: 4px 8px; }
 .connection-builder { display: grid; gap: 8px; border: 1px solid #e2e2e2; padding: 10px; background: #fcfcfc; }
+.profile-settings-box { border: 1px solid #d7e7f7; padding: 10px; background: #f8fbff; }
 .section-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 .section-head strong { display: block; color: #333; margin-bottom: 3px; }
 .section-head span { display: block; color: #777; line-height: 1.45; }
 .section-head button { width: 116px; flex: 0 0 auto; }
 .section-head.flat { border-top: 1px solid #eee; padding-top: 10px; }
+.profile-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.profile-actions button { width: auto; min-width: 118px; }
 .connection-card { display: grid; gap: 8px; border: 1px solid #dcdcdc; background: #fff; padding: 10px; }
 .connection-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .connection-title strong { color: #333; }

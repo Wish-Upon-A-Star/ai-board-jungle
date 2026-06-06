@@ -142,6 +142,15 @@ def seed() -> None:
                     },
                 ),
             ]
+            profile_defaults = [(admin, defaults[0][2]), (user, defaults[1][2])]
+            for profile_user, values in profile_defaults:
+                profile_user.profile_ai_provider = values["ai_provider"]
+                profile_user.profile_ai_model = values["ai_model"]
+                profile_user.profile_ai_api_base = values["ai_api_base"]
+                profile_user.profile_api_key_strategy = values["api_key_strategy"]
+                profile_user.profile_template_preset = values["template_preset"]
+                profile_user.profile_custom_template = values["custom_template"]
+                profile_user.profile_custom_connections = values["custom_connections"]
             for name, owner_id, values in defaults:
                 task = db.query(AutomationTask).filter(AutomationTask.name == name).first()
                 if not task:

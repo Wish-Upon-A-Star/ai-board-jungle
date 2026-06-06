@@ -19,6 +19,34 @@ def test_full_fastapi_flow():
         token = register.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
 
+        profile = client.put(
+            "/api/profile/settings",
+            headers=headers,
+            json={
+                "ai_provider": "OpenAI",
+                "ai_model": "gpt-4o-mini",
+                "ai_api_base": "https://api.openai.com/v1",
+                "api_key_strategy": "Use per-user secret store variables.",
+                "template_preset": "custom",
+                "custom_template": "title: {title}\nstatus: {status}",
+                "custom_connections": [
+                    {
+                        "label": "Profile Task DB",
+                        "service": "notion",
+                        "url": "https://www.notion.so/workspace/profile-db",
+                        "api": "Notion API",
+                        "auth_key_name": "PROFILE_NOTION_TOKEN",
+                        "operation": "upsert_task_page",
+                        "template": "title: {title}",
+                    }
+                ],
+            },
+        )
+        assert profile.status_code == 200
+        saved_profile = client.get("/api/profile/settings", headers=headers).json()["profileSettings"]
+        assert saved_profile["aiModel"] == "gpt-4o-mini"
+        assert saved_profile["customConnections"][0]["auth_key_name"] == "PROFILE_NOTION_TOKEN"
+
         created = client.post(
             "/api/posts",
             headers=headers,

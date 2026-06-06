@@ -7,10 +7,12 @@ React, FastAPI, PostgreSQL-ready SQLAlchemy, Redis 캐시를 기반으로 만든
 1. 사용자가 회원가입 또는 로그인합니다.
 2. 자동화 작업에 `몇 분마다`, `어디에서`, `어디로`, `지침`, `사용 API`, `AI Agent`, `AI 모델`, `템플릿 선택`, `커스텀 출력 템플릿`, `API Key 관리 방식`을 입력합니다.
 3. 사용자는 `커스텀 연결 칸`을 필요한 만큼 추가합니다. 각 칸에는 표시 이름, 서비스 키, URL/ID, 요청 API, 토큰 변수명, 작업 방식, 연결별 템플릿을 넣습니다.
-4. GitHub/Notion/Figma/Calendar 입력은 빠른 예시용일 뿐이며 필수 대상이 아닙니다. 실제 우선 대상은 사용자가 추가한 커스텀 연결 칸입니다.
-5. Agent가 지침과 연결 칸을 분석해 필요한 대상과 API를 선택합니다.
-6. 사용자는 작업 카드의 `실행` 버튼으로 자동화 계획을 실행하고, `게시판 공유` 버튼으로 결과를 게시글로 남깁니다.
-7. `API 실행 콘솔`에서 Health, RAG, MCP, Agent Hub 버튼을 눌러 실제 FastAPI API 호출 결과를 확인할 수 있습니다.
+4. 자주 쓰는 연결 칸, AI 모델, API base, 토큰 변수명, 커스텀 템플릿은 `프로필 기본값`에 저장합니다.
+5. 새 자동화를 만들 때마다 `프로필 불러오기`로 저장된 설정을 가져오고, 자동화별로 필요한 부분만 바꿉니다.
+6. GitHub/Notion/Figma/Calendar 입력은 빠른 예시용일 뿐이며 필수 대상이 아닙니다. 실제 우선 대상은 사용자가 추가한 커스텀 연결 칸입니다.
+7. Agent가 지침과 연결 칸을 분석해 필요한 대상과 API를 선택합니다.
+8. 사용자는 작업 카드의 `실행` 버튼으로 자동화 계획을 실행하고, `게시판 공유` 버튼으로 결과를 게시글로 남깁니다.
+9. `API 실행 콘솔`에서 Health, RAG, MCP, Agent Hub 버튼을 눌러 실제 FastAPI API 호출 결과를 확인할 수 있습니다.
 
 ## 사용자와 권한
 
@@ -43,6 +45,8 @@ React, FastAPI, PostgreSQL-ready SQLAlchemy, Redis 캐시를 기반으로 만든
 - 사용자별 자동화 작업 등록
 - 사용자별 커스텀 연결 칸 추가/삭제
 - 연결별 서비스 키, URL/ID, 요청 API, 토큰 변수명, 작업 방식, 템플릿 등록
+- 사용자 프로필 기본값 저장/불러오기
+- 자동화별 프로필 설정 재사용
 - GitHub/Notion/Figma/Calendar 빠른 예시 URL 등록
 - 사용자별 AI 제공자, AI 모델, AI API Base 등록
 - 템플릿 프리셋 또는 커스텀 출력 템플릿 선택
@@ -93,6 +97,8 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 - `POST /api/automations/{task_id}/run`
 - `POST /api/integrations/hub/run`
 - `POST /api/ai/agent/moderate`
+- `GET /api/profile/settings`
+- `PUT /api/profile/settings`
 
 ### 변경 감지 실행
 
@@ -131,6 +137,14 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 ## 사용자별 외부 사이트 설정
 
 자동화 등록 폼의 중심은 `커스텀 연결 칸`입니다. 사용자는 연결을 필요한 만큼 추가할 수 있고, Notion/Figma에 고정되지 않습니다.
+
+프로필 기본값:
+
+- `프로필 불러오기`: 현재 로그인한 사용자의 저장된 연결 칸, AI 모델, API base, API Key 관리 전략, 커스텀 템플릿을 자동화 폼에 복사합니다.
+- `현재 설정 프로필 저장`: 현재 자동화 폼의 연결 칸과 AI/API/템플릿 설정을 사용자 프로필에 저장합니다.
+- 저장된 프로필은 새 자동화를 만들 때마다 재사용할 수 있습니다.
+- 자동화 작업은 프로필 값을 복사해 생성되므로, 자동화별로 다른 연결/템플릿을 갖도록 수정할 수 있습니다.
+- 실제 API Key 원문은 저장하지 않고 `NOTION_TOKEN`, `FIGMA_TOKEN`, `JIRA_TOKEN` 같은 토큰 변수명만 저장합니다.
 
 연결 칸 입력값:
 

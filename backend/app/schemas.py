@@ -42,6 +42,16 @@ class CustomConnectionIn(BaseModel):
     template: str = Field(default="", max_length=4000)
 
 
+class ProfileSettingsIn(BaseModel):
+    ai_provider: str = Field(default="OpenAI", min_length=2, max_length=80)
+    ai_model: str = Field(default="gpt-4o-mini", min_length=2, max_length=120)
+    ai_api_base: str = Field(default="", max_length=240)
+    api_key_strategy: str = Field(default="사용자별 환경변수 또는 서버 비밀 저장소에 보관", max_length=2000)
+    template_preset: str = Field(default="github_notion", max_length=80)
+    custom_template: str = Field(default="", max_length=4000)
+    custom_connections: list[CustomConnectionIn] = []
+
+
 class AutomationIn(BaseModel):
     name: str = Field(min_length=2, max_length=160)
     source: str = Field(min_length=2, max_length=120)

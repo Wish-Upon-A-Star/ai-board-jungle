@@ -143,6 +143,7 @@ function App() {
   const [apiPrompt, setApiPrompt] = useState("GitHub 이슈를 읽어서 Notion 업무 DB 양식으로 넣고, 디자인 확인이 필요하면 Figma에도 코멘트를 남겨줘.");
   const [sideTab, setSideTab] = useState("selected");
   const [form, setForm] = useState(githubNotionPreset);
+  const [profileSettings, setProfileSettings] = useState(null);
   const [error, setError] = useState("");
 
   const myTasks = useMemo(() => tasks.filter((task) => task.owner.id === user?.id), [tasks, user]);
@@ -173,6 +174,58 @@ function App() {
     setForm({ ...form, custom_connections: (form.custom_connections || []).filter((_, itemIndex) => itemIndex !== index) });
   }
 
+  function profileToFormPatch(settings) {
+    return {
+      ai_provider: settings.aiProvider,
+      ai_model: settings.aiModel,
+      ai_api_base: settings.aiApiBase,
+      api_key_strategy: settings.apiKeyStrategy,
+      template_preset: settings.templatePreset,
+      custom_template: settings.customTemplate,
+      custom_connections: (settings.customConnections || []).map((connection) => ({ ...connection })),
+    };
+  }
+
+  function currentFormProfilePayload() {
+    return {
+      ai_provider: form.ai_provider,
+      ai_model: form.ai_model,
+      ai_api_base: form.ai_api_base,
+      api_key_strategy: form.api_key_strategy,
+      template_preset: form.template_preset,
+      custom_template: form.custom_template,
+      custom_connections: form.custom_connections || [],
+    };
+  }
+
+  function applyProfileSettings() {
+    if (!profileSettings) return;
+    setForm({ ...form, ...profileToFormPatch(profileSettings) });
+  }
+
+  async function saveProfileSettings() {
+    setError("");
+    try {
+      const data = await api("/api/profile/settings", { method: "PUT", body: JSON.stringify(currentFormProfilePayload()) });
+      setProfileSettings(data.profileSettings);
+      setApiResult({ called: "profile.save", response: data });
+      setSideTab("api");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function reloadProfileSettings() {
+    setError("");
+    try {
+      const data = await api("/api/profile/settings");
+      setProfileSettings(data.profileSettings);
+      setForm({ ...form, ...profileToFormPatch(data.profileSettings) });
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function loadAll(query = q) {
     const [postData, taskData] = await Promise.all([
       api(`/api/posts?q=${encodeURIComponent(query)}`),
@@ -186,7 +239,10 @@ function App() {
   useEffect(() => {
     if (!token) return;
     api("/api/auth/me")
-      .then((data) => setUser(data.user))
+      .then((data) => {
+        setUser(data.user);
+        setProfileSettings(data.profileSettings);
+      })
       .catch(() => {
         localStorage.removeItem("ai-board-token");
         setToken("");
@@ -229,6 +285,7 @@ function App() {
     localStorage.removeItem("ai-board-token");
     setToken("");
     setUser(null);
+    setProfileSettings(null);
     setTasks([]);
     setPosts([]);
   }
@@ -330,7 +387,7 @@ function App() {
           <div className={user.role === "ADMIN" ? "avatar admin" : "avatar user"}>{user.role === "ADMIN" ? "A" : "U"}</div>
           <div>
             <h1>{user.name}</h1>
-            <p><Badge role={user.role} /> 사용자별 사이트/API/AI 모델을 입력해 실행하는 자동화 게시판</p>
+            <p><Badge role={user.role} /> 프로필에 저장한 연결/API/AI 모델을 자동화마다 불러와 실행하는 게시판</p>
           </div>
         </section>
 
@@ -394,6 +451,22 @@ function App() {
                 </div>
               </div>
               <form className="automation-form" onSubmit={createAutomation}>
+                <section className="profile-settings-box">
+                  <div className="section-head">
+                    <div>
+                      <strong>프로필 기본값</strong>
+                      <span>
+                        저장된 AI 모델 {profileSettings?.aiModel || "미설정"} /
+                        연결 {profileSettings?.customConnections?.length || 0}개.
+                        자동화마다 불러온 뒤 필요한 부분만 바꿔 저장합니다.
+                      </span>
+                    </div>
+                    <div className="profile-actions">
+                      <button type="button" onClick={reloadProfileSettings}><Link2 size={14} /> 프로필 불러오기</button>
+                      <button type="button" onClick={saveProfileSettings}><KeyRound size={14} /> 현재 설정 프로필 저장</button>
+                    </div>
+                  </div>
+                </section>
                 <Field label="작업명"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
                 <div className="grid2">
                   <Field label="어디에서"><input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} /></Field>
