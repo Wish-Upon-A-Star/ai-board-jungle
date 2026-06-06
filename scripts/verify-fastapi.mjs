@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
-import { rmSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 function mergedEnv(patch = {}) {
   return Object.fromEntries(
@@ -7,18 +8,30 @@ function mergedEnv(patch = {}) {
   );
 }
 
+function commandFor(cmd, args) {
+  if (cmd === "node") return { executable: process.execPath, args };
+  if (cmd === "npm") {
+    const npmCli = join(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
+    if (existsSync(npmCli)) return { executable: process.execPath, args: [npmCli, ...args] };
+    return { executable: process.platform === "win32" ? "npm.cmd" : "npm", args };
+  }
+  if (process.platform === "win32" && cmd === "powershell") return { executable: "powershell.exe", args };
+  return { executable: cmd, args };
+}
+
 function run(cmd, args, opts = {}) {
   console.log(`\n== ${cmd} ${args.join(" ")} ==`);
-  const r = spawnSync(cmd, args, { shell: true, stdio: "inherit", env: mergedEnv(opts.env), timeout: opts.timeout ?? 120000 });
+  const command = commandFor(cmd, args);
+  const r = spawnSync(command.executable, command.args, { shell: false, stdio: "inherit", env: mergedEnv(opts.env), timeout: opts.timeout ?? 120000 });
   if (r.status !== 0) {
-    console.error(`FAILED ${cmd} ${args.join(" ")} status=${r.status} signal=${r.signal}`);
+    console.error(`FAILED ${cmd} ${args.join(" ")} status=${r.status} signal=${r.signal} error=${r.error ?? ""}`);
     process.exit(r.status ?? 1);
   }
 }
 
 function start(cmd, args, env, opts = {}) {
-  const executable = cmd === "node" ? process.execPath : cmd;
-  return spawn(executable, args, { shell: false, stdio: "inherit", env: mergedEnv(env), cwd: opts.cwd });
+  const command = commandFor(cmd, args);
+  return spawn(command.executable, command.args, { shell: false, stdio: "inherit", env: mergedEnv(env), cwd: opts.cwd });
 }
 
 async function wait(url) {
@@ -40,12 +53,12 @@ function resetVerifyDb() {
   }
 }
 function stopLocalServers() {
-  run("powershell", ["-NoProfile", "-Command", "\"1..8 | ForEach-Object { Get-NetTCPConnection -LocalPort 3000,8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 1000 }; exit 0\""], { timeout: 30000 });
+  run("powershell", ["-NoProfile", "-Command", "1..8 | ForEach-Object { Get-NetTCPConnection -LocalPort 3000,8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 1000 }; exit 0"], { timeout: 30000 });
 }
 function stop(processHandle) {
   if (!processHandle || processHandle.killed) return;
   if (process.platform === "win32") {
-    spawnSync("taskkill", ["/pid", String(processHandle.pid), "/T", "/F"], { shell: true, stdio: "ignore" });
+    spawnSync("taskkill", ["/pid", String(processHandle.pid), "/T", "/F"], { shell: false, stdio: "ignore" });
   } else {
     processHandle.kill("SIGTERM");
   }

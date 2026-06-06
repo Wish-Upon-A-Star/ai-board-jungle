@@ -28,6 +28,7 @@
 - `verify:full`과 `verify:full:quick`은 시작할 때 `data/full-verify.db`와 SQLite sidecar 파일을 초기화해 이전 검증 데이터가 결과에 섞이지 않게 합니다.
 - `verify:fastapi`도 시작할 때 `data/fastapi-verify.db`와 SQLite sidecar 파일을 초기화하고 종료 시 3000/8000 포트를 정리합니다.
 - `verify:fastapi` runs the Vite dev server directly and kills the spawned process tree on Windows, so repeated smoke checks do not leave orphaned local servers.
+- Local verification resolves npm through `npm-cli.js` under the active Node install and runs short commands without shell argument concatenation.
 
 ## 운영 Secret/KMS 설정
 
