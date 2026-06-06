@@ -51,3 +51,22 @@ def init_db() -> None:
             post_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(posts)")).fetchall()}
             if "automation_task_id" not in post_columns:
                 conn.execute(text("ALTER TABLE posts ADD COLUMN automation_task_id INTEGER REFERENCES automation_tasks(id)"))
+            task_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(automation_tasks)")).fetchall()}
+            task_additions = {
+                "github_repo_url": "VARCHAR(300) DEFAULT ''",
+                "github_project_url": "VARCHAR(300) DEFAULT ''",
+                "notion_database_url": "VARCHAR(300) DEFAULT ''",
+                "figma_file_url": "VARCHAR(300) DEFAULT ''",
+                "calendar_id": "VARCHAR(160) DEFAULT 'primary'",
+                "ai_provider": "VARCHAR(80) DEFAULT 'OpenAI'",
+                "ai_model": "VARCHAR(120) DEFAULT 'gpt-4o-mini'",
+                "ai_api_base": "VARCHAR(240) DEFAULT ''",
+                "api_key_strategy": "TEXT DEFAULT '사용자별 환경변수 또는 서버 비밀 저장소에 보관'",
+                "request_template": "TEXT DEFAULT ''",
+                "github_issue_template": "TEXT DEFAULT ''",
+                "notion_template": "TEXT DEFAULT ''",
+                "figma_template": "TEXT DEFAULT ''",
+            }
+            for column, ddl in task_additions.items():
+                if column not in task_columns:
+                    conn.execute(text(f"ALTER TABLE automation_tasks ADD COLUMN {column} {ddl}"))

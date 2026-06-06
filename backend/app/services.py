@@ -82,24 +82,65 @@ def automation_plan(task: AutomationTask) -> dict:
     targets = []
     text = f"{task.source} {task.destination} {task.instruction} {task.api_provider}".lower()
     if re.search(r"github|깃허브|git hub|kanban|칸반|issue|이슈", text):
-        targets.append({"target": "github", "api": "GitHub REST/CLI", "mode": "live" if settings().github_token else "connector-or-cli"})
+        targets.append({
+            "target": "github",
+            "api": "GitHub REST/CLI",
+            "mode": "live" if settings().github_token else "user-token-required",
+            "site": task.github_repo_url or task.github_project_url,
+            "template": task.github_issue_template,
+            "operation": "issue_create_or_update",
+        })
     if re.search(r"notion|노션", text):
-        targets.append({"target": "notion", "api": "Notion API/MCP", "mode": "live" if settings().notion_token else "connector"})
+        targets.append({
+            "target": "notion",
+            "api": "Notion API/MCP",
+            "mode": "live" if settings().notion_token else "user-token-required",
+            "site": task.notion_database_url,
+            "template": task.notion_template,
+            "operation": "database_row_upsert",
+        })
     if re.search(r"calendar|캘린더|google|구글|일정", text):
-        targets.append({"target": "google_calendar", "api": "Google Calendar API", "mode": "live" if settings().google_access_token else "needs-token"})
+        targets.append({
+            "target": "google_calendar",
+            "api": "Google Calendar API",
+            "mode": "live" if settings().google_access_token else "user-token-required",
+            "site": task.calendar_id,
+            "template": task.request_template,
+            "operation": "event_create",
+        })
     if re.search(r"figma|피그마|design|디자인", text):
-        targets.append({"target": "figma", "api": "Figma API/MCP", "mode": "live" if settings().figma_token else "connector"})
+        targets.append({
+            "target": "figma",
+            "api": "Figma API/MCP",
+            "mode": "live" if settings().figma_token else "user-token-required",
+            "site": task.figma_file_url,
+            "template": task.figma_template,
+            "operation": "comment_or_section_create",
+        })
     if not targets:
-        targets.append({"target": "board", "api": "FastAPI", "mode": "local"})
+        targets.append({"target": "board", "api": "FastAPI", "mode": "local", "site": "AI Board", "template": task.template, "operation": "post_create"})
     return {
         "taskId": task.id,
         "agent": task.ai_agent,
+        "ai": {"provider": task.ai_provider, "model": task.ai_model, "apiBase": task.ai_api_base, "keyStrategy": task.api_key_strategy},
         "intervalMinutes": task.interval_minutes,
         "route": f"{task.source} -> {task.destination}",
         "template": task.template,
+        "requestTemplate": task.request_template,
         "instruction": task.instruction,
         "targets": targets,
         "loopGuard": {"maxToolCalls": 6, "timeoutSeconds": 45, "retry": 1},
+        "exampleTransform": {
+            "githubIssueToNotion": {
+                "from": task.github_issue_template,
+                "to": task.notion_template,
+                "targetDatabase": task.notion_database_url,
+            },
+            "notionToFigmaOrCalendar": {
+                "figma": task.figma_template,
+                "calendar": task.request_template,
+            },
+        },
     }
 
 
@@ -115,6 +156,19 @@ async def instruction_hub(instruction: str) -> dict:
         template="요약, 실행 대상, 실패 사유를 남긴다.",
         api_provider="GitHub/Notion/Google/Figma",
         ai_agent="AutomationPlannerAgent",
+        github_repo_url="사용자가 입력한 GitHub 저장소 URL",
+        github_project_url="사용자가 입력한 GitHub Project URL",
+        notion_database_url="사용자가 입력한 Notion DB URL",
+        figma_file_url="사용자가 입력한 Figma 파일 URL",
+        calendar_id="primary",
+        ai_provider="OpenAI",
+        ai_model="gpt-4o-mini",
+        ai_api_base="",
+        api_key_strategy="사용자별 환경변수 또는 서버 비밀 저장소에 보관",
+        request_template="요청 제목 / 담당자 / 마감일 / 링크 / 다음 액션",
+        github_issue_template="이슈 제목 / 본문 / 라벨 / 담당자 / 마감일",
+        notion_template="업무명 / 상태 / GitHub 링크 / 요약 / 담당자 / 마감일",
+        figma_template="섹션명 / 확인 기준 / 관련 링크 / 담당자",
     )
     plan = automation_plan(pseudo)
     return {

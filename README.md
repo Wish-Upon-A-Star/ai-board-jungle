@@ -5,10 +5,11 @@ React, FastAPI, PostgreSQL-ready SQLAlchemy, Redis 캐시를 기반으로 만든
 ## 주요 사용 흐름
 
 1. 사용자가 회원가입 또는 로그인합니다.
-2. 자동화 작업에 `몇 분마다`, `어디에서`, `어디로`, `지침`, `결과 템플릿`, `사용 API`, `AI Agent`를 입력합니다.
-3. Agent가 지침을 분석해 GitHub, Notion, Google Calendar, Figma, 게시판 중 필요한 대상과 API를 선택합니다.
-4. 사용자는 작업 카드의 `실행` 버튼으로 자동화 계획을 실행하고, `게시판 공유` 버튼으로 결과를 게시글로 남깁니다.
-5. `API 실행 콘솔`에서 Health, RAG, MCP, Agent Hub 버튼을 눌러 실제 FastAPI API 호출 결과를 확인할 수 있습니다.
+2. 자동화 작업에 `몇 분마다`, `어디에서`, `어디로`, `지침`, `결과 템플릿`, `사용 API`, `AI Agent`, `AI 모델`, `요청 사이트 URL`, `API Key 관리 방식`을 입력합니다.
+3. 사용자는 자기 GitHub repo/project URL, Notion DB URL, Figma file URL, Google Calendar ID를 직접 입력합니다. 특정 개발자 계정에 고정하지 않습니다.
+4. Agent가 지침을 분석해 GitHub, Notion, Google Calendar, Figma, 게시판 중 필요한 대상과 API를 선택합니다.
+5. 사용자는 작업 카드의 `실행` 버튼으로 자동화 계획을 실행하고, `게시판 공유` 버튼으로 결과를 게시글로 남깁니다.
+6. `API 실행 콘솔`에서 Health, RAG, MCP, Agent Hub 버튼을 눌러 실제 FastAPI API 호출 결과를 확인할 수 있습니다.
 
 ## 사용자와 권한
 
@@ -39,6 +40,10 @@ React, FastAPI, PostgreSQL-ready SQLAlchemy, Redis 캐시를 기반으로 만든
 - 태그
 - 페이징과 검색
 - 사용자별 자동화 작업 등록
+- 사용자별 GitHub/Notion/Figma/Calendar 대상 URL 등록
+- 사용자별 AI 제공자, AI 모델, AI API Base 등록
+- 사용자별 API Key 관리 전략 기록
+- GitHub 이슈 템플릿, Notion 반영 템플릿, Figma 작업 템플릿 등록
 - 자동화 작업 실행
 - 자동화 실행 결과 게시판 공유
 - 실제 API 실행 콘솔
@@ -68,7 +73,14 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 
 ### AI Agent
 
-자동화 작업의 source, destination, instruction, api_provider를 읽고 필요한 도구를 선택합니다. GitHub, Notion, Google Calendar, Figma, Board 중 대상 API를 고르고, 무한 루프 방지를 위해 max tool calls, timeout, retry 제한을 결과에 포함합니다.
+자동화 작업의 source, destination, instruction, api_provider, 연결 URL, AI 모델, 템플릿을 읽고 필요한 도구를 선택합니다. GitHub, Notion, Google Calendar, Figma, Board 중 대상 API를 고르고, 무한 루프 방지를 위해 max tool calls, timeout, retry 제한을 결과에 포함합니다.
+
+예시 변환:
+
+- GitHub 이슈 생성 템플릿: `제목 / 본문 / 라벨 / 담당자 / 마감일`
+- Notion DB 반영 템플릿: `업무명 / 상태 / GitHub 링크 / 요약 / 담당자 / 마감일 / 다음 액션`
+- Figma 작업 템플릿: `섹션명 / 확인 기준 / 관련 게시글 / 담당자`
+- Calendar 템플릿: `일정 제목 / 시작 / 종료 / 설명 / 링크`
 
 관련 API:
 
@@ -86,6 +98,22 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 - `Agent Hub`: `POST /api/integrations/hub/run`
 
 응답은 우측 `API` 탭에 JSON으로 표시됩니다.
+
+## 사용자별 외부 사이트 설정
+
+자동화 등록 폼에는 아래 입력값이 있습니다.
+
+- GitHub Repo URL: `https://github.com/<owner>/<repo>`
+- GitHub Project URL: `https://github.com/users/<owner>/projects/<number>`
+- Notion DB URL: `https://www.notion.so/<workspace>/<database-id>`
+- Figma File URL: `https://www.figma.com/design/<fileKey>/<fileName>`
+- Google Calendar ID: 보통 `primary`, 공유 캘린더는 해당 calendar id
+- AI 제공자: `OpenAI`, `Anthropic`, `Gemini`, `Vercel AI Gateway`, `사내 LLM Gateway` 등
+- AI 모델: 예시 `gpt-4o-mini`, `gpt-4.1-mini`, `claude-sonnet-4`, `gemini-2.5-pro`
+- AI API Base: OpenAI 호환 gateway 또는 사내 gateway URL
+- API Key 관리: `.env`, 서버 비밀 저장소, 사용자별 encrypted credential store 등
+
+보안상 실제 API Key 값을 게시판 작업 데이터에 직접 저장하지 않는 것을 전제로 합니다. 작업에는 “어떤 키를 어디서 꺼내 쓸지” 전략을 남기고, 실제 키는 `.env`나 운영 비밀 저장소에서 주입합니다.
 
 ## 아키텍처
 

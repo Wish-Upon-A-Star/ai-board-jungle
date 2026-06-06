@@ -51,6 +51,19 @@ def serialize_task(task: AutomationTask) -> dict:
         "template": task.template,
         "apiProvider": task.api_provider,
         "aiAgent": task.ai_agent,
+        "githubRepoUrl": task.github_repo_url,
+        "githubProjectUrl": task.github_project_url,
+        "notionDatabaseUrl": task.notion_database_url,
+        "figmaFileUrl": task.figma_file_url,
+        "calendarId": task.calendar_id,
+        "aiProvider": task.ai_provider,
+        "aiModel": task.ai_model,
+        "aiApiBase": task.ai_api_base,
+        "apiKeyStrategy": task.api_key_strategy,
+        "requestTemplate": task.request_template,
+        "githubIssueTemplate": task.github_issue_template,
+        "notionTemplate": task.notion_template,
+        "figmaTemplate": task.figma_template,
         "status": task.status,
         "lastResult": task.last_result,
         "lastRunAt": str(task.last_run_at) if task.last_run_at else None,
@@ -155,6 +168,19 @@ def create_automation(data: AutomationIn, user: User = Depends(current_user), db
         template=data.template,
         api_provider=data.api_provider,
         ai_agent=data.ai_agent,
+        github_repo_url=data.github_repo_url,
+        github_project_url=data.github_project_url,
+        notion_database_url=data.notion_database_url,
+        figma_file_url=data.figma_file_url,
+        calendar_id=data.calendar_id,
+        ai_provider=data.ai_provider,
+        ai_model=data.ai_model,
+        ai_api_base=data.ai_api_base,
+        api_key_strategy=data.api_key_strategy,
+        request_template=data.request_template,
+        github_issue_template=data.github_issue_template,
+        notion_template=data.notion_template,
+        figma_template=data.figma_template,
         status=data.status,
     )
     db.add(task)
@@ -195,6 +221,21 @@ def share_automation(task_id: int, user: User = Depends(current_user), db: Sessi
 - 템플릿: {task.template}
 - API: {task.api_provider}
 - AI Agent: {task.ai_agent}
+- AI 모델: {task.ai_provider} / {task.ai_model}
+- GitHub: {task.github_repo_url or task.github_project_url or "미설정"}
+- Notion: {task.notion_database_url or "미설정"}
+- Figma: {task.figma_file_url or "미설정"}
+- Calendar: {task.calendar_id}
+- API Key 전략: {task.api_key_strategy}
+
+GitHub 이슈 템플릿:
+{task.github_issue_template}
+
+Notion 반영 템플릿:
+{task.notion_template}
+
+Figma 작업 템플릿:
+{task.figma_template}
 
 최근 실행 결과:
 {result}
