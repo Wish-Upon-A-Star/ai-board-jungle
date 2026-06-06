@@ -154,6 +154,13 @@ def test_full_fastapi_flow(monkeypatch):
         assert figma_write.json()["write"]["status"] == "ready"
         assert figma_write.json()["write"]["service"] == "figma"
         assert "figma_secret_value" not in str(figma_write.json())
+        blocked_live_write = client.post(
+            f"/api/integration-profiles/{figma_profile.json()['profile']['id']}/write",
+            headers=headers,
+            json={"title": "Blocked live write", "body": "Missing confirmation.", "dry_run": False},
+        )
+        assert blocked_live_write.status_code == 400
+        assert "WRITE LIVE" in blocked_live_write.json()["detail"]
 
         calendar_profile = client.post(
             "/api/integration-profiles",

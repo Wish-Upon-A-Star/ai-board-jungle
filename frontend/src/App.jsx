@@ -154,6 +154,7 @@ function App() {
   const [sideTab, setSideTab] = useState("selected");
   const [form, setForm] = useState(githubNotionPreset);
   const [profileSettings, setProfileSettings] = useState(null);
+  const [liveWriteConfirmations, setLiveWriteConfirmations] = useState({});
   const [knowledgeForm, setKnowledgeForm] = useState({
     title: "운영 자동화 지침",
     source_type: "document",
@@ -503,15 +504,23 @@ function App() {
     }
   }
 
-  async function writeIntegrationProfile(profile) {
+  async function writeIntegrationProfile(profile, dryRun = true) {
     setError("");
+    const confirmation = liveWriteConfirmations[profile.id] || "";
+    if (!dryRun && confirmation.trim() !== "WRITE LIVE") {
+      setError("실제 외부 쓰기는 확인 문구 WRITE LIVE를 입력해야 실행됩니다.");
+      setApiResult({ called: "integration-profile.write", error: "Missing confirmation text WRITE LIVE" });
+      setSideTab("api");
+      return;
+    }
     try {
       const data = await api(`/api/integration-profiles/${profile.id}/write`, {
         method: "POST",
         body: JSON.stringify({
-          title: `AI Board ${profile.sourceKind} write check`,
-          body: `Dry-run from ${profile.name}. Use dry_run=false through the API for an actual external write.`,
-          dry_run: true,
+          title: `AI Board ${profile.sourceKind} ${dryRun ? "write check" : "live write"}`,
+          body: `${dryRun ? "Dry-run" : "Actual write"} from ${profile.name}.`,
+          dry_run: dryRun,
+          confirmation,
         }),
       });
       setApiResult({ called: "integration-profile.write", response: data });
@@ -869,7 +878,23 @@ function App() {
                     {profile.lastCollect?.warnings?.length ? <p className="warning-line">{profile.lastCollect.warnings.join(" / ")}</p> : null}
                     <button type="button" onClick={() => collectIntegrationProfile(profile)}><Search size={14} /> RAG 수집 실행</button>
                     {["figma", "google_calendar"].includes(profile.sourceKind) ? (
-                      <button type="button" onClick={() => writeIntegrationProfile(profile)}><Play size={14} /> Live write check</button>
+                      <div className="live-write-controls">
+                        <button type="button" onClick={() => writeIntegrationProfile(profile, true)}><Play size={14} /> Dry-run write</button>
+                        <input
+                          aria-label={`${profile.name} live write confirmation`}
+                          value={liveWriteConfirmations[profile.id] || ""}
+                          onChange={(e) => setLiveWriteConfirmations({ ...liveWriteConfirmations, [profile.id]: e.target.value })}
+                          placeholder="WRITE LIVE"
+                        />
+                        <button
+                          type="button"
+                          className="danger-action"
+                          disabled={(liveWriteConfirmations[profile.id] || "").trim() !== "WRITE LIVE"}
+                          onClick={() => writeIntegrationProfile(profile, false)}
+                        >
+                          <Play size={14} /> Actual write
+                        </button>
+                      </div>
                     ) : null}
                   </div>
                 ))}

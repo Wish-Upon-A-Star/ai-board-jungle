@@ -473,6 +473,8 @@ def write_integration_profile(profile_id: int, data: LiveWriteIn, user: User = D
         raise HTTPException(status_code=404, detail="?곕룞 ?꾨줈?꾩쓣 李얠쓣 ???놁뒿?덈떎.")
     if profile.owner_id != user.id:
         raise HTTPException(status_code=403, detail="?ㅻⅨ ?ъ슜?먯쓽 ?곕룞 ?꾨줈?꾩? ?ㅽ뻾?????놁뒿?덈떎.")
+    if not data.dry_run and data.confirmation.strip() != "WRITE LIVE":
+        raise HTTPException(status_code=400, detail="Actual external writes require confirmation text WRITE LIVE.")
     result = execute_profile_write(
         profile,
         title=data.title,
@@ -488,7 +490,7 @@ def write_integration_profile(profile_id: int, data: LiveWriteIn, user: User = D
         profile.source_kind,
         result.get("status", "unknown"),
         f"{profile.source_kind} live write {result.get('status', 'unknown')} for {profile.name}",
-        {key: value for key, value in result.items() if key != "payload"},
+        {**{key: value for key, value in result.items() if key != "payload"}, "dryRun": data.dry_run},
         profile_id=profile.id,
     )
     db.commit()

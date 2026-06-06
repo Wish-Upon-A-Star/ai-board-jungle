@@ -6,6 +6,7 @@
 - 사용자는 서버 DB에 자기 계정별 연동 프로필, 토큰, AI provider/model/API base, RAG 수집 범위, 자동화별 템플릿을 저장합니다.
 - GitHub issues/commits/pull requests와 Notion database/pages는 사용자별 연동 프로필 토큰으로 수집되어 RAG 지식자료에 저장됩니다.
 - Figma comment와 Google Calendar event는 live write API가 있으며 기본은 `dry_run=true`입니다.
+- 실제 외부 쓰기(`dry_run=false`)는 UI와 API 모두 확인 문구 `WRITE LIVE`가 있어야 실행됩니다.
 - 자동화는 수동 실행과 `POST /api/automations/scheduler/tick` 예약 tick을 모두 지원하고, 입력 변경이 없으면 외부 API 실행을 skip합니다.
 
 ## 운영 Secret/KMS 설정

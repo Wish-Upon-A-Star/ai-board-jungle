@@ -36,6 +36,7 @@ class LiveWriteIn(BaseModel):
     title: str = Field(default="AI Board live write", min_length=1, max_length=160)
     body: str = Field(default="Created from AI Board automation.", min_length=1, max_length=4000)
     dry_run: bool = True
+    confirmation: str = Field(default="", max_length=80)
     start_minutes_from_now: int = Field(default=15, ge=0, le=10080)
     duration_minutes: int = Field(default=30, ge=5, le=1440)
 

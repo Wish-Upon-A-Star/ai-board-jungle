@@ -91,6 +91,8 @@ async function main() {
     "연결 칸 추가",
     "커스텀 출력 템플릿",
     "Live Write Readiness",
+    "Dry-run write",
+    "Actual write",
     "Integration Activity Log",
     "Reset filters",
     "Google Calendar",
@@ -106,6 +108,10 @@ async function main() {
     "PostgreSQL",
   ];
   const missing = required.filter((item) => !text.includes(item));
+  const hasLiveWritePlaceholder = await evalJs(
+    `Boolean(Array.from(document.querySelectorAll("input")).find((input) => input.placeholder === "WRITE LIVE"))`
+  );
+  if (!hasLiveWritePlaceholder) missing.push("WRITE LIVE");
 
   await page.call("Runtime.evaluate", {
     expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('연결 칸 추가')).click()",
