@@ -81,7 +81,7 @@ run("npm", ["--prefix", "frontend", "run", "build"]);
 run("python", ["scripts/seed-fastapi.py"], { env });
 
 const api = start("python", ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"], env);
-const web = start("node", ["node_modules/vite/bin/vite.js", "--host", "0.0.0.0", "--port", "3000"], { VITE_API_BASE: "http://127.0.0.1:8000" }, { cwd: "frontend" });
+const web = start("node", ["node_modules/vite/bin/vite.js", "--host", "0.0.0.0", "--port", "3000", "--strictPort"], { VITE_API_BASE: "http://127.0.0.1:8000" }, { cwd: "frontend" });
 
 try {
   await waitFor("http://127.0.0.1:8000/api/health");
