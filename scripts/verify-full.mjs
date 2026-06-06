@@ -27,6 +27,7 @@ const web = start("node", ["node_modules/vite/bin/vite.js", "--host", "0.0.0.0",
 try {
   await waitFor("http://127.0.0.1:8000/api/health");
   await waitFor("http://127.0.0.1:3000");
+  run("node", ["scripts/verify-api-contract.mjs"], { env });
   run("node", ["scripts/smoke-fastapi.mjs"], { env });
   run("node", ["scripts/verify-ui-cdp.mjs"], { env, timeout: 180000 });
   console.log("\nFULL_VERIFY_OK http://127.0.0.1:3000 http://127.0.0.1:8000/docs");

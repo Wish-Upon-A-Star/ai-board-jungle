@@ -34,6 +34,7 @@ const suspicious = suspiciousPatterns.filter((pattern) => pattern.test(readme)).
 const checklistRequired = [
   "npm run demo:screenshot",
   "npm run verify:hygiene",
+  "npm run verify:contract",
   "npm run verify:readme",
   "npm run verify:full:quick",
 ];

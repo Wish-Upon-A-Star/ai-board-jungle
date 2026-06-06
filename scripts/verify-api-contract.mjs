@@ -1,0 +1,224 @@
+const API = process.env.API_BASE || "http://127.0.0.1:8000";
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+function assertKeys(object, keys, label) {
+  assert(object && typeof object === "object" && !Array.isArray(object), `${label} must be an object`);
+  const missing = keys.filter((key) => !(key in object));
+  assert(missing.length === 0, `${label} missing keys: ${missing.join(", ")}`);
+}
+
+async function call(path, options = {}, token = "") {
+  const headers = { "content-type": "application/json", ...(options.headers || {}) };
+  if (token) headers.authorization = `Bearer ${token}`;
+  const response = await fetch(`${API}${path}`, { ...options, headers });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`${path} ${response.status} ${JSON.stringify(data)}`);
+  return data;
+}
+
+let token = "";
+let profileId = null;
+let taskId = null;
+
+try {
+  const login = await call("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email: "admin@example.com", password: "password123" }),
+  });
+  assert(typeof login.token === "string" && login.token.length > 20, "login token contract changed");
+  token = login.token;
+
+  const settings = await call("/api/profile/settings", {}, token);
+  assertKeys(settings, ["profileSettings"], "profile settings response");
+  assertKeys(settings.profileSettings, ["aiProvider", "aiModel", "apiKeyStrategy", "templatePreset", "customConnections"], "profileSettings");
+  assert(Array.isArray(settings.profileSettings.customConnections), "profileSettings.customConnections must be an array");
+
+  const readiness = await call("/api/provider-readiness", {}, token);
+  assert(Array.isArray(readiness.providers), "provider-readiness.providers must be an array");
+  for (const provider of readiness.providers) {
+    assertKeys(provider, ["key", "name", "ready", "profileCount", "readyCount", "profiles", "nextAction"], "provider readiness item");
+    assert(Array.isArray(provider.profiles), "provider readiness profiles must be an array");
+  }
+
+  const createdProfile = await call(
+    "/api/integration-profiles",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Contract GitHub profile",
+        source_kind: "github",
+        base_url: "https://github.com/example/example",
+        api_provider: "GitHub REST API",
+        token_name: "GITHUB_TOKEN",
+        token_value: "",
+        ai_provider: "OpenAI",
+        ai_model: "gpt-4o-mini",
+        ai_api_base: "https://api.openai.com/v1",
+        rag_targets: ["issues", "commits", "pull_requests"],
+        collect_limit: 3,
+        collect_pages: 1,
+        custom_connections: [
+          {
+            label: "GitHub Issues",
+            service: "github",
+            url: "https://github.com/example/example/issues",
+            api: "GitHub REST API",
+            auth_key_name: "GITHUB_TOKEN",
+            operation: "issue_sync",
+            template: "title/status/link/summary",
+          },
+        ],
+        custom_template: "Summarize changed issues and propose the next action.",
+      }),
+    },
+    token,
+  );
+  assertKeys(createdProfile, ["profile"], "create integration profile response");
+  const profile = createdProfile.profile;
+  profileId = profile.id;
+  assertKeys(
+    profile,
+    [
+      "id",
+      "name",
+      "sourceKind",
+      "baseUrl",
+      "apiProvider",
+      "tokenName",
+      "hasToken",
+      "tokenPreview",
+      "tokenStorage",
+      "aiProvider",
+      "aiModel",
+      "ragTargets",
+      "collectLimit",
+      "collectPages",
+      "customConnections",
+      "customTemplate",
+      "lastCollect",
+    ],
+    "integration profile",
+  );
+  assert(!("tokenValue" in profile) && !("token_value" in profile), "integration profile must not expose raw token values");
+  assert(profile.sourceKind === "github", "integration profile sourceKind must be camelCase github");
+  assert(Array.isArray(profile.ragTargets) && profile.ragTargets.includes("issues"), "integration profile ragTargets contract changed");
+  assert(Array.isArray(profile.customConnections) && profile.customConnections.length === 1, "integration profile customConnections contract changed");
+
+  const profileList = await call("/api/integration-profiles", {}, token);
+  assert(Array.isArray(profileList.profiles), "integration profile list must contain profiles array");
+  assert(profileList.profiles.some((item) => item.id === profileId), "created integration profile missing from list");
+
+  const collect = await call(`/api/integration-profiles/${profileId}/collect?limit=1&pages=1`, { method: "POST" }, token);
+  assertKeys(collect, ["profile", "collected", "saved", "skippedDuplicates", "warnings", "status"], "collect response");
+  assert(Array.isArray(collect.saved) && Array.isArray(collect.warnings), "collect saved and warnings must be arrays");
+  assert(typeof collect.collected === "number" && typeof collect.status === "string", "collect numeric/status contract changed");
+
+  const dryWrite = await call(
+    `/api/integration-profiles/${profileId}/write`,
+    { method: "POST", body: JSON.stringify({ title: "Contract dry run", body: "No external write.", dry_run: true }) },
+    token,
+  );
+  assertKeys(dryWrite, ["profile", "write"], "integration write response");
+  assertKeys(dryWrite.write, ["service", "status", "dryRun"], "integration write result");
+  assert(dryWrite.write.dryRun === true, "dry-run write must not become a live write");
+
+  const automation = await call(
+    "/api/automations",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Contract automation",
+        integration_profile_id: profileId,
+        source: "GitHub Issues",
+        destination: "Notion Tasks",
+        interval_minutes: 3,
+        instruction: "Summarize changed GitHub issues and sync them to a Notion task table.",
+        template: "title/status/github link/summary/next action",
+        api_provider: "GitHub REST API + Notion API",
+        ai_agent: "SyncPlannerAgent",
+        template_preset: "github_notion",
+        custom_template: "Use the selected integration profile.",
+      }),
+    },
+    token,
+  );
+  assertKeys(automation, ["task", "plan"], "automation create response");
+  taskId = automation.task.id;
+  assertKeys(
+    automation.task,
+    ["id", "name", "integrationProfileId", "integrationProfile", "intervalMinutes", "status", "lastResult", "lastRunAt", "runs"],
+    "automation task",
+  );
+  assert(Array.isArray(automation.task.runs), "automation task runs must be an array");
+  assertKeys(automation.plan, ["taskId", "agent", "integrationProfile", "ai", "intervalMinutes", "route", "targets", "externalRagSources"], "automation plan");
+  assert(automation.task.integrationProfileId === profileId, "automation did not keep selected integration profile id");
+  assert(automation.plan.integrationProfile?.id === profileId, "automation plan did not include selected integration profile");
+  assert(Array.isArray(automation.plan.targets) && automation.plan.targets.length > 0, "automation plan targets must be present");
+
+  const run = await call(`/api/automations/${taskId}/run`, { method: "POST" }, token);
+  assertKeys(run, ["task", "run"], "automation run response");
+  assertKeys(run.run, ["id", "result", "createdPostId"], "automation immediate run");
+  assertKeys(run.run.result, ["status", "targets", "agent"], "automation run result");
+  assert(Array.isArray(run.run.result.targets), "automation run result targets must be an array");
+
+  const runs = await call(`/api/automations/${taskId}/runs?limit=2&offset=0`, {}, token);
+  assertKeys(runs, ["task", "runs", "total", "limit", "offset", "nextOffset", "hasMore"], "automation runs page");
+  assert(Array.isArray(runs.runs) && runs.limit === 2 && typeof runs.hasMore === "boolean", "automation runs pagination contract changed");
+  for (const historyRun of runs.runs) {
+    assertKeys(historyRun, ["id", "taskId", "ownerId", "result", "createdPostId", "createdAt"], "automation history run");
+  }
+
+  const activities = await call(`/api/integration-activities?integration_profile_id=${profileId}&limit=5`, {}, token);
+  assertKeys(activities, ["activities", "total", "limit", "offset", "nextOffset", "hasMore"], "integration activities page");
+  assert(Array.isArray(activities.activities), "integration activities must be an array");
+  for (const activity of activities.activities) {
+    assertKeys(
+      activity,
+      ["id", "ownerId", "automationTaskId", "integrationProfileId", "eventType", "provider", "status", "summary", "details", "createdAt"],
+      "integration activity",
+    );
+  }
+  const writeActivity = activities.activities.find((activity) => activity.eventType === "integration_profile.write");
+  assert(writeActivity && writeActivity.details?.dryRun === true, "dry-run write activity must keep details.dryRun true");
+
+  const scheduler = await call("/api/automations/scheduler/tick?limit=1", { method: "POST" }, token);
+  assertKeys(scheduler, ["checked", "due", "limit", "results"], "scheduler tick response");
+  assert(Array.isArray(scheduler.results), "scheduler results must be an array");
+
+  const mcp = await call("/mcp/rpc", {
+    method: "POST",
+    body: JSON.stringify({ jsonrpc: "2.0", id: "contract", method: "automation.describe", params: {} }),
+  });
+  assertKeys(mcp, ["jsonrpc", "id", "result"], "mcp response");
+  assert(typeof mcp.result.summary === "string", "mcp automation.describe summary missing");
+
+  console.log(JSON.stringify({
+    ok: true,
+    checked: [
+      "profile_settings",
+      "provider_readiness",
+      "integration_profile_create_list_collect_write",
+      "automation_create_run_history_tick",
+      "integration_activities",
+      "mcp_rpc",
+      "token_redaction",
+    ],
+    profileId,
+    taskId,
+    activityCount: activities.activities.length,
+  }, null, 2));
+} finally {
+  const cleanupErrors = [];
+  if (token && taskId) {
+    await call(`/api/automations/${taskId}`, { method: "DELETE" }, token).catch((error) => cleanupErrors.push(error.message));
+  }
+  if (token && profileId) {
+    await call(`/api/integration-profiles/${profileId}`, { method: "DELETE" }, token).catch((error) => cleanupErrors.push(error.message));
+  }
+  if (cleanupErrors.length) {
+    throw new Error(`contract cleanup failed: ${cleanupErrors.join("; ")}`);
+  }
+}
