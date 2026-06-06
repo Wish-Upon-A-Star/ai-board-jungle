@@ -31,6 +31,7 @@
 - Local verification resolves npm through `npm-cli.js` under the active Node install and runs short commands without shell argument concatenation.
 - `scripts/verify-helpers.mjs` centralizes local verification process spawning, port cleanup, URL waiting, and SQLite DB reset helpers used by both `verify:fastapi` and `verify:full`.
 - `npm run dev` also uses the shared process helper, starts Vite directly on `AI_BOARD_WEB_PORT` or 3000 with `--strictPort`, and cleans up the API/web process tree on exit.
+- `npm run verify:auto` is an alias of the current FastAPI/React verification flow; older Prisma/Next/demo-store auto-verify scripts were removed to avoid false validation paths.
 
 ## 운영 Secret/KMS 설정
 
