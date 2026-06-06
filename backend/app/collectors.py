@@ -68,7 +68,10 @@ def collect_github(profile: IntegrationProfile, limit: int = 20, pages: int = 2)
     with httpx.Client(headers=github_headers(token), timeout=15.0) as client:
         if "issues" in targets:
             for page in range(1, page_count + 1):
-                response = client.get(f"https://api.github.com/repos/{owner}/{name}/issues", params={"state": "all", "per_page": per_page, "page": page})
+                response = client.get(
+                    f"https://api.github.com/repos/{owner}/{name}/issues",
+                    params={"state": "all", "per_page": per_page, "page": page},
+                )
                 if not response.is_success:
                     warnings.append(f"GitHub issues 수집 실패: {response.status_code} page={page}")
                     break
@@ -84,7 +87,10 @@ def collect_github(profile: IntegrationProfile, limit: int = 20, pages: int = 2)
 
         if "commits" in targets:
             for page in range(1, page_count + 1):
-                response = client.get(f"https://api.github.com/repos/{owner}/{name}/commits", params={"per_page": per_page, "page": page})
+                response = client.get(
+                    f"https://api.github.com/repos/{owner}/{name}/commits",
+                    params={"per_page": per_page, "page": page},
+                )
                 if not response.is_success:
                     warnings.append(f"GitHub commits 수집 실패: {response.status_code} page={page}")
                     break
@@ -97,11 +103,15 @@ def collect_github(profile: IntegrationProfile, limit: int = 20, pages: int = 2)
                     sha = commit.get("sha", "")[:12]
                     author = (info.get("author") or {}).get("name", "")
                     text = f"{message}\nsha: {sha}\nauthor: {author}\nurl: {commit.get('html_url', '')}"
-                    items.append(CollectedItem(f"Commit {sha}: {message.splitlines()[0] if message else 'no message'}", "github_commit", commit.get("html_url", ""), text, ["github", "commit"]))
+                    title = f"Commit {sha}: {message.splitlines()[0] if message else 'no message'}"
+                    items.append(CollectedItem(title, "github_commit", commit.get("html_url", ""), text, ["github", "commit"]))
 
         if "pull_requests" in targets:
             for page in range(1, page_count + 1):
-                response = client.get(f"https://api.github.com/repos/{owner}/{name}/pulls", params={"state": "all", "per_page": per_page, "page": page})
+                response = client.get(
+                    f"https://api.github.com/repos/{owner}/{name}/pulls",
+                    params={"state": "all", "per_page": per_page, "page": page},
+                )
                 if not response.is_success:
                     warnings.append(f"GitHub pull requests 수집 실패: {response.status_code} page={page}")
                     break

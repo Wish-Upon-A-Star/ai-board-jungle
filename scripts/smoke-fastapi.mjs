@@ -46,7 +46,7 @@ try {
         source: "GitHub Issues",
         destination: "Notion Tasks",
         interval_minutes: 2,
-        instruction: "변경된 이슈를 요약해 노션 업무에 반영한다.",
+        instruction: "변경된 이슈를 요약하고 Notion 업무에 반영한다.",
         template: "제목 / 상태 / 링크 / 요약",
         api_provider: "GitHub REST API + Notion API",
         ai_agent: "SyncPlannerAgent",

@@ -1,468 +1,294 @@
 # AI Board
 
+React + FastAPI 기반의 AI 게시판입니다. 기본 게시판 기능 위에 사용자별 연동 프로필, GitHub/Notion 중심 자동화, RAG, MCP, AI Agent, Figma/Google Calendar dry-run write 검증을 자연스럽게 붙인 개인 과제용 구현입니다.
+
 ## 목차
 
 - [과제 제출물 매핑](#과제-제출물-매핑)
-- [현재 구현 상태 요약](#현재-구현-상태-요약)
-- [주요 사용 흐름](#주요-사용-흐름)
-- [기술 스택](#기술-스택)
-- [구현 기능](#구현-기능)
-- [AI 기능이 사이트에 녹아든 방식](#ai-기능이-사이트에-녹아든-방식)
-- [사용자별 외부 사이트 설정](#사용자별-외부-사이트-설정)
-- [아키텍처](#아키텍처)
+- [프로젝트 개요](#프로젝트-개요)
+- [주요 구현 기능](#주요-구현-기능)
+- [전체 아키텍처 구조](#전체-아키텍처-구조)
+- [AI 활용 기능과 구조](#ai-활용-기능과-구조)
+- [사용자별 연동과 자동화](#사용자별-연동과-자동화)
 - [실행 방법](#실행-방법)
+- [검증과 데모](#검증과-데모)
 - [실제 외부 연동 검증 기록](#실제-외부-연동-검증-기록)
-- [한계와 개선 아이디어](#한계와-개선-아이디어)
+- [회고와 개선 아이디어](#회고와-개선-아이디어)
 
 ## 과제 제출물 매핑
 
 | 제출 요구 | README 위치 | 구현/검증 근거 |
 | --- | --- | --- |
-| 프로젝트 개요 | [주요 사용 흐름](#주요-사용-흐름), [기술 스택](#기술-스택) | React + FastAPI + PostgreSQL-ready SQLAlchemy + Redis-ready AI automation board |
-| 주요 구현 기능 | [구현 기능](#구현-기능) | 회원가입/로그인, 게시글 CRUD, 댓글, 태그, 페이징, 검색, 자동화 실행/공유 |
-| 전체 아키텍처 구조 | [아키텍처](#아키텍처) | React, FastAPI, DB, Redis, RAG, MCP, Agent, 외부 API 연결 Mermaid |
-| RAG 기능 | [RAG](#rag) | 게시글/자동화/사용자 지식자료/외부 GitHub-Notion 수집 기반 검색/요약 |
-| MCP 기능 | [MCP](#mcp) | FastAPI `POST /mcp/rpc` JSON-RPC endpoint, CDP smoke `mcpOk: true` |
-| Agent 기능 | [AI Agent](#ai-agent) | 자동화 지침과 연결 칸을 분석해 대상/API/템플릿을 선택하는 Agent 흐름 |
-| 데모/스크린샷 | [실행 방법](#실행-방법), [실제 외부 연동 검증 기록](#실제-외부-연동-검증-기록) | `docs/demo-screenshot.png`, `npm run verify:full:quick`, CDP UI smoke, GitHub push 기록 |
-| 회고/한계/개선 | [한계와 개선 아이디어](#한계와-개선-아이디어) | 실제 외부 API 권한, 운영 KMS, 배포 환경 개선 항목 |
+| 프로젝트 개요 | [프로젝트 개요](#프로젝트-개요) | React + FastAPI + PostgreSQL-ready SQLAlchemy + Redis-ready 구조 |
+| 주요 구현 기능 | [주요 구현 기능](#주요-구현-기능) | 회원가입/로그인, 게시글 CRUD, 댓글, 태그, 페이징, 검색, 자동화 |
+| 전체 아키텍처 구조 | [전체 아키텍처 구조](#전체-아키텍처-구조) | Frontend, Backend, DB, Redis, RAG, MCP, Agent, 외부 API |
+| RAG 기능 | [RAG](#rag) | 게시글, 자동화, 사용자 지식자료, GitHub issues/commits/pull requests, Notion database/pages |
+| MCP 기능 | [MCP](#mcp) | FastAPI `POST /mcp/rpc` JSON-RPC endpoint |
+| Agent 기능 | [AI Agent](#ai-agent) | 자동화 지침을 분석해 대상 API, 템플릿, 다음 액션을 계획 |
+| 데모/스크린샷 | [검증과 데모](#검증과-데모) | `docs/demo-screenshot.png`, `npm run verify:full:quick` |
+| 회고/한계/개선 | [회고와 개선 아이디어](#회고와-개선-아이디어) | 실서비스 운영 시 필요한 보완점 정리 |
 
-## 현재 구현 상태 요약
+## 프로젝트 개요
 
-- React 프론트엔드, FastAPI 백엔드, PostgreSQL-ready SQLAlchemy 모델, Redis 캐시 옵션을 사용합니다.
-- 사용자는 서버 DB에 자기 계정별 연동 프로필, 토큰, AI provider/model/API base, RAG 수집 범위, 자동화별 템플릿을 저장합니다.
-- GitHub issues/commits/pull requests와 Notion database/pages는 사용자별 연동 프로필 토큰으로 수집되어 RAG 지식자료에 저장됩니다.
-- Figma comment와 Google Calendar event는 live write API가 있으며 기본은 `dry_run=true`입니다.
-- 실제 외부 쓰기(`dry_run=false`)는 UI와 API 모두 확인 문구 `WRITE LIVE`가 있어야 실행됩니다.
-- 자동화는 수동 실행과 `POST /api/automations/scheduler/tick` 예약 tick을 모두 지원하고, 입력 변경이 없으면 외부 API 실행을 skip합니다.
-- 통합 활동 로그는 `limit`, `offset`, `total`, `nextOffset`, `hasMore` 기반 페이지네이션과 UI 더보기를 지원합니다.
-- 통합 활동 로그는 `dry_run=true/false` 필터와 `Real-write audit` 프리셋으로 실제 외부 쓰기만 감시할 수 있습니다.
-- 활동 로그, RAG 지식자료, 자동화 실행 이력에는 owner/filter/sort 기준 복합 인덱스를 적용해 고용량 조회를 대비합니다.
-- 자동화별 실행 이력은 `/api/automations/{task_id}/runs`에서 `limit`, `offset`, `total`, `nextOffset`, `hasMore`로 페이지네이션됩니다.
-- 실행 이력 UI는 기본적으로 상태/Agent/경로/RAG 수집 수를 요약하고, `Details` 토글로 원본 JSON을 접어 확인할 수 있습니다.
-- 실행 이력 행은 상태 배지와 `Retry` 버튼을 제공해 실패/차단/스킵 상태를 빠르게 확인하고 같은 자동화를 즉시 재실행한 뒤 이력 첫 페이지를 새로고침하며, 행 안에 성공/실패 메시지를 표시합니다.
-- 실행 이력의 행별 Details/Retry 상태는 `taskId:runId` 키로 관리해 여러 자동화의 실행 이력이 동시에 열려도 상태 표시가 섞이지 않습니다.
-- 로그아웃 또는 자동화 삭제 시 열린 실행 이력, Details 확장, Retry 피드백 상태를 정리해 다른 사용자나 삭제된 작업의 UI 상태가 남지 않게 합니다.
-- 자동화 삭제는 `Delete` 후 `Confirm delete`를 눌러야 실행되는 2단계 확인 흐름을 사용합니다.
-- 서버에서 자동화 목록을 다시 불러올 때 확인 중이던 작업이 사라졌으면 삭제 확인 상태도 자동 해제합니다.
-- 게시글 목록을 다시 불러올 때 선택된 게시글이 사라졌거나 접근 불가하면 현재 목록의 첫 게시글로 교체하거나 비워 stale 선택 상태를 막습니다.
-- 게시글 검색/목록 API는 `limit`, `offset`, `total`, `nextOffset`, `hasMore`를 반환하고 UI는 `Load more posts`로 긴 게시판을 이어서 탐색합니다.
-- 게시글 더보기 로딩/오류 상태는 게시판 목록 바로 아래에 표시해 실패 원인을 해당 작업 맥락에서 확인할 수 있습니다.
-- 게시글 더보기는 이미 화면에 있는 게시글 id를 중복 추가하지 않아, 새 게시글 생성이나 검색 결과 변동 중에도 같은 행이 반복 표시되지 않습니다.
-- CDP 스모크 검증은 실행 전 FastAPI, React, Chrome CDP 연결을 preflight로 확인하고, `CDP Figma dry-run profile` 재사용/중복 정리와 임시 RAG 지식자료 저장/삭제까지 검증합니다.
-- 전체 로컬 검증은 `npm run verify:full`로 FastAPI/React 서버를 한 번만 띄운 뒤 HTTP smoke와 UI CDP smoke를 순차 실행해 포트 경합을 피합니다.
-- 의존성이 이미 설치된 반복 개발 상황에서는 `npm run verify:full:quick`으로 pip/npm install 단계를 건너뛰고 같은 전체 smoke를 빠르게 실행할 수 있습니다.
-- `verify:full`과 `verify:full:quick`은 시작할 때 `data/full-verify.db`와 SQLite sidecar 파일을 초기화해 이전 검증 데이터가 결과에 섞이지 않게 합니다.
-- `verify:fastapi`도 시작할 때 `data/fastapi-verify.db`와 SQLite sidecar 파일을 초기화하고 종료 시 3000/8000 포트를 정리합니다.
-- `verify:fastapi` runs the Vite dev server directly and kills the spawned process tree on Windows, so repeated smoke checks do not leave orphaned local servers.
-- Local verification resolves npm through `npm-cli.js` under the active Node install and runs short commands without shell argument concatenation.
-- `npm run verify:hygiene` checks that generated folders such as `frontend/dist/` are ignored, not tracked by git, and that submitted source/docs do not contain obvious real API tokens.
-- `npm run verify:contract` checks the FastAPI response contract used by the React automation UI: profile settings, integration profiles, dry-run writes, automation plans/runs, activity pagination, scheduler tick, MCP, and token redaction.
-- `scripts/verify-helpers.mjs` centralizes local verification process spawning, port cleanup, URL waiting, and SQLite DB reset helpers used by both `verify:fastapi` and `verify:full`.
-- `npm run dev` also uses the shared process helper, starts Vite directly on `AI_BOARD_WEB_PORT` or 3000 with `--strictPort`, and cleans up the API/web process tree on exit.
-- `npm run verify:auto` is an alias of the current FastAPI/React verification flow; older Prisma/Next/demo-store auto-verify scripts were removed to avoid false validation paths.
-- MCP is served by the FastAPI app at `POST /mcp/rpc`; the old standalone TypeScript MCP prototype was removed so users do not need a second MCP process.
-- `npm run verify:readme` checks that the submitted README still contains the required React/FastAPI/PostgreSQL/RAG/MCP/Agent/verification sections and no obvious UTF-8 mojibake markers.
-- Iterative quality reports are stored in `docs/evaluation-reports` with functionality, UI/design, security/privacy, performance, tests, docs, and next-risk scores.
-- `npm run demo:screenshot` captures the committed demo image at `docs/demo-screenshot.png` through Chrome CDP after logging in as the admin demo user.
-- Final submission checks are summarized in `docs/submission-checklist.md`, including when to refresh the screenshot and which verification commands to run.
+AI Board는 게시판 사용자가 GitHub, Notion, Figma, Google Calendar 같은 외부 도구를 사용자별로 등록하고, 각 자동화마다 어떤 프로필과 AI 모델/API 설정을 쓸지 선택할 수 있게 만든 서비스입니다.
 
-## 운영 Secret/KMS 설정
+핵심 흐름은 다음과 같습니다.
 
-기본값은 로컬 암호화입니다.
+1. 사용자가 가입/로그인합니다.
+2. 게시글, 댓글, 태그, 검색, 페이징을 일반 게시판처럼 사용합니다.
+3. 사용자는 서버 DB에 자기 연동 프로필을 저장합니다. 토큰은 응답에 원문으로 노출되지 않습니다.
+4. 자동화는 저장된 프로필 또는 커스텀 설정을 선택해 주기, 지침, 템플릿, AI Agent를 저장합니다.
+5. GitHub/Notion 프로필은 RAG 근거 수집에 사용할 수 있고, Figma/Google Calendar 프로필은 dry-run 또는 확인 문구 기반 live write 흐름을 검증합니다.
+6. 자동화 실행 결과는 게시판에 공유할 수 있고, 실행 이력과 활동 로그가 사용자별로 분리됩니다.
+
+## 주요 구현 기능
+
+- 회원가입 / 로그인 / 현재 사용자 조회
+- 게시글 CRUD, 댓글, 태그
+- 게시글 검색, `limit`, `offset`, `total`, `nextOffset`, `hasMore` 기반 페이징
+- 관리자/일반 사용자 역할 표시와 권한 분리
+- 사용자별 프로필 설정: AI provider, AI model, API base, 템플릿 preset, 커스텀 연결
+- 사용자별 연동 프로필: GitHub, Notion, Figma, Google Calendar, custom API
+- 연동 프로필별 토큰 저장, 응답 마스킹, `tokenStorage` 상태 표시
+- 자동화 등록: 주기, 출발지/목적지, 지침, 템플릿, API provider, AI Agent
+- 자동화별 프로필 선택 또는 커스텀 설정 사용
+- 자동화 수동 실행, scheduler tick, 입력 변경 없음 skip 처리
+- 자동화 실행 이력 페이지네이션과 retry UI
+- 자동화 결과 게시판 공유
+- 사용자별 integration activity log와 필터
+- RAG 질문 응답, 문서/텍스트/업로드 지식자료 저장
+- MCP JSON-RPC endpoint
+- API hub dry-run 실행 콘솔
+
+## 전체 아키텍처 구조
+
+```mermaid
+flowchart LR
+  User["사용자"] --> React["React Frontend"]
+  React --> FastAPI["FastAPI Backend"]
+  FastAPI --> SQLAlchemy["SQLAlchemy Models"]
+  SQLAlchemy --> PostgreSQL["PostgreSQL-ready DB"]
+  FastAPI --> Redis["Redis-ready Cache"]
+  FastAPI --> RAG["RAG Services"]
+  FastAPI --> MCP["MCP JSON-RPC /mcp/rpc"]
+  FastAPI --> Agent["Automation Agent"]
+  RAG --> GitHub["GitHub Issues/Commits/PRs"]
+  RAG --> Notion["Notion Database/Pages"]
+  Agent --> Figma["Figma dry-run/live write"]
+  Agent --> Calendar["Google Calendar dry-run/live write"]
+```
+
+개발 검증은 SQLite를 기본으로 사용하지만, 모델과 세션 구성은 PostgreSQL-ready SQLAlchemy 구조입니다. `AI_BOARD_DATABASE_URL`을 PostgreSQL URL로 지정하면 운영 DB로 전환할 수 있습니다. Redis는 RAG 유사도 검색 캐시가 사용할 수 있도록 옵션 구조를 갖췄고, 로컬에서는 메모리 캐시 fallback으로 동작합니다.
+
+## AI 활용 기능과 구조
+
+### RAG
+
+RAG는 Retrieval-Augmented Generation의 약자입니다. LLM이 바로 답하게 하지 않고, 먼저 게시글/자동화 결과/사용자 지식자료/외부 수집 자료를 검색한 뒤 그 근거를 바탕으로 답변하도록 만드는 구조입니다.
+
+구현 위치:
+
+- `backend/app/services.py`: `similar_posts()`, `similar_knowledge()`, `rag_answer()`
+- `backend/app/collectors.py`: GitHub/Notion 외부 수집기
+- `POST /api/ai/rag`
+- `POST /api/knowledge/rag`
+- `POST /api/integration-profiles/{profile_id}/collect`
+
+사용 가능한 RAG 데이터:
+
+- 게시판 글과 댓글 흐름
+- 자동화 실행 결과
+- 사용자가 직접 입력한 지식자료
+- 텍스트/문서 업로드 자료
+- GitHub issues, commits, pull requests
+- Notion database rows, pages, page blocks
+
+### MCP
+
+MCP는 외부 시스템을 LLM 도구처럼 호출하기 위한 인터페이스입니다. 이 프로젝트는 FastAPI 내부에 JSON-RPC endpoint를 제공합니다.
+
+- Endpoint: `POST /mcp/rpc`
+- Method: `automation.describe`
+- Method: `weather.lookup`
+- 검증: `verify:contract`와 CDP UI smoke에서 `mcpOk: true` 확인
+
+### AI Agent
+
+Agent는 사용자가 적은 자동화 지침을 분석해 다음 정보를 계획합니다.
+
+- 어떤 외부 시스템을 호출할지
+- 어떤 API provider를 사용할지
+- 어떤 템플릿으로 요청/게시글/업무를 만들지
+- 토큰이 준비됐는지
+- 변경이 없을 때 skip할지
+- 결과를 게시판에 공유할지
+
+구현 위치:
+
+- `backend/app/services.py`: `automation_plan()`, `automation_fingerprint()`, `agent_review()`
+- `POST /api/automations`
+- `POST /api/automations/{task_id}/run`
+- `POST /api/automations/scheduler/tick`
+
+## 사용자별 연동과 자동화
+
+연동 프로필은 사용자별로 DB에 저장됩니다. 다른 사용자의 프로필은 조회/수집/실행/삭제할 수 없습니다.
+
+지원 필드:
+
+- `source_kind`: github, notion, figma, google_calendar, custom
+- `base_url`
+- `api_provider`
+- `token_name`
+- `token_value`
+- `ai_provider`
+- `ai_model`
+- `ai_api_base`
+- `rag_targets`
+- `collect_limit`
+- `collect_pages`
+- `custom_connections`
+- `custom_template`
+
+토큰 보안:
+
+- API 응답은 원문 토큰을 반환하지 않습니다.
+- 응답에는 `hasToken`, `tokenPreview`, `tokenStorage`만 표시됩니다.
+- 신규 저장 토큰은 `enc:v1:` 형식으로 암호화됩니다.
+- 운영에서는 `AI_BOARD_TOKEN_ENCRYPTION_SECRET`을 `AI_BOARD_JWT_SECRET`과 다른 긴 랜덤 값으로 설정해야 합니다.
+- Vault/KMS 연동은 `AI_BOARD_TOKEN_SECRET_COMMAND`를 통해 command provider 방식으로 교체할 수 있습니다.
+
+## 실행 방법
+
+### 1. 의존성 설치
+
+```powershell
+npm install
+npm --prefix frontend install
+python -m pip install -r backend/requirements.txt
+```
+
+### 2. 환경 변수
+
+로컬 기본값은 SQLite입니다.
+
+```powershell
+$env:PYTHONPATH="backend"
+$env:AI_BOARD_DATABASE_URL="sqlite:///./data/dev.db"
+```
+
+PostgreSQL 예시:
+
+```powershell
+$env:AI_BOARD_DATABASE_URL="postgresql+psycopg://user:password@localhost:5432/ai_board"
+```
+
+토큰 암호화 예시:
 
 ```env
 AI_BOARD_TOKEN_SECRET_PROVIDER="local"
 AI_BOARD_TOKEN_ENCRYPTION_SECRET="replace-with-a-separate-long-random-secret"
-```
-
-운영 환경에서 Vault, KMS, 사내 secret service를 쓰려면 command provider를 사용할 수 있습니다. 서버가 토큰을 저장할 때 command에 JSON stdin을 보내고, command는 JSON stdout으로 보호된 값 또는 복원된 값을 반환합니다.
-
-```env
-AI_BOARD_TOKEN_SECRET_PROVIDER="command"
 AI_BOARD_TOKEN_SECRET_COMMAND="python scripts/secret-adapter.sample.py"
 ```
 
-Command stdin:
-
-```json
-{"action":"protect","value":"plain-token"}
-```
-
-Command stdout:
-
-```json
-{"value":"vault-or-kms-reference"}
-```
-
-`reveal` action은 저장된 reference를 다시 실제 API 토큰으로 복원해야 합니다. API 응답은 원문 토큰을 반환하지 않고 `hasToken`, `tokenPreview`, `tokenStorage`만 반환합니다. `tokenStorage` 값은 `encrypted`, `external`, `legacy`, `empty` 중 하나입니다.
-
-샘플 어댑터는 [scripts/secret-adapter.sample.py](scripts/secret-adapter.sample.py)에 있습니다. 기본 구현은 로컬 파일 저장소 데모이며, 운영에서는 `protect_value()`와 `reveal_value()` 내부를 Vault/KMS SDK 호출로 교체하십시오.
-
-React, FastAPI, PostgreSQL-ready SQLAlchemy, Redis 캐시를 기반으로 만든 AI 자동화 게시판입니다. 단순 게시판에 AI 버튼만 붙인 구조가 아니라, 사용자가 GitHub, Notion, Google Calendar, Figma뿐 아니라 Jira, Slack, Sheets, 사내 API 같은 임의의 외부 업무 흐름을 자동화 작업으로 등록하고 실행 결과를 게시판에 공유하는 방식으로 구성했습니다.
-
-## 주요 사용 흐름
-
-1. 사용자가 회원가입 또는 로그인합니다.
-2. 자동화 작업에 `몇 분마다`, `어디에서`, `어디로`, `지침`, `사용 API`, `AI Agent`, `AI 모델`, `템플릿 선택`, `커스텀 출력 템플릿`, `API Key 관리 방식`을 입력합니다.
-3. 사용자는 `커스텀 연결 칸`을 필요한 만큼 추가합니다. 각 칸에는 표시 이름, 서비스 키, URL/ID, 요청 API, 토큰 변수명, 작업 방식, 연결별 템플릿을 넣습니다.
-4. 자주 쓰는 연결 칸, AI 모델, API base, 토큰 변수명, 커스텀 템플릿은 사용자와 함께 서버 DB에 `서버 저장값`으로 저장합니다.
-5. 새 자동화를 만들 때마다 `서버 저장값 불러오기`로 저장된 설정을 가져오고, 자동화별로 필요한 부분만 바꿉니다.
-6. GitHub/Notion/Figma/Calendar 입력은 빠른 예시용일 뿐이며 필수 대상이 아닙니다. 실제 우선 대상은 사용자가 추가한 커스텀 연결 칸입니다.
-7. Agent가 지침과 연결 칸을 분석해 필요한 대상과 API를 선택합니다.
-8. 사용자는 작업 카드의 `실행` 버튼으로 자동화 계획을 실행하고, `게시판 공유` 버튼으로 결과를 게시글로 남깁니다.
-9. `API 실행 콘솔`에서 Health, RAG, MCP, Agent Hub 버튼을 눌러 실제 FastAPI API 호출 결과를 확인할 수 있습니다.
-
-## 사용자와 권한
-
-- 새 사용자는 홈페이지에서 직접 회원가입할 수 있습니다.
-- 일반 사용자는 자기 자동화 작업만 조회, 실행, 공유할 수 있습니다.
-- 관리자는 전체 사용자의 자동화 작업을 볼 수 있습니다.
-- 데모 계정:
-  - 관리자: `admin@example.com / password123`
-  - 일반 사용자: `user@example.com / password123`
-
-## 기술 스택
-
-- Frontend: React + Vite
-- Backend: FastAPI
-- Database: PostgreSQL-ready SQLAlchemy 모델, 로컬 검증용 SQLite fallback
-- Cache: Redis 기반 RAG 검색 결과 캐시
-- AI/RAG: 게시글과 자동화 공유글 기반 유사 기록 검색 및 요약
-- MCP: `/mcp/rpc` JSON-RPC endpoint
-- Agent: `SyncPlannerAgent`, `ReviewRouteAgent`, `AutomationPlannerAgent`
-- External API 대상: GitHub REST/CLI, Notion API/MCP, Google Calendar API, Figma API/MCP
-
-## 구현 기능
-
-- 회원가입 / 로그인
-- 역할 기반 사용자 표시
-- 게시글 생성, 조회, 삭제
-- 댓글
-- 태그
-- 페이징과 검색
-- 사용자별 자동화 작업 등록
-- 사용자별 커스텀 연결 칸 추가/삭제
-- 연결별 서비스 키, URL/ID, 요청 API, 토큰 변수명, 작업 방식, 템플릿 등록
-- 사용자별 서버 저장값 저장/불러오기
-- 자동화별 서버 저장 설정 재사용
-- 사용자별 연동 프로필 등록
-- 자동화별 연동 프로필 선택 또는 커스텀 직접 입력
-- GitHub issue, commit, pull request RAG 수집 대상 설정
-- Notion database/page RAG 수집 대상 설정
-- 사용자별 API token/API key 서버 저장 및 응답 마스킹
-- 자동화별 AI provider/model/API base 선택
-- 사용자별 RAG 지식자료 저장
-- 텍스트 문서 내용 추출 저장
-- 문서, 음성, 이미지, 영상, 표/엑셀, 기타 파일의 설명/작성 지침 저장
-- GitHub/Notion/Figma/Calendar 빠른 예시 URL 등록
-- 사용자별 AI 제공자, AI 모델, AI API Base 등록
-- 템플릿 프리셋 또는 커스텀 출력 템플릿 선택
-- 사용자별 API Key 관리 전략 기록
-- GitHub 이슈 템플릿, Notion 반영 템플릿, Figma 작업 템플릿 등록
-- 자동화 작업 실행
-- 자동화 실행 결과 게시판 공유
-- 실제 API 실행 콘솔
-- RAG 검색/요약
-- MCP JSON-RPC 호출
-- Agent 기반 도구 선택
-- Redis 캐시
-- PostgreSQL 전환 준비
-
-## AI 기능이 사이트에 녹아든 방식
-
-### RAG
-
-게시글, 자동화 공유글, 사용자별 서버 저장 지식자료를 지식 베이스로 사용합니다. 사용자가 질문하거나 Agent가 중복/유사성을 판단할 때 기존 게시글과 지식자료를 검색하고, 관련 근거와 요약을 반환합니다.
-
-RAG는 Retrieval-Augmented Generation의 약자입니다. LLM이 기억만으로 답하는 대신, 먼저 우리 서비스의 게시글/자동화 결과/사용자 지식자료에서 관련 기록을 검색하고 그 검색 결과를 근거로 답변하게 만드는 방식입니다. 이 프로젝트에서는 `backend/app/services.py`의 `similar_posts()`, `similar_knowledge()`, `rag_answer()`가 그 역할을 하며, `/api/knowledge/rag` API와 API 실행 콘솔의 `RAG` 버튼으로 확인할 수 있습니다.
-
-RAG에 넣을만한 자료:
-
-- 게시판 운영 규칙, 금칙어, 모더레이션 기준
-- GitHub 이슈 작성 규칙, 라벨/마일스톤/칸반 사용 규칙
-- Notion 업무 DB 필드 설명과 상태 전환 규칙
-- Figma 디자인 리뷰 체크리스트
-- Google Calendar 일정 작성 규칙
-- 회의록, 음성 녹취 요약, 수업/과제 지침
-- PDF/문서의 핵심 내용, 표/엑셀의 주요 컬럼 설명
-- 이미지 설명, 화면 캡처 설명, 디자인 QA 기준
-- API 사용법, 사내 시스템 작업 절차, 실패 시 대응법
-
-외부 시스템 RAG:
-
-- GitHub: `issues`, `commits`, `pull_requests`를 연동 프로필의 RAG 수집 대상으로 설정할 수 있습니다.
-- Notion: `notion_database`, `notion_pages`를 연동 프로필의 RAG 수집 대상으로 설정할 수 있습니다.
-- 기타: Jira, Slack, GitLab, 사내 REST API 등은 `custom` 연동 프로필로 등록하고 대상 이름을 자유롭게 넣을 수 있습니다.
-- 자동화 실행 결과에는 `externalRagSources`가 포함되어 어떤 외부 소스를 어떤 API와 토큰 상태로 읽을지 표시합니다.
-- 실제 외부 fetch는 사용자가 저장한 연동 프로필의 `source_kind`, `base_url`, `api_provider`, `token_name/token_value`, `rag_targets`를 기준으로 붙이면 됩니다.
-- GitHub/Notion은 `/api/integration-profiles/{profile_id}/collect`로 실제 수집기가 연결되어 있습니다. 토큰이 저장된 프로필이면 GitHub issues/commits/pull requests, Notion database/page를 읽어 `knowledge_sources`에 저장합니다.
-- 수집 API는 `?limit=20&pages=2`처럼 페이지당 개수와 최대 페이지 수를 받을 수 있고, 쿼리를 생략하면 연동 프로필에 저장된 `collect_limit`, `collect_pages`를 사용합니다. GitHub는 REST `page/per_page`, Notion은 `next_cursor`를 따라가며 UI 버튼은 각 프로필에 저장된 범위를 그대로 실행합니다.
-- 같은 사용자에게 이미 저장된 외부 URL과 소스 타입은 중복 저장하지 않고 `unchanged`와 `skippedDuplicates`로 반환합니다. 반복 자동화가 같은 항목을 계속 쌓지 않도록 변경분 중심으로 동작합니다.
-- 연동 프로필 카드에는 최근 수집 상태, 읽은 항목 수, 새로 저장한 항목 수, 중복 건수, 경고 메시지, 수집 시간을 표시합니다.
-- 토큰이 없는 프로필이면 수집을 중단하고 `warnings`에 필요한 토큰 정보를 반환합니다.
-- 다른 사용자의 연동 프로필 ID를 자동화에 넣으면 403으로 차단합니다.
-
-관련 API:
-
-- `POST /api/ai/rag`
-- `POST /api/knowledge/rag`
-- `GET /api/knowledge`
-- `POST /api/knowledge`
-- `POST /api/knowledge/upload`
-- `DELETE /api/knowledge/{source_id}`
-- `GET /api/integration-profiles`
-- `POST /api/integration-profiles`
-- `DELETE /api/integration-profiles/{profile_id}`
-- `POST /api/integration-profiles/{profile_id}/write`: Figma comment 또는 Google Calendar event live write를 실행합니다. 기본 `dry_run=true`는 실제 외부 변경 없이 요청 URL과 payload를 검증하고, 토큰/URL이 준비된 사용자가 `dry_run=false`로 호출하면 실제 API를 호출합니다.
-- `GET /api/provider-readiness`: 사용자별 연동 프로필, 암호화 토큰, URL을 기준으로 GitHub/Notion/Figma/Google Calendar live write 준비 상태를 반환합니다.
-- `GET /api/integration-activities`: 사용자별 연동 프로필 저장, 외부 RAG 수집, live write, 자동화 생성/실행/공유 활동 로그를 반환합니다. `provider`, `status`, `event_type`, `automation_task_id`, `integration_profile_id`, `limit` 쿼리로 필터링할 수 있습니다.
-
-### MCP
-
-FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automation.describe`, `weather.lookup` 메서드가 있으며, 외부 시스템을 도구처럼 호출하는 구조를 과제 요구사항에 맞게 보여줍니다.
-
-관련 API:
-
-- `POST /mcp/rpc`
-
-### AI Agent
-
-자동화 작업의 source, destination, instruction, api_provider, 커스텀 연결 칸, AI 모델, 템플릿을 읽고 필요한 도구를 선택합니다. 커스텀 연결 칸이 있으면 그 목록을 우선 사용하고, 없을 때만 문장에 포함된 GitHub, Notion, Google Calendar, Figma, Board 같은 대상을 추론합니다. 무한 루프 방지를 위해 max tool calls, timeout, retry 제한을 결과에 포함합니다.
-
-예시 변환:
-
-- GitHub 이슈 생성 템플릿: `제목 / 본문 / 라벨 / 담당자 / 마감일`
-- Notion DB 반영 템플릿: `업무명 / 상태 / GitHub 링크 / 요약 / 담당자 / 마감일 / 다음 액션`
-- Figma 작업 템플릿: `섹션명 / 확인 기준 / 관련 게시글 / 담당자`
-- Calendar 템플릿: `일정 제목 / 시작 / 종료 / 설명 / 링크`
-
-관련 API:
-
-- `POST /api/automations/{task_id}/run`
-- `POST /api/automations/scheduler/tick`
-- `POST /api/integrations/hub/run`
-- `POST /api/ai/agent/moderate`
-- `GET /api/profile/settings`
-- `PUT /api/profile/settings`
-
-### 변경 감지 실행
-
-자동화는 매번 무조건 외부 API를 때리지 않습니다. 실행할 때 아래 감시 대상 값을 SHA-256 해시로 계산하고, 이전 실행의 해시와 같으면 `status: "skipped"`로 응답합니다.
-
-감시 대상:
-
-- source, destination, instruction, template
-- api_provider, ai_agent
-- GitHub repo/project URL
-- Notion DB URL
-- Figma file URL
-- 템플릿 선택
-- 커스텀 출력 템플릿
-- 커스텀 연결 칸
-- Calendar ID
-- AI provider, AI model, AI API base
-- 요청/일정 템플릿
-- GitHub 이슈 템플릿
-- Notion 반영 템플릿
-- Figma 작업 템플릿
-
-즉 지침, 대상 사이트, 커스텀 연결 칸, 템플릿, AI 모델 같은 값이 바뀐 경우에만 `status: "changed"`로 실제 실행 계획을 만들고 실행 기록을 저장합니다.
-
-## API 실행 콘솔
-
-홈페이지의 `API 실행 콘솔` 버튼은 실제 API를 호출합니다.
-
-Scheduler tick:
-
-- `POST /api/automations/scheduler/tick` finds due ACTIVE automations by `last_run_at + interval_minutes`.
-- Normal users run only their own due automations. Admin users can tick all due automations.
-- Each scheduled run uses the same no-change guard as manual run. If watched input is unchanged, the run is recorded as `skipped`.
-- In production, call this endpoint from cron, Windows Task Scheduler, systemd timer, Vercel Cron, or CI schedule.
-
-- `Health`: `GET /api/health`
-- `RAG`: `POST /api/ai/rag`
-- `MCP`: `POST /mcp/rpc`
-- `Agent Hub`: `POST /api/integrations/hub/run`
-
-응답은 우측 `API` 탭에 JSON으로 표시됩니다.
-
-## 사용자별 외부 사이트 설정
-
-자동화 등록 폼의 중심은 `커스텀 연결 칸`입니다. 사용자는 연결을 필요한 만큼 추가할 수 있고, Notion/Figma에 고정되지 않습니다.
-
-서버 저장값:
-
-- `서버 저장값 불러오기`: 현재 로그인한 사용자의 저장된 연결 칸, AI 모델, API base, API Key 관리 전략, 커스텀 템플릿을 자동화 폼에 복사합니다.
-- `현재 설정 서버 저장`: 현재 자동화 폼의 연결 칸과 AI/API/템플릿 설정을 `users` 테이블의 사용자별 서버 저장값으로 저장합니다.
-- 저장된 서버 설정은 새 자동화를 만들 때마다 재사용할 수 있습니다.
-- 자동화 작업은 서버 저장값을 복사해 생성되므로, 자동화별로 다른 연결/템플릿을 갖도록 수정할 수 있습니다.
-- 실제 API Key 원문은 저장하지 않고 `NOTION_TOKEN`, `FIGMA_TOKEN`, `JIRA_TOKEN` 같은 토큰 변수명만 저장합니다.
-
-연동 프로필:
-
-- 사용자가 여러 개의 GitHub/Notion/커스텀 API 프로필을 등록할 수 있습니다.
-- 각 프로필은 `종류`, `Base URL`, `요청 API`, `토큰 이름`, `토큰/API Key`, `AI 제공자`, `AI 모델`, `AI API Base`, `RAG가 볼 대상`, `Collect limit`, `Collect pages`, `프로필 템플릿`을 가집니다.
-- 자동화 등록 화면에서 `저장된 연동 프로필`을 선택하면 해당 프로필의 API/AI/연결/RAG 설정이 자동화에 복사됩니다.
-- 같은 사용자라도 자동화 A는 GitHub + gpt-4o-mini, 자동화 B는 Notion + 사내 모델처럼 다르게 선택할 수 있습니다.
-- API 응답은 토큰 원문을 반환하지 않고 `hasToken`, `tokenPreview`, `tokenStorage`만 반환합니다.
-- 새로 저장되는 `token_value`는 `enc:v1:` 형식으로 DB에 암호화 저장됩니다. 운영 환경에서는 `AI_BOARD_TOKEN_ENCRYPTION_SECRET`을 `AI_BOARD_JWT_SECRET`과 다른 긴 랜덤 값으로 설정하십시오.
-- 기존 데모 DB의 평문 토큰은 읽기 호환을 위해 `tokenStorage: legacy`로 표시되며, 새로 저장하는 프로필부터 암호화됩니다.
-
-RAG 지식자료:
-
-- 직접 입력: 문서 내용, 회의 요약, 이미지 설명, 표의 핵심 값 등을 `직접 입력할 내용`에 작성합니다.
-- 파일 업로드: 텍스트 파일은 서버가 내용을 읽어 RAG 검색 대상에 넣습니다.
-- 음성/이미지/PDF/기타 바이너리: 파일명, MIME type, 사용자가 작성한 `어디에 어떻게 작성/사용할지` 지침을 RAG 근거로 저장합니다.
-- 이후 OCR/STT 또는 PDF 파서가 필요하면 같은 `knowledge_sources.extracted_text` 필드에 추출 결과를 업데이트하면 됩니다.
-
-연결 칸 입력값:
-
-- 표시 이름: 화면에 보이는 이름, 예: `업무 DB`, `디자인 파일`, `Jira 보드`
-- 서비스 키: agent가 사용할 식별자, 예: `notion`, `figma`, `jira`, `slack`, `internal_crm`
-- URL/ID: API 대상 URL, DB ID, 파일 URL, 캘린더 ID 등
-- 요청 API: `REST API`, `GraphQL`, `MCP`, `Google Calendar API`, `Figma MCP` 등
-- 토큰 변수명: `NOTION_TOKEN`, `FIGMA_TOKEN`, `JIRA_TOKEN`처럼 실제 키를 찾을 이름
-- 작업 방식: `create_issue`, `upsert_page`, `create_event`, `create_comment` 등
-- 연결별 템플릿: 해당 서비스에 보낼 필드 양식
-
-템플릿 선택:
-
-- `GitHub 이슈 -> 업무 DB`
-- `디자인 확인 -> 일정/피드백`
-- `RAG 게시판 요약/추천`
-- `커스텀 템플릿`
-
-빠른 예시 입력값:
-
-- GitHub Repo URL: `https://github.com/<owner>/<repo>`
-- GitHub Project URL: `https://github.com/users/<owner>/projects/<number>`
-- Notion DB URL: `https://www.notion.so/<workspace>/<database-id>`
-- Figma File URL: `https://www.figma.com/design/<fileKey>/<fileName>`
-- Google Calendar ID: 보통 `primary`, 공유 캘린더는 해당 calendar id
-- AI 제공자: `OpenAI`, `Anthropic`, `Gemini`, `Vercel AI Gateway`, `사내 LLM Gateway` 등
-- AI 모델: 예시 `gpt-4o-mini`, `gpt-4.1-mini`, `claude-sonnet-4`, `gemini-2.5-pro`
-- AI API Base: OpenAI 호환 gateway 또는 사내 gateway URL
-- API Key 관리: `.env`, 서버 비밀 저장소, 사용자별 encrypted credential store 등
-
-보안상 실제 API Key 값을 게시판 작업 데이터에 직접 저장하지 않는 것을 전제로 합니다. 작업에는 “어떤 키 이름을 어디서 꺼내 쓸지” 전략과 토큰 변수명만 남기고, 실제 키는 `.env`나 운영 비밀 저장소에서 주입합니다.
-
-## 아키텍처
-
-Live write readiness:
-
-- 연동 프로필 목록 상단의 `Live Write Readiness` 카드가 GitHub, Notion, Figma, Google Calendar별 live write 준비 여부를 표시합니다.
-- Figma는 `source_kind=figma` 또는 custom connection `service=figma`, Figma file URL, `FIGMA_TOKEN` 토큰이 있는 프로필이면 ready입니다.
-- Google Calendar는 `source_kind=google_calendar` 또는 custom connection `service=google_calendar`, calendar id, `GOOGLE_CALENDAR_TOKEN` 토큰이 있는 프로필이면 ready입니다.
-- Figma/Google Calendar 프로필 카드의 `Live write check` 버튼은 `dry_run=true`로 실제 요청 payload를 확인합니다. 실제 변경은 같은 엔드포인트에 `dry_run=false`를 보내야 하며, 이때 사용자별로 저장된 암호화 토큰만 사용합니다.
-- `Integration Activity Log`에는 profile save, RAG collect, live write, automation run/share 같은 작업 이력이 사용자별로 표시됩니다. provider/status/event/automation/profile 필터를 제공하며, 다른 사용자의 활동 로그는 조회되지 않습니다.
-
-```mermaid
-flowchart LR
-  User["사용자"] --> React["React UI"]
-  React --> FastAPI["FastAPI"]
-  FastAPI --> Auth["JWT Auth"]
-  FastAPI --> DB["PostgreSQL / SQLite"]
-  FastAPI --> Redis["Redis Cache"]
-  FastAPI --> RAG["RAG Service"]
-  FastAPI --> Agent["Automation Agent"]
-  FastAPI --> MCP["MCP JSON-RPC"]
-  Agent --> GitHub["GitHub API/CLI"]
-  Agent --> Notion["Notion API/MCP"]
-  Agent --> Calendar["Google Calendar API"]
-  Agent --> Figma["Figma API/MCP"]
-  Agent --> Board["게시판 공유"]
-```
-
-## 실행 방법
-
-검증:
+### 3. 시드와 개발 서버
 
 ```powershell
-npm run verify:fastapi
-```
-
-개발 서버:
-
-```powershell
+python scripts/seed-fastapi.py
 npm run dev
 ```
 
-접속:
+기본 접속:
 
-- UI: `http://127.0.0.1:3000`
-- API Docs: `http://127.0.0.1:8000/docs`
+- React: `http://127.0.0.1:3000`
+- FastAPI Docs: `http://127.0.0.1:8000/docs`
 
-같은 네트워크의 다른 사용자가 접속해야 하면 실행 중인 컴퓨터의 LAN IP를 사용합니다.
+기본 계정:
 
-- UI: `http://<서버-LAN-IP>:3000`
-- API Docs: `http://<서버-LAN-IP>:8000/docs`
+- `admin@example.com` / `password123`
+- `user@example.com` / `password123`
 
-프론트엔드는 별도 `VITE_API_BASE`가 없으면 현재 접속한 hostname의 8000 포트를 API 서버로 사용합니다. 예를 들어 사용자가 `http://192.168.0.10:3000`으로 접속하면 API도 `http://192.168.0.10:8000`으로 호출합니다.
+## 검증과 데모
 
-시드 데이터 생성:
-
-```powershell
-npm run seed
-```
-
-UI CDP smoke:
-
-```powershell
-npm run smoke:ui
-```
-
-`smoke:ui` preflight checks FastAPI at `API_BASE` (default `http://127.0.0.1:8000`), React at `APP_URL` (default `http://127.0.0.1:3000`), and Chrome/Edge CDP at `CDP_PORT` (default `9223`). If one is missing, the script prints the failed service and the setup action before running any destructive verification step.
-
-Full sequential verification:
-
-```powershell
-npm run verify:full
-```
-
-`verify:full` starts managed FastAPI/React servers once, resets `data/full-verify.db`, runs backend tests, frontend build, HTTP smoke, then UI CDP smoke in order. Use this instead of running `verify:fastapi` and `smoke:ui` in parallel.
-
-Fast full verification for repeat iterations:
+빠른 전체 검증:
 
 ```powershell
 npm run verify:full:quick
 ```
 
-`verify:full:quick` uses the same flow as `verify:full` and also resets `data/full-verify.db`, but skips `pip install` and `npm install`, so use it after dependencies are already installed.
-
-PostgreSQL + Redis:
+의존성 설치까지 포함한 전체 검증:
 
 ```powershell
-docker compose up -d
-$env:AI_BOARD_DATABASE_URL="postgresql://ai_board:ai_board@localhost:5432/ai_board"
-$env:AI_BOARD_REDIS_URL="redis://localhost:6379/0"
-npm run seed
-npm run dev
+npm run verify:full
 ```
 
-## 실제 외부 연동 검증 기록
+개별 검증:
+
+```powershell
+npm run verify:hygiene
+npm run verify:readme
+npm run verify:contract
+npm run verify:fastapi
+npm run smoke:ui
+npm run smoke:http
+```
+
+검증 내용:
+
+- `verify:hygiene`: `frontend/dist/`, DB, 로그, `.env` 추적 방지와 실토큰 패턴 스캔
+- `verify:readme`: 제출 README 구조, 체크리스트, PNG 스크린샷 무결성 확인
+- `verify:contract`: React UI가 의존하는 FastAPI 응답 계약 확인
+- `verify:full:quick`: hygiene, README, backend tests, frontend build, API contract, HTTP smoke, UI CDP smoke, MCP smoke
+
+데모 스크린샷:
 
 ![AI Board automation dashboard demo](docs/demo-screenshot.png)
 
-이미 실제로 검증한 항목:
+제출 전 체크리스트는 `docs/submission-checklist.md`에 정리되어 있습니다. 반복 개선 리포트는 `docs/evaluation-reports`에 저장됩니다.
 
-- Figma 파일 생성 및 UI 레이아웃 추가: `https://www.figma.com/design/SAinYC2KXnsHP5puWxTR12`
-- Notion 페이지 생성 및 GitHub 결과 업데이트: `https://app.notion.com/p/3777051c2f998169a87ad8131c2b055b`
-- GitHub 레포 생성, commit, push, issue 생성:
-  - Repo: `https://github.com/Wish-Upon-A-Star/ai-board-codex-live-test-20260606-161841`
-  - Issue: `https://github.com/Wish-Upon-A-Star/ai-board-codex-live-test-20260606-161841/issues/1`
+## 실제 외부 연동 검증 기록
 
-토큰 기반 live test:
+실제 외부 API 쓰기 검증은 사용자가 `.env`에 각 서비스 토큰과 대상 URL을 넣은 뒤 실행합니다.
 
 ```powershell
 npm run test:live-integrations
 ```
 
-이 명령은 `.env`에 실제 GitHub, Notion, Google Calendar, Figma 토큰이 있을 때 외부 서비스에 직접 변경을 생성합니다.
+필요한 환경 변수 예시:
 
-## 한계와 개선 아이디어
+- `AI_BOARD_GITHUB_TOKEN`
+- `AI_BOARD_GITHUB_REPO`
+- `AI_BOARD_NOTION_TOKEN`
+- `AI_BOARD_NOTION_DATABASE_ID`
+- `AI_BOARD_GOOGLE_ACCESS_TOKEN`
+- `AI_BOARD_GOOGLE_CALENDAR_ID`
+- `AI_BOARD_FIGMA_TOKEN`
+- `AI_BOARD_FIGMA_FILE_KEY`
 
-- 현재 자동화 실행은 계획/도구 선택과 게시판 공유까지 구현되어 있으며, 실제 주기 실행은 Celery, RQ, APScheduler 같은 워커를 붙이면 됩니다.
+앱 내부의 Figma/Google Calendar write는 기본적으로 `dry_run=true`입니다. 실제 외부 변경은 `dry_run=false`와 확인 문구 `WRITE LIVE`가 있을 때만 실행됩니다.
+
+## 회고와 개선 아이디어
+
+구현한 점:
+
+- 게시판 필수 기능과 AI 응용 기능을 한 화면 흐름으로 연결했습니다.
+- GitHub/Notion을 RAG 데이터 수집의 중심으로 두고, 사용자별 프로필과 자동화별 선택 구조를 만들었습니다.
+- MCP와 Agent를 별도 장식이 아니라 자동화 실행/설명/외부 도구 호출 구조에 녹였습니다.
+- 토큰 원문 비노출, dry-run 우선 정책, 실제 write 확인 문구를 넣었습니다.
+- 검증 자동화를 반복적으로 보강해 UI/API/문서/보안 회귀를 잡도록 했습니다.
+
+한계:
+
+- 실제 운영 수준의 LLM 호출 비용/사용량 추적은 샘플 구조입니다.
+- PostgreSQL과 Redis는 ready 구조지만 로컬 검증 기본값은 SQLite와 메모리 캐시입니다.
 - Google Calendar는 OAuth access token이 있어야 실제 이벤트 생성까지 가능합니다.
-- 운영 배포 시 refresh token, webhook signature verification, rate limit, audit log를 추가해야 합니다.
-- PostgreSQL과 Redis는 Docker Compose로 준비되어 있고, 로컬 기본값은 SQLite fallback입니다.
+- Figma 실제 write는 토큰과 파일 권한이 필요합니다.
+
+개선 아이디어:
+
+- 운영 배포에서 refresh token, webhook signature verification, rate limit, audit log 강화
+- pgvector 또는 외부 vector DB 연결
+- LangGraph 기반의 더 엄격한 Agent 상태 머신
+- 사용자별 토큰 KMS/Vault 연동
+- GitHub/Notion webhook 기반 변경 감지
+- CI에서 `npm run verify:full:quick` 자동 실행

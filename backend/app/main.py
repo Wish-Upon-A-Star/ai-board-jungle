@@ -240,7 +240,7 @@ async def extract_upload_text(upload: UploadFile | None) -> tuple[str, str, str]
     if mime_type.startswith("text/") or file_name.lower().endswith((".txt", ".md", ".csv", ".json", ".log")):
         text = raw[:20000].decode("utf-8", errors="ignore")
         return file_name, mime_type, text
-    return file_name, mime_type, f"[{mime_type or 'binary'} ?뚯씪: {file_name}] ?뚯씪 ?ㅻ챸/?묒꽦 吏移⑥쓣 RAG 洹쇨굅濡??ъ슜?⑸땲??"
+    return file_name, mime_type, f"[{mime_type or 'binary'} 파일: {file_name}] 파일 이름과 메타데이터를 RAG 근거로 사용합니다."
 
 
 def serialize_post(post: Post) -> dict:
@@ -306,7 +306,7 @@ def health() -> dict:
 @app.post("/api/auth/register")
 def register(data: RegisterIn, db: Session = Depends(get_db)) -> dict:
     if db.query(User).filter(User.email == data.email).first():
-        raise HTTPException(status_code=409, detail="?대? 媛?낅맂 ?대찓?쇱엯?덈떎.")
+        raise HTTPException(status_code=409, detail="이미 가입된 이메일입니다.")
     user = User(email=data.email, name=data.name, password_hash=hash_password(data.password))
     db.add(user)
     db.commit()
@@ -318,7 +318,7 @@ def register(data: RegisterIn, db: Session = Depends(get_db)) -> dict:
 def login(data: LoginIn, db: Session = Depends(get_db)) -> dict:
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="?대찓???먮뒗 鍮꾨?踰덊샇媛 ?щ컮瑜댁? ?딆뒿?덈떎.")
+        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다.")
     return {"token": create_token(user), "user": serialize_user(user)}
 
 
@@ -447,9 +447,9 @@ def create_integration_profile(data: IntegrationProfileIn, user: User = Depends(
 def delete_integration_profile(profile_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     profile = db.get(IntegrationProfile, profile_id)
     if not profile:
-        raise HTTPException(status_code=404, detail="?곕룞 ?꾨줈?꾩쓣 李얠쓣 ???놁뒿?덈떎.")
+        raise HTTPException(status_code=404, detail="연동 프로필을 찾을 수 없습니다.")
     if profile.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="?ㅻⅨ ?ъ슜?먯쓽 ?곕룞 ?꾨줈?꾩? ?ъ슜?????놁뒿?덈떎.")
+        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 사용할 수 없습니다.")
     db.delete(profile)
     db.commit()
     return {"ok": True}
@@ -459,9 +459,9 @@ def delete_integration_profile(profile_id: int, user: User = Depends(current_use
 def collect_integration_profile(profile_id: int, limit: int | None = None, pages: int | None = None, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     profile = db.get(IntegrationProfile, profile_id)
     if not profile:
-        raise HTTPException(status_code=404, detail="?곕룞 ?꾨줈?꾩쓣 李얠쓣 ???놁뒿?덈떎.")
+        raise HTTPException(status_code=404, detail="연동 프로필을 찾을 수 없습니다.")
     if profile.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="?ㅻⅨ ?ъ슜?먯쓽 ?곕룞 ?꾨줈?꾩? ?섏쭛?????놁뒿?덈떎.")
+        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 수집할 수 없습니다.")
     safe_limit = max(1, min(limit if limit is not None else profile.collect_limit, 100))
     safe_pages = max(1, min(pages if pages is not None else profile.collect_pages, 5))
     items, warnings = collect_profile_items(profile, limit=safe_limit, pages=safe_pages)
@@ -502,9 +502,9 @@ def collect_integration_profile(profile_id: int, limit: int | None = None, pages
 def write_integration_profile(profile_id: int, data: LiveWriteIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     profile = db.get(IntegrationProfile, profile_id)
     if not profile:
-        raise HTTPException(status_code=404, detail="?곕룞 ?꾨줈?꾩쓣 李얠쓣 ???놁뒿?덈떎.")
+        raise HTTPException(status_code=404, detail="연동 프로필을 찾을 수 없습니다.")
     if profile.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="?ㅻⅨ ?ъ슜?먯쓽 ?곕룞 ?꾨줈?꾩? ?ㅽ뻾?????놁뒿?덈떎.")
+        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 실행할 수 없습니다.")
     if not data.dry_run and data.confirmation.strip() != "WRITE LIVE":
         raise HTTPException(status_code=400, detail="Actual external writes require confirmation text WRITE LIVE.")
     result = execute_profile_write(
@@ -567,7 +567,7 @@ def create_post(data: PostIn, user: User = Depends(current_user), db: Session = 
 @app.post("/api/posts/{post_id}/comments")
 def add_comment(post_id: int, data: CommentIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     if not db.get(Post, post_id):
-        raise HTTPException(status_code=404, detail="寃뚯떆湲??李얠쓣 ???놁뒿?덈떎.")
+        raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
     comment = Comment(post_id=post_id, author_id=user.id, content=data.content)
     db.add(comment)
     db.commit()
@@ -579,9 +579,9 @@ def add_comment(post_id: int, data: CommentIn, user: User = Depends(current_user
 def delete_post(post_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     post = db.get(Post, post_id)
     if not post:
-        raise HTTPException(status_code=404, detail="寃뚯떆湲??李얠쓣 ???놁뒿?덈떎.")
+        raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
     if post.author_id != user.id and user.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="??젣 沅뚰븳???놁뒿?덈떎.")
+        raise HTTPException(status_code=403, detail="삭제 권한이 없습니다.")
     db.delete(post)
     db.commit()
     return {"ok": True}
@@ -642,9 +642,9 @@ async def upload_knowledge(
 def delete_knowledge(source_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     source = db.get(KnowledgeSource, source_id)
     if not source:
-        raise HTTPException(status_code=404, detail="吏?앹옄猷뚮? 李얠쓣 ???놁뒿?덈떎.")
+        raise HTTPException(status_code=404, detail="지식 자료를 찾을 수 없습니다.")
     if source.owner_id != user.id and user.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="??젣 沅뚰븳???놁뒿?덈떎.")
+        raise HTTPException(status_code=403, detail="삭제 권한이 없습니다.")
     db.delete(source)
     db.commit()
     return {"ok": True}
@@ -663,7 +663,7 @@ def list_automations(user: User = Depends(current_user), db: Session = Depends(g
 def create_automation(data: AutomationIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     selected_profile = db.get(IntegrationProfile, data.integration_profile_id) if data.integration_profile_id else None
     if selected_profile and selected_profile.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="?ㅻⅨ ?ъ슜?먯쓽 ?곕룞 ?꾨줈?꾩? ?먮룞?붿뿉 ?ъ슜?????놁뒿?덈떎.")
+        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 자동화에 사용할 수 없습니다.")
     custom_connections = data.custom_connections
     custom_template = data.custom_template
     ai_provider = data.ai_provider
@@ -676,7 +676,7 @@ def create_automation(data: AutomationIn, user: User = Depends(current_user), db
         ai_model = selected_profile.ai_model
         ai_api_base = selected_profile.ai_api_base
         api_provider = selected_profile.api_provider
-        api_key_strategy = f"?ъ슜?먮퀎 ?곕룞 ?꾨줈??'{selected_profile.name}'??{selected_profile.token_name or '?좏겙'} ?ъ슜"
+        api_key_strategy = f"사용자별 연동 프로필 '{selected_profile.name}'의 {selected_profile.token_name or '토큰'} 사용"
         custom_template = selected_profile.custom_template or custom_template
         profile_connections = parse_connections(selected_profile.custom_connections)
         if profile_connections:
@@ -958,9 +958,9 @@ Figma 작업 템플릿:
 def delete_automation(task_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     task = db.get(AutomationTask, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail="?먮룞???묒뾽??李얠쓣 ???놁뒿?덈떎.")
+        raise HTTPException(status_code=404, detail="자동화 작업을 찾을 수 없습니다.")
     if task.owner_id != user.id and user.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="??젣 沅뚰븳???놁뒿?덈떎.")
+        raise HTTPException(status_code=403, detail="삭제 권한이 없습니다.")
     db.delete(task)
     db.commit()
     return {"ok": True}
