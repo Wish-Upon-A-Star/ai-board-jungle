@@ -1,6 +1,8 @@
 const port = process.env.CDP_PORT || "9223";
 const appUrl = process.env.APP_URL || "http://127.0.0.1:3000";
 const apiBase = process.env.API_BASE || "http://127.0.0.1:8000";
+const cdpProfileName = "CDP Figma dry-run profile";
+const cdpKnowledgeTitle = "CDP verification document";
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -71,11 +73,15 @@ async function main() {
   };
 
   const profileData = await apiJson("/api/integration-profiles");
-  if (!profileData.profiles.some((profile) => ["figma", "google_calendar"].includes(profile.sourceKind))) {
+  const cdpProfiles = profileData.profiles.filter((profile) => profile.name === cdpProfileName && profile.sourceKind === "figma");
+  for (const duplicateProfile of cdpProfiles.slice(1)) {
+    await apiJson(`/api/integration-profiles/${duplicateProfile.id}`, { method: "DELETE" });
+  }
+  if (!cdpProfiles.length) {
     await apiJson("/api/integration-profiles", {
       method: "POST",
       body: JSON.stringify({
-        name: "CDP Figma dry-run profile",
+        name: cdpProfileName,
         source_kind: "figma",
         base_url: "https://www.figma.com/design/cdp-test/ai-board",
         api_provider: "Figma REST API",
@@ -172,16 +178,20 @@ async function main() {
     const runs = await apiJson(`/api/automations/${task.id}/runs?limit=2&offset=0`);
     return Array.isArray(runs.runs) && runs.limit === 2 && typeof runs.total === "number" && typeof runs.hasMore === "boolean";
   });
-  const knowledgeSaved = await apiJson("/api/knowledge", {
+  const knowledgeCreate = await apiJson("/api/knowledge", {
     method: "POST",
     body: JSON.stringify({
-      title: "CDP verification document",
+      title: cdpKnowledgeTitle,
       source_type: "document",
       instruction: "Use this for UI smoke verification.",
       extracted_text: "GitHub Notion Figma Calendar automation verification.",
       tags: ["cdp", "verification"],
     }),
-  }).then((data) => Boolean(data.source));
+  });
+  const knowledgeSaved = Boolean(knowledgeCreate.source);
+  const knowledgeDeleted = knowledgeCreate.source
+    ? await apiJson(`/api/knowledge/${knowledgeCreate.source.id}`, { method: "DELETE" }).then((data) => data.ok === true)
+    : false;
   const healthOk = await fetch(`${apiBase}/api/health`).then((response) => response.ok);
   const mcpOk = await fetch(`${apiBase}/mcp/rpc`, {
     method: "POST",
@@ -243,6 +253,7 @@ async function main() {
     schedulerApi,
     automationRunsApi,
     knowledgeSaved,
+    knowledgeDeleted,
     healthOk,
     mcpOk,
     hubOk,
@@ -268,6 +279,7 @@ async function main() {
     !schedulerApi ||
     !automationRunsApi ||
     !knowledgeSaved ||
+    !knowledgeDeleted ||
     !healthOk ||
     !mcpOk ||
     !hubOk ||
