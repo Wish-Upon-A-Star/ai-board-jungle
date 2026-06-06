@@ -32,6 +32,14 @@ class QuestionIn(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
 
 
+class LiveWriteIn(BaseModel):
+    title: str = Field(default="AI Board live write", min_length=1, max_length=160)
+    body: str = Field(default="Created from AI Board automation.", min_length=1, max_length=4000)
+    dry_run: bool = True
+    start_minutes_from_now: int = Field(default=15, ge=0, le=10080)
+    duration_minutes: int = Field(default=30, ge=5, le=1440)
+
+
 class KnowledgeIn(BaseModel):
     title: str = Field(min_length=2, max_length=180)
     source_type: str = Field(default="document", max_length=40)

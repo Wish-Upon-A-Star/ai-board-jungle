@@ -168,6 +168,36 @@ async function main() {
     const keys = new Set((data.providers || []).map((item) => item.key));
     return response.ok && keys.has("figma") && keys.has("google_calendar") && keys.has("github") && keys.has("notion");
   })()`);
+  const liveWriteApi = await evalJs(`(async () => {
+    const token = localStorage.getItem("ai-board-token");
+    const created = await fetch("http://127.0.0.1:8000/api/integration-profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+      body: JSON.stringify({
+        name: "UI Figma writer",
+        source_kind: "figma",
+        base_url: "https://www.figma.com/design/abc123/Demo",
+        api_provider: "Figma REST API",
+        token_name: "FIGMA_TOKEN",
+        token_value: "secret-figma-ui-token",
+        ai_provider: "OpenAI",
+        ai_model: "gpt-4o-mini",
+        ai_api_base: "https://api.openai.com/v1",
+        rag_targets: [],
+        custom_connections: [],
+        custom_template: "comment: {summary}"
+      })
+    });
+    const profileData = await created.json();
+    if (!created.ok) return false;
+    const response = await fetch("http://127.0.0.1:8000/api/integration-profiles/" + profileData.profile.id + "/write", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+      body: JSON.stringify({ title: "UI write dry-run", body: "Figma live write check", dry_run: true })
+    });
+    const data = await response.json();
+    return response.ok && data.write.service === "figma" && data.write.status === "ready" && !JSON.stringify(data).includes("secret-figma-ui-token");
+  })()`);
   const activityApi = await evalJs(`(async () => {
     const token = localStorage.getItem("ai-board-token");
     const response = await fetch("http://127.0.0.1:8000/api/integration-activities", {
@@ -239,9 +269,9 @@ async function main() {
   page.close();
   browser.close();
 
-  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, activityApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
+  const result = { missing, customConnectionAdded, profileSaved, integrationProfileApi, collectorApi, readinessApi, liveWriteApi, activityApi, knowledgeSaved, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
   console.log(JSON.stringify(result, null, 2));
-  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !activityApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
+  if (missing.length || !customConnectionAdded || !profileSaved || !integrationProfileApi || !collectorApi || !readinessApi || !liveWriteApi || !activityApi || !knowledgeSaved || !healthOk || !mcpOk || !hubOk || !ran) {
     process.exit(1);
   }
 }

@@ -115,6 +115,7 @@ RAG에 넣을만한 자료:
 - `GET /api/integration-profiles`
 - `POST /api/integration-profiles`
 - `DELETE /api/integration-profiles/{profile_id}`
+- `POST /api/integration-profiles/{profile_id}/write`: Figma comment 또는 Google Calendar event live write를 실행합니다. 기본 `dry_run=true`는 실제 외부 변경 없이 요청 URL과 payload를 검증하고, 토큰/URL이 준비된 사용자가 `dry_run=false`로 호출하면 실제 API를 호출합니다.
 - `GET /api/provider-readiness`: 사용자별 연동 프로필, 암호화 토큰, URL을 기준으로 GitHub/Notion/Figma/Google Calendar live write 준비 상태를 반환합니다.
 - `GET /api/integration-activities`: 사용자별 연동 프로필 저장, 외부 RAG 수집, 자동화 생성/실행/공유 활동 로그를 최근 50개까지 반환합니다.
 
@@ -246,6 +247,7 @@ Live write readiness:
 - 연동 프로필 목록 상단의 `Live Write Readiness` 카드가 GitHub, Notion, Figma, Google Calendar별 live write 준비 여부를 표시합니다.
 - Figma는 `source_kind=figma` 또는 custom connection `service=figma`, Figma file URL, `FIGMA_TOKEN` 토큰이 있는 프로필이면 ready입니다.
 - Google Calendar는 `source_kind=google_calendar` 또는 custom connection `service=google_calendar`, calendar id, `GOOGLE_CALENDAR_TOKEN` 토큰이 있는 프로필이면 ready입니다.
+- Figma/Google Calendar 프로필 카드의 `Live write check` 버튼은 `dry_run=true`로 실제 요청 payload를 확인합니다. 실제 변경은 같은 엔드포인트에 `dry_run=false`를 보내야 하며, 이때 사용자별로 저장된 암호화 토큰만 사용합니다.
 - `Integration Activity Log`에는 profile save, RAG collect, automation run/share 같은 작업 이력이 사용자별로 표시됩니다. 다른 사용자의 활동 로그는 조회되지 않습니다.
 
 ```mermaid

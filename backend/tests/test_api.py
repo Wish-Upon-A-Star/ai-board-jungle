@@ -142,6 +142,83 @@ def test_full_fastapi_flow(monkeypatch):
         readiness_by_key = {item["key"]: item for item in client.get("/api/provider-readiness", headers=headers).json()["providers"]}
         assert readiness_by_key["figma"]["ready"] is True
         assert readiness_by_key["figma"]["profiles"][0]["tokenStorage"] == "encrypted"
+        figma_write = client.post(
+            f"/api/integration-profiles/{figma_profile.json()['profile']['id']}/write",
+            headers=headers,
+            json={"title": "Figma check", "body": "Create review comment dry-run.", "dry_run": True},
+        )
+        assert figma_write.status_code == 200
+        assert figma_write.json()["write"]["status"] == "ready"
+        assert figma_write.json()["write"]["service"] == "figma"
+        assert "figma_secret_value" not in str(figma_write.json())
+
+        calendar_profile = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Calendar writer",
+                "source_kind": "google_calendar",
+                "base_url": "team@example.com",
+                "api_provider": "Google Calendar API",
+                "token_name": "GOOGLE_CALENDAR_TOKEN",
+                "token_value": "calendar_secret_value",
+                "ai_provider": "OpenAI",
+                "ai_model": "gpt-4o-mini",
+                "ai_api_base": "https://api.openai.com/v1",
+                "rag_targets": [],
+                "custom_template": "event: {title}",
+                "custom_connections": [],
+            },
+        )
+        assert calendar_profile.status_code == 200
+        calendar_write = client.post(
+            f"/api/integration-profiles/{calendar_profile.json()['profile']['id']}/write",
+            headers=headers,
+            json={"title": "Calendar check", "body": "Create event dry-run.", "dry_run": True, "start_minutes_from_now": 20, "duration_minutes": 40},
+        )
+        assert calendar_write.status_code == 200
+        assert calendar_write.json()["write"]["status"] == "ready"
+        assert calendar_write.json()["write"]["service"] == "google_calendar"
+        assert "team%40example.com" in calendar_write.json()["write"]["url"]
+        assert "calendar_secret_value" not in str(calendar_write.json())
+
+        custom_writer = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Custom Figma connection",
+                "source_kind": "custom",
+                "base_url": "",
+                "api_provider": "Custom API",
+                "token_name": "FIGMA_TOKEN",
+                "token_value": "custom_figma_secret",
+                "rag_targets": [],
+                "custom_connections": [
+                    {
+                        "label": "Design file",
+                        "service": "figma",
+                        "url": "https://www.figma.com/design/customKey/Demo",
+                        "api": "Figma REST API",
+                        "auth_key_name": "FIGMA_TOKEN",
+                        "operation": "create_review_comment",
+                        "template": "comment: {summary}",
+                    }
+                ],
+            },
+        )
+        assert custom_writer.status_code == 200
+        readiness_by_key = {item["key"]: item for item in client.get("/api/provider-readiness", headers=headers).json()["providers"]}
+        assert any(item["id"] == custom_writer.json()["profile"]["id"] and item["hasUrl"] for item in readiness_by_key["figma"]["profiles"])
+        custom_write = client.post(
+            f"/api/integration-profiles/{custom_writer.json()['profile']['id']}/write",
+            headers=headers,
+            json={"title": "Custom Figma check", "body": "Use custom connection URL.", "dry_run": True},
+        )
+        assert custom_write.status_code == 200
+        assert custom_write.json()["write"]["service"] == "figma"
+        assert "customKey" in custom_write.json()["write"]["url"]
+        assert "custom_figma_secret" not in str(custom_write.json())
+
         collected = client.post(f"/api/integration-profiles/{profile_json['id']}/collect", headers=headers)
         assert collected.status_code == 200
         assert collected.json()["status"] == "collected"
@@ -161,6 +238,8 @@ def test_full_fastapi_flow(monkeypatch):
         assert after_duplicate_profile["lastCollect"]["skippedDuplicates"] == 1
         activities_after_collect = client.get("/api/integration-activities", headers=headers).json()["activities"]
         assert any(item["eventType"] == "integration_profile.collect" and item["status"] == "unchanged" for item in activities_after_collect)
+        assert any(item["eventType"] == "integration_profile.write" and item["provider"] == "figma" for item in activities_after_collect)
+        assert any(item["eventType"] == "integration_profile.write" and item["provider"] == "google_calendar" for item in activities_after_collect)
 
         knowledge = client.post(
             "/api/knowledge",

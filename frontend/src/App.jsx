@@ -464,6 +464,27 @@ function App() {
     }
   }
 
+  async function writeIntegrationProfile(profile) {
+    setError("");
+    try {
+      const data = await api(`/api/integration-profiles/${profile.id}/write`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: `AI Board ${profile.sourceKind} write check`,
+          body: `Dry-run from ${profile.name}. Use dry_run=false through the API for an actual external write.`,
+          dry_run: true,
+        }),
+      });
+      setApiResult({ called: "integration-profile.write", response: data });
+      setSideTab("api");
+      await loadAll();
+    } catch (err) {
+      setError(err.message);
+      setApiResult({ called: "integration-profile.write", error: err.message });
+      setSideTab("api");
+    }
+  }
+
   if (!token || !user) {
     return (
       <main className="login-page">
@@ -778,6 +799,9 @@ function App() {
                     </div>
                     {profile.lastCollect?.warnings?.length ? <p className="warning-line">{profile.lastCollect.warnings.join(" / ")}</p> : null}
                     <button type="button" onClick={() => collectIntegrationProfile(profile)}><Search size={14} /> RAG 수집 실행</button>
+                    {["figma", "google_calendar"].includes(profile.sourceKind) ? (
+                      <button type="button" onClick={() => writeIntegrationProfile(profile)}><Play size={14} /> Live write check</button>
+                    ) : null}
                   </div>
                 ))}
               </div>

@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session
 
 from .collectors import collect_profile_items, save_collected_items
 from .db import get_db, init_db
+from .live_writers import execute_profile_write
 from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, User
-from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
+from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LiveWriteIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
 from .security import create_token, current_user, hash_password, protect_secret, reveal_secret, secret_preview, verify_password
 from .services import agent_review, automation_fingerprint, automation_plan, get_or_create_tags, instruction_hub, rag_answer, result_to_text, search_posts, summarize
 
@@ -186,12 +187,17 @@ def provider_readiness(user: User, db: Session) -> list[dict]:
     for provider in providers:
         key = provider["key"]
         matches: list[IntegrationProfile] = []
+        profile_urls: dict[int, bool] = {}
         for profile in profiles:
             connections = parse_connections(profile.custom_connections)
             has_connection = any(str(item.get("service", "")).lower() == key for item in connections)
             if profile.source_kind == key or has_connection:
                 matches.append(profile)
-        ready_profiles = [profile for profile in matches if reveal_secret(profile.token_value) and profile.base_url]
+                profile_urls[profile.id] = bool(profile.base_url) or any(
+                    str(item.get("service", "")).lower() == key and bool(item.get("url"))
+                    for item in connections
+                )
+        ready_profiles = [profile for profile in matches if reveal_secret(profile.token_value) and profile_urls.get(profile.id)]
         results.append({
             **provider,
             "profileCount": len(matches),
@@ -203,7 +209,7 @@ def provider_readiness(user: User, db: Session) -> list[dict]:
                     "name": profile.name,
                     "sourceKind": profile.source_kind,
                     "hasToken": bool(reveal_secret(profile.token_value)),
-                    "hasUrl": bool(profile.base_url),
+                    "hasUrl": bool(profile_urls.get(profile.id)),
                     "tokenStorage": "encrypted" if profile.token_value.startswith("enc:v1:") else "legacy" if profile.token_value else "empty",
                     "customConnections": [item.get("service", "custom") for item in parse_connections(profile.custom_connections)],
                 }
@@ -442,6 +448,35 @@ def collect_integration_profile(profile_id: int, limit: int | None = None, pages
         "status": status,
         "request": {"limit": safe_limit, "pages": safe_pages},
     }
+
+
+@app.post("/api/integration-profiles/{profile_id}/write")
+def write_integration_profile(profile_id: int, data: LiveWriteIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    profile = db.get(IntegrationProfile, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="연동 프로필을 찾을 수 없습니다.")
+    if profile.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 실행할 수 없습니다.")
+    result = execute_profile_write(
+        profile,
+        title=data.title,
+        body=data.body,
+        dry_run=data.dry_run,
+        start_minutes_from_now=data.start_minutes_from_now,
+        duration_minutes=data.duration_minutes,
+    )
+    log_activity(
+        db,
+        user,
+        "integration_profile.write",
+        profile.source_kind,
+        result.get("status", "unknown"),
+        f"{profile.source_kind} live write {result.get('status', 'unknown')} for {profile.name}",
+        {key: value for key, value in result.items() if key != "payload"},
+        profile_id=profile.id,
+    )
+    db.commit()
+    return {"profile": serialize_integration_profile(profile), "write": result}
 
 
 @app.get("/api/posts")
