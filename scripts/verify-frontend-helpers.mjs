@@ -6,6 +6,14 @@ import {
   parseRunResult,
   summarizeRunResult,
 } from "../frontend/src/viewModel.js";
+import {
+  automationPresets,
+  customPreset,
+  defaultAutomation,
+  defaultIntegration,
+  defaultKnowledge,
+  figmaCalendarPreset,
+} from "../frontend/src/presets.js";
 
 const parsed = parseRunResult('{"agent":"SyncPlannerAgent","route":"GitHub -> Notion","targets":[1,2],"externalRagSources":[3],"status":"CHANGED"}');
 assert.equal(parsed.agent, "SyncPlannerAgent");
@@ -32,4 +40,40 @@ assert.deepEqual(cards.find((card) => card.label === "Live APIs"), { label: "Liv
 const emptyCards = buildSystemReadinessCards();
 assert.deepEqual(emptyCards.find((card) => card.label === "Live APIs"), { label: "Live APIs", value: "0/0 ready", ok: false });
 
-console.log(JSON.stringify({ ok: true, checked: ["parseRunResult", "summarizeRunResult", "getRunStatus", "mergePostsById", "buildSystemReadinessCards"] }, null, 2));
+for (const preset of automationPresets) {
+  assert.equal(typeof preset.name, "string");
+  assert.ok(preset.name.length >= 4, "automation preset name should be useful");
+  assert.ok(Number.isInteger(preset.interval_minutes) && preset.interval_minutes >= 1, "automation interval should be a positive integer");
+  assert.ok(preset.ai_provider && preset.ai_model && preset.ai_api_base, "automation preset should include AI provider/model/base");
+  assert.ok(preset.template_preset, "automation preset should identify the template preset");
+  assert.ok(Array.isArray(preset.custom_connections) && preset.custom_connections.length >= 1, "automation preset should include at least one connection");
+  for (const connection of preset.custom_connections) {
+    assert.ok(connection.label && connection.service && connection.api && connection.auth_key_name && connection.operation, "connection metadata should be complete");
+    assert.ok(connection.template.includes("{"), "connection template should contain placeholders");
+  }
+}
+
+assert.deepEqual(defaultAutomation.custom_connections.map((connection) => connection.service), ["github", "notion"]);
+assert.deepEqual(figmaCalendarPreset.custom_connections.map((connection) => connection.service), ["figma", "google_calendar"]);
+assert.deepEqual(customPreset.custom_connections.map((connection) => connection.service), ["custom"]);
+assert.equal(defaultAutomation.template_preset, "github_notion");
+assert.equal(figmaCalendarPreset.figma_file_url.includes("figma.com/design"), true);
+assert.equal(customPreset.api_provider, "사용자 지정 API");
+assert.equal(defaultKnowledge.source_type, "document");
+assert.ok(defaultKnowledge.extracted_text.includes("GitHub 이슈"));
+assert.equal(defaultIntegration.source_kind, "github");
+assert.ok(defaultIntegration.rag_targets.includes("pull_requests"));
+
+console.log(JSON.stringify({
+  ok: true,
+  checked: [
+    "parseRunResult",
+    "summarizeRunResult",
+    "getRunStatus",
+    "mergePostsById",
+    "buildSystemReadinessCards",
+    "automationPresets",
+    "defaultKnowledge",
+    "defaultIntegration",
+  ],
+}, null, 2));
