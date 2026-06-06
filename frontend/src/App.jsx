@@ -168,6 +168,10 @@ function prettyRunResult(result) {
   return JSON.stringify(data, null, 2);
 }
 
+function retryStateKey(taskId, runId) {
+  return `${taskId}:${runId}`;
+}
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem("ai-board-token") || "");
   const [user, setUser] = useState(null);
@@ -436,16 +440,17 @@ function App() {
   }
 
   async function retryTaskFromRun(task, run) {
-    setRetryRunState((current) => ({ ...current, [run.id]: { status: "running", message: "Retrying..." } }));
+    const stateKey = retryStateKey(task.id, run.id);
+    setRetryRunState((current) => ({ ...current, [stateKey]: { status: "running", message: "Retrying..." } }));
     setError("");
     try {
       await runTask(task, { refreshRuns: true });
-      setRetryRunState((current) => ({ ...current, [run.id]: { status: "ok", message: "Retry updated" } }));
+      setRetryRunState((current) => ({ ...current, [stateKey]: { status: "ok", message: "Retry updated" } }));
     } catch (err) {
       setError(err.message);
       setApiResult({ called: "automation.retry", error: err.message, runId: run.id, taskId: task.id });
       setSideTab("api");
-      setRetryRunState((current) => ({ ...current, [run.id]: { status: "failed", message: err.message } }));
+      setRetryRunState((current) => ({ ...current, [stateKey]: { status: "failed", message: err.message } }));
     }
   }
 
@@ -739,7 +744,7 @@ function App() {
                           <span>{runHistory[task.id].runs.length} / {runHistory[task.id].total} · Updated {runHistory[task.id].loadedAt}</span>
                         </div>
                         {runHistory[task.id].runs.map((run) => {
-                          const retryState = retryRunState[run.id];
+                          const retryState = retryRunState[retryStateKey(task.id, run.id)];
                           return (
                             <div key={run.id} className="run-row">
                               <div className="run-row-main">
