@@ -32,6 +32,16 @@ class QuestionIn(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
 
 
+class CustomConnectionIn(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+    service: str = Field(min_length=1, max_length=80)
+    url: str = Field(default="", max_length=500)
+    api: str = Field(default="", max_length=160)
+    auth_key_name: str = Field(default="", max_length=120)
+    operation: str = Field(default="", max_length=160)
+    template: str = Field(default="", max_length=4000)
+
+
 class AutomationIn(BaseModel):
     name: str = Field(min_length=2, max_length=160)
     source: str = Field(min_length=2, max_length=120)
@@ -54,4 +64,7 @@ class AutomationIn(BaseModel):
     github_issue_template: str = Field(default="", max_length=4000)
     notion_template: str = Field(default="", max_length=4000)
     figma_template: str = Field(default="", max_length=4000)
+    template_preset: str = Field(default="github_notion", max_length=80)
+    custom_template: str = Field(default="", max_length=4000)
+    custom_connections: list[CustomConnectionIn] = []
     status: str = "ACTIVE"

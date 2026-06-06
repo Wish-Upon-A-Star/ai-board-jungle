@@ -81,8 +81,24 @@ def agent_review(db: Session, title: str, content: str) -> dict:
 
 def automation_plan(task: AutomationTask) -> dict:
     targets = []
+    try:
+        custom_connections = json.loads(task.custom_connections or "[]")
+    except json.JSONDecodeError:
+        custom_connections = []
+    for connection in custom_connections:
+        service = connection.get("service", "custom")
+        targets.append({
+            "target": service.lower().replace(" ", "_"),
+            "label": connection.get("label", service),
+            "api": connection.get("api", "Custom API"),
+            "mode": "user-token-required" if connection.get("auth_key_name") else "manual-or-public",
+            "site": connection.get("url", ""),
+            "authKeyName": connection.get("auth_key_name", ""),
+            "template": connection.get("template", ""),
+            "operation": connection.get("operation", "custom_action"),
+        })
     text = f"{task.source} {task.destination} {task.instruction} {task.api_provider}".lower()
-    if re.search(r"github|깃허브|git hub|kanban|칸반|issue|이슈", text):
+    if not custom_connections and re.search(r"github|깃허브|git hub|kanban|칸반|issue|이슈", text):
         targets.append({
             "target": "github",
             "api": "GitHub REST/CLI",
@@ -91,7 +107,7 @@ def automation_plan(task: AutomationTask) -> dict:
             "template": task.github_issue_template,
             "operation": "issue_create_or_update",
         })
-    if re.search(r"notion|노션", text):
+    if not custom_connections and re.search(r"notion|노션", text):
         targets.append({
             "target": "notion",
             "api": "Notion API/MCP",
@@ -100,7 +116,7 @@ def automation_plan(task: AutomationTask) -> dict:
             "template": task.notion_template,
             "operation": "database_row_upsert",
         })
-    if re.search(r"calendar|캘린더|google|구글|일정", text):
+    if not custom_connections and re.search(r"calendar|캘린더|google|구글|일정", text):
         targets.append({
             "target": "google_calendar",
             "api": "Google Calendar API",
@@ -109,7 +125,7 @@ def automation_plan(task: AutomationTask) -> dict:
             "template": task.request_template,
             "operation": "event_create",
         })
-    if re.search(r"figma|피그마|design|디자인", text):
+    if not custom_connections and re.search(r"figma|피그마|design|디자인", text):
         targets.append({
             "target": "figma",
             "api": "Figma API/MCP",
@@ -127,6 +143,8 @@ def automation_plan(task: AutomationTask) -> dict:
         "intervalMinutes": task.interval_minutes,
         "route": f"{task.source} -> {task.destination}",
         "template": task.template,
+        "templatePreset": task.template_preset,
+        "customTemplate": task.custom_template,
         "requestTemplate": task.request_template,
         "instruction": task.instruction,
         "targets": targets,
@@ -166,6 +184,9 @@ def automation_fingerprint(task: AutomationTask) -> str:
         "github_issue_template": task.github_issue_template,
         "notion_template": task.notion_template,
         "figma_template": task.figma_template,
+        "template_preset": task.template_preset,
+        "custom_template": task.custom_template,
+        "custom_connections": task.custom_connections,
     }
     payload = json.dumps(watched, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return sha256(payload.encode("utf-8")).hexdigest()
@@ -196,6 +217,9 @@ async def instruction_hub(instruction: str) -> dict:
         github_issue_template="이슈 제목 / 본문 / 라벨 / 담당자 / 마감일",
         notion_template="업무명 / 상태 / GitHub 링크 / 요약 / 담당자 / 마감일",
         figma_template="섹션명 / 확인 기준 / 관련 링크 / 담당자",
+        template_preset="custom",
+        custom_template="사용자 정의 출력 양식",
+        custom_connections="[]",
     )
     plan = automation_plan(pseudo)
     return {

@@ -66,6 +66,9 @@ def init_db() -> None:
                 "github_issue_template": "TEXT DEFAULT ''",
                 "notion_template": "TEXT DEFAULT ''",
                 "figma_template": "TEXT DEFAULT ''",
+                "template_preset": "VARCHAR(80) DEFAULT 'github_notion'",
+                "custom_template": "TEXT DEFAULT ''",
+                "custom_connections": "TEXT DEFAULT '[]'",
                 "last_input_hash": "VARCHAR(80) DEFAULT ''",
             }
             for column, ddl in task_additions.items():

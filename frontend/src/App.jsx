@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Bot, CalendarClock, Database, GitBranch, KeyRound, Link2, LogOut, Play, Search, Share2, UserPlus } from "lucide-react";
+import { Bot, CalendarClock, Database, GitBranch, KeyRound, Link2, LogOut, Play, Plus, Search, Share2, Trash2, UserPlus } from "lucide-react";
 import { api } from "./api";
 import "./style.css";
 
@@ -26,6 +26,28 @@ const githubNotionPreset = {
   github_issue_template: "제목: {title}\n본문: {summary}\n라벨: {labels}\n담당자: {assignee}\n마감일: {due_date}",
   notion_template: "업무명: {title}\n상태: {status}\nGitHub 링크: {github_url}\n요약: {summary}\n담당자: {assignee}\n마감일: {due_date}\n다음 액션: {next_action}",
   figma_template: "",
+  template_preset: "github_notion",
+  custom_template: "업무명: {title}\n상태: {status}\n원본 링크: {source_url}\n요약: {summary}\n다음 액션: {next_action}",
+  custom_connections: [
+    {
+      label: "GitHub 이슈",
+      service: "github",
+      url: "https://github.com/<owner>/<repo>",
+      api: "GitHub REST API",
+      auth_key_name: "GITHUB_TOKEN",
+      operation: "changed_issues_to_tasks",
+      template: "제목: {title}\n본문: {summary}\n라벨: {labels}\n담당자: {assignee}",
+    },
+    {
+      label: "업무 DB",
+      service: "notion",
+      url: "https://www.notion.so/<workspace>/<database-id>",
+      api: "Notion API",
+      auth_key_name: "NOTION_TOKEN",
+      operation: "upsert_task_page",
+      template: "업무명: {title}\n상태: {status}\nGitHub 링크: {github_url}\n요약: {summary}",
+    },
+  ],
 };
 
 const figmaCalendarPreset = {
@@ -45,6 +67,57 @@ const figmaCalendarPreset = {
   github_issue_template: "",
   notion_template: "",
   figma_template: "섹션명: {title}\n확인 기준: {checklist}\n관련 게시글: {post_url}\n담당자: {owner}",
+  template_preset: "figma_calendar",
+  custom_template: "일정 제목: {title}\n디자인 링크: {figma_url}\n확인 기준: {checklist}\n담당자: {owner}",
+  custom_connections: [
+    {
+      label: "디자인 파일",
+      service: "figma",
+      url: "https://www.figma.com/design/<fileKey>/<fileName>",
+      api: "Figma REST API 또는 Figma MCP",
+      auth_key_name: "FIGMA_TOKEN",
+      operation: "create_review_comment",
+      template: "섹션명: {title}\n확인 기준: {checklist}\n관련 게시글: {post_url}",
+    },
+    {
+      label: "일정",
+      service: "google_calendar",
+      url: "primary",
+      api: "Google Calendar API",
+      auth_key_name: "GOOGLE_CALENDAR_TOKEN",
+      operation: "create_event",
+      template: "일정 제목: {title}\n시작: {start}\n종료: {end}\n설명: {summary}",
+    },
+  ],
+};
+
+const blankConnection = {
+  label: "새 연결",
+  service: "custom",
+  url: "",
+  api: "Custom REST API",
+  auth_key_name: "CUSTOM_API_KEY",
+  operation: "custom_action",
+  template: "필드명: {value}\n링크: {source_url}\n다음 액션: {next_action}",
+};
+
+const customPreset = {
+  ...githubNotionPreset,
+  name: "커스텀 사이트/API 자동화",
+  source: "사용자 입력 소스",
+  destination: "사용자 입력 대상",
+  instruction: "연결 목록의 변경사항을 감지하고, 선택한 템플릿에 맞춰 필요한 사이트/API에 반영한다.",
+  template: "원본 / 변경 내용 / 대상 API / 결과 / 다음 액션",
+  api_provider: "사용자 지정 API",
+  ai_agent: "CustomWorkflowAgent",
+  github_repo_url: "",
+  github_project_url: "",
+  notion_database_url: "",
+  figma_file_url: "",
+  calendar_id: "",
+  template_preset: "custom",
+  custom_template: "원본: {source}\n변경: {changes}\n대상: {target}\n요약: {summary}\n다음 액션: {next_action}",
+  custom_connections: [{ ...blankConnection }],
 };
 
 function Badge({ role }) {
@@ -74,6 +147,31 @@ function App() {
 
   const myTasks = useMemo(() => tasks.filter((task) => task.owner.id === user?.id), [tasks, user]);
   const sharedCount = posts.filter((post) => post.automationTaskId).length;
+  const connectionCount = form.custom_connections?.length || 0;
+
+  function applyPreset(nextPreset) {
+    setForm({
+      ...nextPreset,
+      custom_connections: nextPreset.custom_connections.map((connection) => ({ ...connection })),
+    });
+  }
+
+  function updateConnection(index, key, value) {
+    const customConnections = [...(form.custom_connections || [])];
+    customConnections[index] = { ...customConnections[index], [key]: value };
+    setForm({ ...form, custom_connections: customConnections });
+  }
+
+  function addConnection() {
+    setForm({
+      ...form,
+      custom_connections: [...(form.custom_connections || []), { ...blankConnection, label: `새 연결 ${(form.custom_connections?.length || 0) + 1}` }],
+    });
+  }
+
+  function removeConnection(index) {
+    setForm({ ...form, custom_connections: (form.custom_connections || []).filter((_, itemIndex) => itemIndex !== index) });
+  }
 
   async function loadAll(query = q) {
     const [postData, taskData] = await Promise.all([
@@ -246,6 +344,7 @@ function App() {
               <div><dt>게시판 공유</dt><dd className="green">{sharedCount}</dd></div>
               <div><dt>Redis</dt><dd className="green">RAG 캐시</dd></div>
               <div><dt>AI 모델</dt><dd className="green">{form.ai_model}</dd></div>
+              <div><dt>연결 칸</dt><dd className="green">{connectionCount}</dd></div>
               <div><dt>RAG</dt><dd className="green">검색/요약</dd></div>
               <div><dt>MCP</dt><dd>JSON-RPC</dd></div>
               <div><dt>Agent</dt><dd>도구 선택</dd></div>
@@ -269,11 +368,11 @@ function App() {
                       <div><dt>경로</dt><dd>{task.source} {"->"} {task.destination}</dd></div>
                       <div><dt>AI</dt><dd>{task.aiProvider} / {task.aiModel}</dd></div>
                       <div><dt>API</dt><dd>{task.apiProvider}</dd></div>
-                      <div><dt>GitHub</dt><dd>{task.githubRepoUrl || task.githubProjectUrl || "미설정"}</dd></div>
-                      <div><dt>Notion</dt><dd>{task.notionDatabaseUrl || "미설정"}</dd></div>
-                      <div><dt>Figma</dt><dd>{task.figmaFileUrl || "미설정"}</dd></div>
-                      <div><dt>Calendar</dt><dd>{task.calendarId || "primary"}</dd></div>
+                      <div><dt>템플릿 선택</dt><dd>{task.templatePreset || "github_notion"}</dd></div>
+                      <div><dt>커스텀 연결</dt><dd>{task.customConnections?.length ? task.customConnections.map((item) => `${item.label}(${item.service})`).join(", ") : "빠른 입력만 사용"}</dd></div>
+                      <div><dt>빠른 입력</dt><dd>{[task.githubRepoUrl || task.githubProjectUrl, task.notionDatabaseUrl, task.figmaFileUrl, task.calendarId].filter(Boolean).join(" / ") || "미설정"}</dd></div>
                       <div><dt>템플릿</dt><dd>{task.template}</dd></div>
+                      <div><dt>커스텀 템플릿</dt><dd>{task.customTemplate || "미설정"}</dd></div>
                       <div><dt>지침</dt><dd>{task.instruction}</dd></div>
                     </dl>
                     <div className="task-actions">
@@ -289,8 +388,9 @@ function App() {
               <div className="panel-title row-title">
                 <span>자동화 등록</span>
                 <div className="preset-actions">
-                  <button type="button" onClick={() => setForm(githubNotionPreset)}>GitHub -> Notion 예시</button>
-                  <button type="button" onClick={() => setForm(figmaCalendarPreset)}>Figma/Calendar 예시</button>
+                  <button type="button" onClick={() => applyPreset(githubNotionPreset)}>GitHub to Notion 예시</button>
+                  <button type="button" onClick={() => applyPreset(figmaCalendarPreset)}>Figma/Calendar 예시</button>
+                  <button type="button" onClick={() => applyPreset(customPreset)}>커스텀 API 예시</button>
                 </div>
               </div>
               <form className="automation-form" onSubmit={createAutomation}>
@@ -304,9 +404,59 @@ function App() {
                   <Field label="AI 제공자"><input value={form.ai_provider} onChange={(e) => setForm({ ...form, ai_provider: e.target.value })} /></Field>
                   <Field label="AI 모델"><input value={form.ai_model} onChange={(e) => setForm({ ...form, ai_model: e.target.value })} /></Field>
                 </div>
+                <div className="grid2">
+                  <Field label="템플릿 선택">
+                    <select value={form.template_preset} onChange={(e) => setForm({ ...form, template_preset: e.target.value })}>
+                      <option value="github_notion">GitHub 이슈 to 업무 DB</option>
+                      <option value="figma_calendar">디자인 확인 to 일정/피드백</option>
+                      <option value="rag_board">RAG 게시판 요약/추천</option>
+                      <option value="custom">커스텀 템플릿</option>
+                    </select>
+                  </Field>
+                  <Field label="커스텀 모델/API">
+                    <input value={form.ai_model} onChange={(e) => setForm({ ...form, ai_model: e.target.value })} placeholder="gpt-4o-mini, claude, gemini, 사내 모델명" />
+                  </Field>
+                </div>
                 <Field label="AI API Base"><input value={form.ai_api_base} onChange={(e) => setForm({ ...form, ai_api_base: e.target.value })} placeholder="https://api.openai.com/v1 또는 사내 gateway URL" /></Field>
                 <Field label="사용 API"><input value={form.api_provider} onChange={(e) => setForm({ ...form, api_provider: e.target.value })} /></Field>
                 <Field label="AI Agent"><input value={form.ai_agent} onChange={(e) => setForm({ ...form, ai_agent: e.target.value })} /></Field>
+                <section className="connection-builder">
+                  <div className="section-head">
+                    <div>
+                      <strong>커스텀 연결 칸</strong>
+                      <span>Notion, Figma를 고정하지 않고 사용자가 필요한 사이트/API를 직접 추가합니다.</span>
+                    </div>
+                    <button type="button" onClick={addConnection}><Plus size={14} /> 연결 칸 추가</button>
+                  </div>
+                  {(form.custom_connections || []).map((connection, index) => (
+                    <div className="connection-card" key={`${connection.label}-${index}`}>
+                      <div className="connection-title">
+                        <strong>{index + 1}. {connection.label || "새 연결"}</strong>
+                        <button type="button" className="danger" onClick={() => removeConnection(index)}><Trash2 size={13} /> 삭제</button>
+                      </div>
+                      <div className="grid3 wide">
+                        <Field label="표시 이름"><input value={connection.label} onChange={(e) => updateConnection(index, "label", e.target.value)} placeholder="업무 DB, 디자인 파일, 사내 Jira" /></Field>
+                        <Field label="서비스 키"><input value={connection.service} onChange={(e) => updateConnection(index, "service", e.target.value)} placeholder="notion, figma, jira, slack" /></Field>
+                        <Field label="요청 API"><input value={connection.api} onChange={(e) => updateConnection(index, "api", e.target.value)} placeholder="REST API, MCP, GraphQL" /></Field>
+                      </div>
+                      <div className="grid3 wide">
+                        <Field label="URL/ID"><input value={connection.url} onChange={(e) => updateConnection(index, "url", e.target.value)} placeholder="사이트 URL, DB ID, 파일 URL, 캘린더 ID" /></Field>
+                        <Field label="토큰 변수명"><input value={connection.auth_key_name} onChange={(e) => updateConnection(index, "auth_key_name", e.target.value)} placeholder="NOTION_TOKEN, FIGMA_TOKEN" /></Field>
+                        <Field label="작업 방식"><input value={connection.operation} onChange={(e) => updateConnection(index, "operation", e.target.value)} placeholder="create_issue, upsert_page, create_event" /></Field>
+                      </div>
+                      <Field label="이 연결의 템플릿"><textarea value={connection.template} onChange={(e) => updateConnection(index, "template", e.target.value)} /></Field>
+                    </div>
+                  ))}
+                </section>
+                <Field label="커스텀 출력 템플릿"><textarea value={form.custom_template} onChange={(e) => setForm({ ...form, custom_template: e.target.value })} placeholder="프리셋 대신 사용할 전체 출력 양식" /></Field>
+                <div className="quick-inputs">
+                  <div className="section-head flat">
+                    <div>
+                      <strong>빠른 예시 입력</strong>
+                      <span>아래 칸은 선택 사항입니다. 실제 대상은 위의 커스텀 연결 칸에 자유롭게 추가할 수 있습니다.</span>
+                    </div>
+                  </div>
+                </div>
                 <div className="grid2">
                   <Field label="GitHub Repo URL"><input value={form.github_repo_url} onChange={(e) => setForm({ ...form, github_repo_url: e.target.value })} /></Field>
                   <Field label="GitHub Project URL"><input value={form.github_project_url} onChange={(e) => setForm({ ...form, github_project_url: e.target.value })} /></Field>

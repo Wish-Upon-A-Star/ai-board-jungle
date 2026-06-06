@@ -51,14 +51,17 @@ async function main() {
   const bodyText = () => evalJs("document.body.innerText");
 
   let text = await bodyText();
-  if (!text.includes("회원가입") || !text.includes("일반 사용자 데모")) {
+  const alreadyLoggedIn = text.includes("사용자별 자동화 작업") && text.includes("자동화 등록");
+  if (!alreadyLoggedIn && (!text.includes("회원가입") || !text.includes("일반 사용자 데모"))) {
     throw new Error("login/register controls are missing");
   }
 
-  await page.call("Runtime.evaluate", {
-    expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('관리자 데모')).click()",
-  });
-  await wait(2000);
+  if (!alreadyLoggedIn) {
+    await page.call("Runtime.evaluate", {
+      expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('관리자 데모')).click()",
+    });
+    await wait(2000);
+  }
 
   text = await bodyText();
   const required = [
@@ -67,6 +70,11 @@ async function main() {
     "Notion",
     "자동화 등록",
     "AI 모델",
+    "템플릿 선택",
+    "커스텀 모델/API",
+    "커스텀 연결 칸",
+    "연결 칸 추가",
+    "커스텀 출력 템플릿",
     "GitHub Repo URL",
     "Notion DB URL",
     "API Key 관리",
@@ -78,6 +86,13 @@ async function main() {
     "PostgreSQL",
   ];
   const missing = required.filter((item) => !text.includes(item));
+
+  await page.call("Runtime.evaluate", {
+    expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('연결 칸 추가')).click()",
+  });
+  await wait(500);
+  const afterAddConnection = await bodyText();
+  const customConnectionAdded = afterAddConnection.includes("새 연결 3") || afterAddConnection.includes("새 연결");
 
   await page.call("Runtime.evaluate", {
     expression: "Array.from(document.querySelectorAll('button')).find((button) => button.innerText.includes('Health')).click()",
@@ -110,9 +125,9 @@ async function main() {
   page.close();
   browser.close();
 
-  const result = { missing, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
+  const result = { missing, customConnectionAdded, healthOk, mcpOk, hubOk, ran, sample: text.slice(0, 1200) };
   console.log(JSON.stringify(result, null, 2));
-  if (missing.length || !healthOk || !mcpOk || !hubOk || !ran) {
+  if (missing.length || !customConnectionAdded || !healthOk || !mcpOk || !hubOk || !ran) {
     process.exit(1);
   }
 }

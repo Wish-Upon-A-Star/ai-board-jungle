@@ -47,14 +47,30 @@ def test_full_fastapi_flow():
                 "template": "title / status / link / summary",
                 "api_provider": "GitHub REST API + Notion API",
                 "ai_agent": "SyncPlannerAgent",
+                "template_preset": "custom",
+                "custom_template": "title: {title}\nstatus: {status}\nlink: {source_url}",
+                "custom_connections": [
+                    {
+                        "label": "Task DB",
+                        "service": "notion",
+                        "url": "https://www.notion.so/workspace/database-id",
+                        "api": "Notion API",
+                        "auth_key_name": "NOTION_TOKEN",
+                        "operation": "upsert_task_page",
+                        "template": "title: {title}\nstatus: {status}",
+                    }
+                ],
             },
         )
         assert automation.status_code == 200
         task_id = automation.json()["task"]["id"]
+        assert automation.json()["task"]["customConnections"][0]["service"] == "notion"
         assert client.get("/api/automations", headers=headers).json()["tasks"]
         first_run = client.post(f"/api/automations/{task_id}/run", headers=headers)
         assert first_run.status_code == 200
         assert first_run.json()["run"]["result"]["status"] == "changed"
+        assert first_run.json()["run"]["result"]["targets"][0]["target"] == "notion"
+        assert first_run.json()["run"]["result"]["targets"][0]["operation"] == "upsert_task_page"
         second_run = client.post(f"/api/automations/{task_id}/run", headers=headers)
         assert second_run.status_code == 200
         assert second_run.json()["run"]["result"]["status"] == "skipped"

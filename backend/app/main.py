@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -42,6 +43,10 @@ def serialize_post(post: Post) -> dict:
 
 
 def serialize_task(task: AutomationTask) -> dict:
+    try:
+        custom_connections = json.loads(task.custom_connections or "[]")
+    except json.JSONDecodeError:
+        custom_connections = []
     return {
         "id": task.id,
         "name": task.name,
@@ -66,6 +71,9 @@ def serialize_task(task: AutomationTask) -> dict:
         "githubIssueTemplate": task.github_issue_template,
         "notionTemplate": task.notion_template,
         "figmaTemplate": task.figma_template,
+        "templatePreset": task.template_preset,
+        "customTemplate": task.custom_template,
+        "customConnections": custom_connections,
         "status": task.status,
         "lastResult": task.last_result,
         "lastInputHash": task.last_input_hash,
@@ -184,6 +192,9 @@ def create_automation(data: AutomationIn, user: User = Depends(current_user), db
         github_issue_template=data.github_issue_template,
         notion_template=data.notion_template,
         figma_template=data.figma_template,
+        template_preset=data.template_preset,
+        custom_template=data.custom_template,
+        custom_connections=json.dumps([item.model_dump() for item in data.custom_connections], ensure_ascii=False),
         status=data.status,
     )
     db.add(task)
@@ -225,6 +236,9 @@ def run_automation(task_id: int, user: User = Depends(current_user), db: Session
                 "github_issue_template",
                 "notion_template",
                 "figma_template",
+                "template_preset",
+                "custom_template",
+                "custom_connections",
             ],
         }
         task.last_result = result_to_text(result)
@@ -266,6 +280,11 @@ def share_automation(task_id: int, user: User = Depends(current_user), db: Sessi
 - Figma: {task.figma_file_url or "미설정"}
 - Calendar: {task.calendar_id}
 - API Key 전략: {task.api_key_strategy}
+- 템플릿 선택: {task.template_preset}
+- 커스텀 템플릿:
+{task.custom_template}
+- 커스텀 연결:
+{task.custom_connections}
 
 GitHub 이슈 템플릿:
 {task.github_issue_template}

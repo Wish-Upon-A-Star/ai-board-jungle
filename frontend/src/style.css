@@ -1,9 +1,9 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: #fff; color: #333; font-family: Arial, "Malgun Gothic", sans-serif; font-size: 12px; }
-button, input, textarea { font: inherit; }
+button, input, textarea, select { font: inherit; }
 button { border: 1px solid #cfcfcf; background: #fff; color: #333; border-radius: 0; padding: 6px 10px; cursor: pointer; }
 button:hover { background: #f7f7f7; }
-input, textarea { width: 100%; border: 1px solid #d8d8d8; padding: 7px 8px; color: #333; background: #fff; }
+input, textarea, select { width: 100%; border: 1px solid #d8d8d8; padding: 7px 8px; color: #333; background: #fff; }
 textarea { min-height: 90px; resize: vertical; line-height: 1.55; }
 a { color: #333; text-decoration: none; }
 a:hover { color: #0086d1; }
@@ -83,6 +83,17 @@ a:hover { color: #0086d1; }
 .field input, .field textarea { min-width: 0; }
 .preset-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .preset-actions button { padding: 4px 8px; }
+.connection-builder { display: grid; gap: 8px; border: 1px solid #e2e2e2; padding: 10px; background: #fcfcfc; }
+.section-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.section-head strong { display: block; color: #333; margin-bottom: 3px; }
+.section-head span { display: block; color: #777; line-height: 1.45; }
+.section-head button { width: 116px; flex: 0 0 auto; }
+.section-head.flat { border-top: 1px solid #eee; padding-top: 10px; }
+.connection-card { display: grid; gap: 8px; border: 1px solid #dcdcdc; background: #fff; padding: 10px; }
+.connection-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.connection-title strong { color: #333; }
+.connection-title .danger { width: 74px; border-color: #c7372f; color: #c7372f; }
+.quick-inputs { margin-top: 2px; }
 .api-console { display: grid; gap: 8px; padding: 10px; }
 .api-console textarea { min-height: 68px; }
 .api-buttons { display: flex; flex-wrap: wrap; gap: 6px; }

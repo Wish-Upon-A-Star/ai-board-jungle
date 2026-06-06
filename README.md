@@ -1,15 +1,16 @@
 # AI Board
 
-React, FastAPI, PostgreSQL-ready SQLAlchemy, Redis 캐시를 기반으로 만든 AI 자동화 게시판입니다. 단순 게시판에 AI 버튼만 붙인 구조가 아니라, 사용자가 GitHub, Notion, Google Calendar, Figma 같은 외부 업무 흐름을 자동화 작업으로 등록하고 실행 결과를 게시판에 공유하는 방식으로 구성했습니다.
+React, FastAPI, PostgreSQL-ready SQLAlchemy, Redis 캐시를 기반으로 만든 AI 자동화 게시판입니다. 단순 게시판에 AI 버튼만 붙인 구조가 아니라, 사용자가 GitHub, Notion, Google Calendar, Figma뿐 아니라 Jira, Slack, Sheets, 사내 API 같은 임의의 외부 업무 흐름을 자동화 작업으로 등록하고 실행 결과를 게시판에 공유하는 방식으로 구성했습니다.
 
 ## 주요 사용 흐름
 
 1. 사용자가 회원가입 또는 로그인합니다.
-2. 자동화 작업에 `몇 분마다`, `어디에서`, `어디로`, `지침`, `결과 템플릿`, `사용 API`, `AI Agent`, `AI 모델`, `요청 사이트 URL`, `API Key 관리 방식`을 입력합니다.
-3. 사용자는 자기 GitHub repo/project URL, Notion DB URL, Figma file URL, Google Calendar ID를 직접 입력합니다. 특정 개발자 계정에 고정하지 않습니다.
-4. Agent가 지침을 분석해 GitHub, Notion, Google Calendar, Figma, 게시판 중 필요한 대상과 API를 선택합니다.
-5. 사용자는 작업 카드의 `실행` 버튼으로 자동화 계획을 실행하고, `게시판 공유` 버튼으로 결과를 게시글로 남깁니다.
-6. `API 실행 콘솔`에서 Health, RAG, MCP, Agent Hub 버튼을 눌러 실제 FastAPI API 호출 결과를 확인할 수 있습니다.
+2. 자동화 작업에 `몇 분마다`, `어디에서`, `어디로`, `지침`, `사용 API`, `AI Agent`, `AI 모델`, `템플릿 선택`, `커스텀 출력 템플릿`, `API Key 관리 방식`을 입력합니다.
+3. 사용자는 `커스텀 연결 칸`을 필요한 만큼 추가합니다. 각 칸에는 표시 이름, 서비스 키, URL/ID, 요청 API, 토큰 변수명, 작업 방식, 연결별 템플릿을 넣습니다.
+4. GitHub/Notion/Figma/Calendar 입력은 빠른 예시용일 뿐이며 필수 대상이 아닙니다. 실제 우선 대상은 사용자가 추가한 커스텀 연결 칸입니다.
+5. Agent가 지침과 연결 칸을 분석해 필요한 대상과 API를 선택합니다.
+6. 사용자는 작업 카드의 `실행` 버튼으로 자동화 계획을 실행하고, `게시판 공유` 버튼으로 결과를 게시글로 남깁니다.
+7. `API 실행 콘솔`에서 Health, RAG, MCP, Agent Hub 버튼을 눌러 실제 FastAPI API 호출 결과를 확인할 수 있습니다.
 
 ## 사용자와 권한
 
@@ -40,8 +41,11 @@ React, FastAPI, PostgreSQL-ready SQLAlchemy, Redis 캐시를 기반으로 만든
 - 태그
 - 페이징과 검색
 - 사용자별 자동화 작업 등록
-- 사용자별 GitHub/Notion/Figma/Calendar 대상 URL 등록
+- 사용자별 커스텀 연결 칸 추가/삭제
+- 연결별 서비스 키, URL/ID, 요청 API, 토큰 변수명, 작업 방식, 템플릿 등록
+- GitHub/Notion/Figma/Calendar 빠른 예시 URL 등록
 - 사용자별 AI 제공자, AI 모델, AI API Base 등록
+- 템플릿 프리셋 또는 커스텀 출력 템플릿 선택
 - 사용자별 API Key 관리 전략 기록
 - GitHub 이슈 템플릿, Notion 반영 템플릿, Figma 작업 템플릿 등록
 - 자동화 작업 실행
@@ -75,7 +79,7 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 
 ### AI Agent
 
-자동화 작업의 source, destination, instruction, api_provider, 연결 URL, AI 모델, 템플릿을 읽고 필요한 도구를 선택합니다. GitHub, Notion, Google Calendar, Figma, Board 중 대상 API를 고르고, 무한 루프 방지를 위해 max tool calls, timeout, retry 제한을 결과에 포함합니다.
+자동화 작업의 source, destination, instruction, api_provider, 커스텀 연결 칸, AI 모델, 템플릿을 읽고 필요한 도구를 선택합니다. 커스텀 연결 칸이 있으면 그 목록을 우선 사용하고, 없을 때만 문장에 포함된 GitHub, Notion, Google Calendar, Figma, Board 같은 대상을 추론합니다. 무한 루프 방지를 위해 max tool calls, timeout, retry 제한을 결과에 포함합니다.
 
 예시 변환:
 
@@ -101,6 +105,9 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 - GitHub repo/project URL
 - Notion DB URL
 - Figma file URL
+- 템플릿 선택
+- 커스텀 출력 템플릿
+- 커스텀 연결 칸
 - Calendar ID
 - AI provider, AI model, AI API base
 - 요청/일정 템플릿
@@ -108,7 +115,7 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 - Notion 반영 템플릿
 - Figma 작업 템플릿
 
-즉 지침, 대상 사이트, 템플릿, AI 모델 같은 값이 바뀐 경우에만 `status: "changed"`로 실제 실행 계획을 만들고 실행 기록을 저장합니다.
+즉 지침, 대상 사이트, 커스텀 연결 칸, 템플릿, AI 모델 같은 값이 바뀐 경우에만 `status: "changed"`로 실제 실행 계획을 만들고 실행 기록을 저장합니다.
 
 ## API 실행 콘솔
 
@@ -123,7 +130,26 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 
 ## 사용자별 외부 사이트 설정
 
-자동화 등록 폼에는 아래 입력값이 있습니다.
+자동화 등록 폼의 중심은 `커스텀 연결 칸`입니다. 사용자는 연결을 필요한 만큼 추가할 수 있고, Notion/Figma에 고정되지 않습니다.
+
+연결 칸 입력값:
+
+- 표시 이름: 화면에 보이는 이름, 예: `업무 DB`, `디자인 파일`, `Jira 보드`
+- 서비스 키: agent가 사용할 식별자, 예: `notion`, `figma`, `jira`, `slack`, `internal_crm`
+- URL/ID: API 대상 URL, DB ID, 파일 URL, 캘린더 ID 등
+- 요청 API: `REST API`, `GraphQL`, `MCP`, `Google Calendar API`, `Figma MCP` 등
+- 토큰 변수명: `NOTION_TOKEN`, `FIGMA_TOKEN`, `JIRA_TOKEN`처럼 실제 키를 찾을 이름
+- 작업 방식: `create_issue`, `upsert_page`, `create_event`, `create_comment` 등
+- 연결별 템플릿: 해당 서비스에 보낼 필드 양식
+
+템플릿 선택:
+
+- `GitHub 이슈 -> 업무 DB`
+- `디자인 확인 -> 일정/피드백`
+- `RAG 게시판 요약/추천`
+- `커스텀 템플릿`
+
+빠른 예시 입력값:
 
 - GitHub Repo URL: `https://github.com/<owner>/<repo>`
 - GitHub Project URL: `https://github.com/users/<owner>/projects/<number>`
@@ -135,7 +161,7 @@ FastAPI가 MCP 스타일의 JSON-RPC endpoint를 제공합니다. 현재 `automa
 - AI API Base: OpenAI 호환 gateway 또는 사내 gateway URL
 - API Key 관리: `.env`, 서버 비밀 저장소, 사용자별 encrypted credential store 등
 
-보안상 실제 API Key 값을 게시판 작업 데이터에 직접 저장하지 않는 것을 전제로 합니다. 작업에는 “어떤 키를 어디서 꺼내 쓸지” 전략을 남기고, 실제 키는 `.env`나 운영 비밀 저장소에서 주입합니다.
+보안상 실제 API Key 값을 게시판 작업 데이터에 직접 저장하지 않는 것을 전제로 합니다. 작업에는 “어떤 키 이름을 어디서 꺼내 쓸지” 전략과 토큰 변수명만 남기고, 실제 키는 `.env`나 운영 비밀 저장소에서 주입합니다.
 
 ## 아키텍처
 
