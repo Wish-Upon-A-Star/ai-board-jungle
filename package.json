@@ -11,6 +11,7 @@
     "demo:screenshot": "node scripts/capture-demo-screenshot.mjs",
     "test": "python -m pytest backend/tests",
     "test:live-integrations": "node scripts/test-live-integrations.mjs",
+    "verify:hygiene": "node scripts/verify-hygiene.mjs",
     "verify:readme": "node scripts/verify-readme.mjs",
     "verify:auto": "node scripts/verify-fastapi.mjs",
     "verify:fastapi": "node scripts/verify-fastapi.mjs",

@@ -31,7 +31,12 @@ const suspiciousPatterns = [
 
 const missing = requiredSnippets.filter((snippet) => !readme.includes(snippet));
 const suspicious = suspiciousPatterns.filter((pattern) => pattern.test(readme)).map(String);
-const checklistRequired = ["npm run demo:screenshot", "npm run verify:readme", "npm run verify:full:quick"];
+const checklistRequired = [
+  "npm run demo:screenshot",
+  "npm run verify:hygiene",
+  "npm run verify:readme",
+  "npm run verify:full:quick",
+];
 const checklistMissing = checklistRequired.filter((snippet) => !checklist.includes(snippet));
 const screenshotPath = "docs/demo-screenshot.png";
 const screenshotOk =

@@ -15,6 +15,7 @@ Run these checks before final submission or when the UI changes:
 2. Verify README structure, required feature evidence, and the screenshot PNG header.
 
    ```powershell
+   npm run verify:hygiene
    npm run verify:readme
    ```
 

@@ -56,6 +56,7 @@
 - `verify:fastapi`도 시작할 때 `data/fastapi-verify.db`와 SQLite sidecar 파일을 초기화하고 종료 시 3000/8000 포트를 정리합니다.
 - `verify:fastapi` runs the Vite dev server directly and kills the spawned process tree on Windows, so repeated smoke checks do not leave orphaned local servers.
 - Local verification resolves npm through `npm-cli.js` under the active Node install and runs short commands without shell argument concatenation.
+- `npm run verify:hygiene` checks that generated folders such as `frontend/dist/` are ignored, not tracked by git, and that submitted source/docs do not contain obvious real API tokens.
 - `scripts/verify-helpers.mjs` centralizes local verification process spawning, port cleanup, URL waiting, and SQLite DB reset helpers used by both `verify:fastapi` and `verify:full`.
 - `npm run dev` also uses the shared process helper, starts Vite directly on `AI_BOARD_WEB_PORT` or 3000 with `--strictPort`, and cleans up the API/web process tree on exit.
 - `npm run verify:auto` is an alias of the current FastAPI/React verification flow; older Prisma/Next/demo-store auto-verify scripts were removed to avoid false validation paths.
