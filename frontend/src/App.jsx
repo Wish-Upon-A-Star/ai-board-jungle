@@ -182,6 +182,7 @@ function App() {
   const [runHistory, setRunHistory] = useState({});
   const [expandedRuns, setExpandedRuns] = useState({});
   const [retryRunState, setRetryRunState] = useState({});
+  const [deleteConfirmTaskId, setDeleteConfirmTaskId] = useState(null);
   const [integrationProfiles, setIntegrationProfiles] = useState([]);
   const [providerReadiness, setProviderReadiness] = useState([]);
   const [integrationActivities, setIntegrationActivities] = useState([]);
@@ -241,6 +242,7 @@ function App() {
     });
     setExpandedRuns((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(prefix))));
     setRetryRunState((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(prefix))));
+    setDeleteConfirmTaskId((current) => (current === taskId ? null : current));
   }
 
   function applyPreset(nextPreset) {
@@ -430,6 +432,7 @@ function App() {
     setTasks([]);
     setPosts([]);
     clearRunUiState();
+    setDeleteConfirmTaskId(null);
   }
 
   async function createAutomation(event) {
@@ -488,6 +491,7 @@ function App() {
       setApiResult({ called: "automation.delete", response: data, taskId: task.id });
       setSideTab("api");
       clearRunUiState(task.id);
+      setDeleteConfirmTaskId(null);
       await loadAll();
     } catch (err) {
       setError(err.message);
@@ -770,7 +774,14 @@ function App() {
                       <button onClick={() => runTask(task)}><Play size={14} /> Run</button>
                       <button onClick={() => shareTask(task)} className="secondary"><Share2 size={14} /> Share</button>
                       <button onClick={() => loadTaskRuns(task)} className="secondary"><Database size={14} /> Run history</button>
-                      <button onClick={() => deleteTask(task)} className="danger"><Trash2 size={14} /> Delete</button>
+                      {deleteConfirmTaskId === task.id ? (
+                        <>
+                          <button onClick={() => deleteTask(task)} className="danger confirm-delete"><Trash2 size={14} /> Confirm delete</button>
+                          <button onClick={() => setDeleteConfirmTaskId(null)} className="secondary">Cancel</button>
+                        </>
+                      ) : (
+                        <button onClick={() => setDeleteConfirmTaskId(task.id)} className="danger"><Trash2 size={14} /> Delete</button>
+                      )}
                     </div>
                     {runHistory[task.id] ? (
                       <div className="run-history">

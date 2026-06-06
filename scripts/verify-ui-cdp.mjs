@@ -182,6 +182,15 @@ async function main() {
   const runHistoryVisible = runClicked && text.includes("Run history");
   const runDetailsVisible = detailClicked && text.includes("Hide details") && text.includes("status");
   const runRetryVisible = retryClicked && text.includes("Retry") && text.includes("Updated") && text.includes("Retry updated");
+  const deleteClicked = await evalJs(`(() => {
+    const button = Array.from(document.querySelectorAll("button")).find((item) => item.innerText.trim() === "Delete");
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`);
+  await wait(500);
+  text = await bodyText();
+  const deleteConfirmVisible = deleteClicked && text.includes("Confirm delete") && text.includes("Cancel");
 
   const result = {
     missing,
@@ -202,6 +211,7 @@ async function main() {
     runHistoryVisible,
     runDetailsVisible,
     runRetryVisible,
+    deleteConfirmVisible,
     sample: text.slice(0, 1200),
   };
   console.log(JSON.stringify(result, null, 2));
@@ -224,7 +234,8 @@ async function main() {
     !hubOk ||
     !runHistoryVisible ||
     !runDetailsVisible ||
-    !runRetryVisible
+    !runRetryVisible ||
+    !deleteConfirmVisible
   ) {
     throw new Error("CDP verification failed");
   }
