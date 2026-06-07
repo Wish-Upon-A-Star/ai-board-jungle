@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { assertFixtureEvidenceOrder, assertFixtureSummaryIndexes, assertFixtureSummaryKeySchema, assertReadinessJsonEvidence } from "./verify-readiness-output.mjs";
+import {
+  assertFixtureEvidenceOrder,
+  assertFixtureSummaryIndexes,
+  assertFixtureSummaryKeySchema,
+  assertReadinessJsonEvidence,
+  expectedFixtureSummaryKeys,
+} from "./verify-readiness-output.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
 const expectedFailureFlags = [
@@ -325,6 +331,16 @@ assert.deepEqual(
   "fixture output must expose direct helper negative scenario coverage"
 );
 const outputKeys = Object.keys(output);
+assert.deepEqual(
+  expectedFixtureSummaryKeys,
+  outputKeys,
+  "exported fixture summary key schema must match fixture output keys"
+);
+assert.throws(
+  () => expectedFixtureSummaryKeys.push("unexpectedEvidence"),
+  /object is not extensible|Cannot add property|read only/,
+  "exported fixture summary key schema must be read-only"
+);
 assertFixtureSummaryKeySchema(output);
 assert.throws(
   () => assertFixtureSummaryKeySchema(extraTopLevelFailureOutput()),

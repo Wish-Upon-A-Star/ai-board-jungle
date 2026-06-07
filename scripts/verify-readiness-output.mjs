@@ -51,7 +51,7 @@ const expectedPositiveFixtureGuards = [
   "validFixtureSummaryIndexes",
 ];
 
-const expectedFixtureSummaryKeys = [
+export const expectedFixtureSummaryKeys = Object.freeze([
   "ok",
   "checked",
   "validScannedFileCount",
@@ -61,7 +61,7 @@ const expectedFixtureSummaryKeys = [
   "directHelperNegativeGuards",
   "directHelperNegativeScenarios",
   ...expectedFailureFlags,
-];
+]);
 
 export function assertCompactReadinessOutput(output) {
   assert.ok(output.includes("READINESS OK 11/11 passed"), "compact output must include the readiness total");
