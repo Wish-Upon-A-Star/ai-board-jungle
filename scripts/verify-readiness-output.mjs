@@ -28,6 +28,13 @@ export function assertCompactReadinessOutput(output) {
   }
 }
 
+export function assertFixtureSummaryIndexes(fixtureSummaryIndexes) {
+  assert.ok(
+    Object.values(fixtureSummaryIndexes).every((index) => Number.isInteger(index) && index >= 0),
+    "readiness output fixture summary indexes must be non-negative integers"
+  );
+}
+
 export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSummary = false } = {}) {
   let fixtureSummaryIndexes = null;
   const readmeResult = readinessSummary.results.find((item) => item.name === "readme");
@@ -101,10 +108,7 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       negativeFixtureGuardsIndex,
       firstBooleanFailureFieldIndex,
     };
-    assert.ok(
-      Object.values(fixtureSummaryIndexes).every((index) => Number.isInteger(index) && index >= 0),
-      "readiness output fixture summary indexes must be non-negative integers"
-    );
+    assertFixtureSummaryIndexes(fixtureSummaryIndexes);
   }
 
   const scannedFileCountMatch = textOutputResult.summary.match(/"scannedFileCount":\s*(\d+)/);

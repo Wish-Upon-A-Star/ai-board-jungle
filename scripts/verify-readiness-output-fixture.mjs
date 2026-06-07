@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { assertReadinessJsonEvidence } from "./verify-readiness-output.mjs";
+import { assertFixtureSummaryIndexes, assertReadinessJsonEvidence } from "./verify-readiness-output.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
 const expectedFailureFlags = [
@@ -144,6 +144,15 @@ assert.equal(
   validResult.fixtureSummaryIndexes,
   null,
   "default fixture must not compute fixtureSummaryIndexes without requireFixtureSummary"
+);
+assert.throws(
+  () => assertFixtureSummaryIndexes({
+    failureFlagsIndex: -1,
+    negativeFixtureGuardsIndex: 10,
+    firstBooleanFailureFieldIndex: 20,
+  }),
+  /non-negative integers/,
+  "mutated fixtureSummaryIndexes with -1 must fail the index-shape guard"
 );
 
 assert.throws(
