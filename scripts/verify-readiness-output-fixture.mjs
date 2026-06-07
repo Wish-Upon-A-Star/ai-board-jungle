@@ -50,6 +50,12 @@ const expectedPositiveFixtureGuards = [
 const evaluationReportRounds = readEvaluationReportRounds();
 const expectedEvaluationReportSummary = buildEvaluationReportSummary(evaluationReportRounds);
 const expectedLatestEvaluationRound = getLatestEvaluationRound();
+const truncatedEvaluationReportRounds = evaluationReportRounds.slice(1);
+assert.throws(
+  () => buildEvaluationReportSummary(truncatedEvaluationReportRounds),
+  /expected round 01/,
+  "buildEvaluationReportSummary must reject a truncated rounds array before CLI execution"
+);
 
 function readEvaluationReportsCliSummary() {
   const result = spawnSync(process.execPath, ["scripts/verify-evaluation-reports.mjs"], {

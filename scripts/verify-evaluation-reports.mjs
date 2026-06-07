@@ -38,6 +38,7 @@ export function getLatestEvaluationRound() {
 }
 
 export function buildEvaluationReportSummary(rounds) {
+  assertEvaluationReportRounds(rounds);
   return {
     ok: true,
     checked: rounds.length,
