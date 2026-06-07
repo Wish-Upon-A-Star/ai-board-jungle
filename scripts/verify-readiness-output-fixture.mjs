@@ -611,6 +611,59 @@ assert.throws(
   /expected order/,
   "readiness fixture summary with reordered direct helper negative scenarios must fail"
 );
+const missingEvaluationReportNegativeGuardsOutput = { ...output };
+delete missingEvaluationReportNegativeGuardsOutput.evaluationReportNegativeGuards;
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(missingEvaluationReportNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /evaluationReportNegativeGuards/,
+  "readiness fixture summary without evaluationReportNegativeGuards must fail"
+);
+const staleEvaluationReportNegativeGuardsOutput = {
+  ...output,
+  evaluationReportNegativeGuards: [],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(staleEvaluationReportNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /truncated evaluation report guard/,
+  "readiness fixture summary without evaluation report negative guard names must fail"
+);
+const partialEvaluationReportNegativeGuardsOutput = {
+  ...output,
+  evaluationReportNegativeGuards: ["truncatedEvaluationReportRounds"],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(partialEvaluationReportNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /duplicate evaluation report guard/,
+  "readiness fixture summary without duplicate evaluation report guard must fail"
+);
+const reversedPartialEvaluationReportNegativeGuardsOutput = {
+  ...output,
+  evaluationReportNegativeGuards: ["duplicateEvaluationReportRounds"],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(reversedPartialEvaluationReportNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /truncated evaluation report guard/,
+  "readiness fixture summary without truncated evaluation report guard must fail"
+);
+const reorderedEvaluationReportNegativeGuardsOutput = {
+  ...output,
+  evaluationReportNegativeGuards: [...expectedEvaluationReportNegativeGuards].reverse(),
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(reorderedEvaluationReportNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with reordered evaluation report negative guards must fail"
+);
 const missingDirectHelperNegativeGuardsOutput = { ...output };
 delete missingDirectHelperNegativeGuardsOutput.directHelperNegativeGuards;
 assert.throws(
