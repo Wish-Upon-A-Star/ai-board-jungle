@@ -220,5 +220,12 @@ assert.deepEqual(
   expectedNegativeFixtureGuards,
   "fixture output must expose covered failureFlags guard directions"
 );
+const outputKeys = Object.keys(output);
+const negativeFixtureGuardsIndex = outputKeys.indexOf("negativeFixtureGuards");
+const firstBooleanFailureFieldIndex = outputKeys.findIndex((key) => key.endsWith("Fails"));
+assert.ok(
+  negativeFixtureGuardsIndex >= 0 && negativeFixtureGuardsIndex < firstBooleanFailureFieldIndex,
+  "fixture output must list negativeFixtureGuards before boolean *Fails fields"
+);
 
 console.log(JSON.stringify(output, null, 2));

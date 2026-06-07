@@ -3,14 +3,14 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const reportsDir = "docs/evaluation-reports";
-const reportPattern = /^(\d{4}-\d{2}-\d{2})-round-(\d{2})\.md$/;
-const files = readdirSync(reportsDir).filter((file) => reportPattern.test(file)).sort();
+const reportPattern = /^(\d{4}-\d{2}-\d{2})-round-(\d{2,})\.md$/;
+const files = readdirSync(reportsDir).filter((file) => reportPattern.test(file));
 assert.ok(files.length > 0, "evaluation reports must exist");
 
 const rounds = files.map((file) => {
   const match = file.match(reportPattern);
   return { file, round: Number(match[2]) };
-});
+}).sort((a, b) => a.round - b.round);
 
 const seen = new Set();
 for (let index = 0; index < rounds.length; index += 1) {
@@ -28,8 +28,8 @@ for (let index = 0; index < rounds.length; index += 1) {
 
 console.log(JSON.stringify({
   ok: true,
-  checked: files.length,
-  first: files[0],
-  latest: files.at(-1),
+  checked: rounds.length,
+  first: rounds[0].file,
+  latest: rounds.at(-1).file,
   latestRound: rounds.at(-1).round,
 }, null, 2));
