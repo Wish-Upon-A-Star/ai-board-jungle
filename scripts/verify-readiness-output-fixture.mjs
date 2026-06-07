@@ -151,8 +151,9 @@ assert.equal(
 );
 const validFixtureSummaryIndexes = {
   failureFlagsIndex: 0,
-  negativeFixtureGuardsIndex: 10,
-  firstBooleanFailureFieldIndex: 20,
+  positiveFixtureGuardsIndex: 10,
+  negativeFixtureGuardsIndex: 20,
+  firstBooleanFailureFieldIndex: 30,
 };
 assertFixtureSummaryIndexes(validFixtureSummaryIndexes);
 assert.throws(
@@ -229,6 +230,19 @@ const output = {
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 
+function buildReadinessWithFixtureSummary(fixtureOutput) {
+  return {
+    results: [
+      buildReadmeResult(),
+      buildTextOutputResult(),
+      {
+        name: "readiness output fixture",
+        summary: JSON.stringify(fixtureOutput, null, 2),
+      },
+    ],
+  };
+}
+
 for (const flag of expectedFailureFlags) {
   assert.equal(output[flag], true, `fixture output must expose ${flag}`);
 }
@@ -265,6 +279,19 @@ assert.ok(
     && negativeFixtureGuardsIndex > positiveFixtureGuardsIndex
     && negativeFixtureGuardsIndex < firstBooleanFailureFieldIndex,
   "fixture output must list positiveFixtureGuards, negativeFixtureGuards, then boolean *Fails fields"
+);
+
+assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(output), {
+  requireFixtureSummary: true,
+});
+const missingPositiveFixtureGuardsOutput = { ...output };
+delete missingPositiveFixtureGuardsOutput.positiveFixtureGuards;
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(missingPositiveFixtureGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /positiveFixtureGuards/,
+  "readiness fixture summary without positiveFixtureGuards must fail"
 );
 
 console.log(JSON.stringify(output, null, 2));
