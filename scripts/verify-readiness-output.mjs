@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { serverlessCommands, serverRequiredCommands } from "./verification-command-lists.mjs";
+import { serverRequiredCommands } from "./verification-command-lists.mjs";
+import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
-const allVerificationCommands = [...serverlessCommands, ...serverRequiredCommands];
 const expectedServerRequiredLine = `server-required: ${serverRequiredCommands.join(", ")}`;
-const expectedChecklistCommands = allVerificationCommands.length;
-const expectedChecklistItems = allVerificationCommands.length + 2;
 
 const result = spawnSync(process.execPath, ["scripts/verify-readiness-summary.mjs", "--compact"], {
   shell: false,

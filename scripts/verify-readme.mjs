@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { serverlessCommands, serverRequiredCommands } from "./verification-command-lists.mjs";
+import { allVerificationCommands, buildReadmeSuccessSummary } from "./verify-readme-contract.mjs";
 
 const readme = readFileSync("README.md", "utf8");
 const checklistPath = "docs/submission-checklist.md";
@@ -59,7 +59,6 @@ const suspiciousPatterns = [
 ];
 
 const missing = requiredSnippets.filter((snippet) => !readme.includes(snippet));
-const allVerificationCommands = [...serverlessCommands, ...serverRequiredCommands];
 const missingCommandMentions = allVerificationCommands
   .map((command) => `npm run ${command}`)
   .filter((snippet) => !readme.includes(snippet));
@@ -82,14 +81,8 @@ if (missing.length || missingCommandMentions.length || missingCommandExplanation
   process.exit(1);
 }
 
-console.log(JSON.stringify({
-  ok: true,
-  checked: "README.md",
+console.log(JSON.stringify(buildReadmeSuccessSummary({
   checklistPath,
   required: requiredSnippets.length,
-  commandMentions: allVerificationCommands.length,
-  commandExplanations: allVerificationCommands.length,
-  checklistCommands: allVerificationCommands.length,
-  checklistItems: checklistRequired.length,
   screenshotOk,
-}, null, 2));
+}), null, 2));
