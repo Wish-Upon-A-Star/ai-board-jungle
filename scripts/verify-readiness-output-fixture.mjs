@@ -676,6 +676,34 @@ assert.throws(
   /expected order/,
   "readiness fixture summary with reordered negative fixture guards must fail"
 );
+const wrongNameNegativeFixtureGuardsOutput = {
+  ...output,
+  negativeFixtureGuards: [
+    "extraBooleanFailureField",
+    "missingBooleanFailureFields",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(wrongNameNegativeFixtureGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /missing-field negative guard/,
+  "readiness fixture summary with wrong negative fixture guard name must fail"
+);
+const expandedNegativeFixtureGuardsOutput = {
+  ...output,
+  negativeFixtureGuards: [
+    ...expectedNegativeFixtureGuards,
+    "unexpectedNegativeFixtureGuard",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(expandedNegativeFixtureGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with expanded negative fixture guards must fail"
+);
 const missingDirectHelperNegativeScenariosOutput = { ...output };
 delete missingDirectHelperNegativeScenariosOutput.directHelperNegativeScenarios;
 assert.throws(
