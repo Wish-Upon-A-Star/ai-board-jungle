@@ -412,6 +412,12 @@ async function main() {
   const runHistoryVisible = runClicked && text.includes("Run history");
   const runDetailsVisible = detailClicked && text.includes("Hide details") && text.includes("status");
   const runRetryVisible = retryClicked && text.includes("Retry") && text.includes("Updated") && text.includes("Retry updated");
+  const runStatusUiVisible = await evalJs(`(() => {
+    const changedRun = document.querySelector(".run-history .run-row.changed .run-status.changed");
+    const skippedLastRun = document.querySelector(".task-card .run-status.compact.skipped");
+    const skippedActivity = document.querySelector(".activity-row.skipped");
+    return Boolean(changedRun && skippedLastRun && skippedActivity);
+  })()`);
   const deleteClicked = await evalJs(`(() => {
     const button = Array.from(document.querySelectorAll("button")).find((item) => item.innerText.trim() === "Delete");
     if (!button) return false;
@@ -450,6 +456,7 @@ async function main() {
     runHistoryVisible,
     runDetailsVisible,
     runRetryVisible,
+    runStatusUiVisible,
     deleteConfirmVisible,
     sample: text.slice(0, 1200),
   };
@@ -483,6 +490,7 @@ async function main() {
     !runHistoryVisible ||
     !runDetailsVisible ||
     !runRetryVisible ||
+    !runStatusUiVisible ||
     !deleteConfirmVisible
   ) {
     throw new Error("CDP verification failed");

@@ -514,6 +514,7 @@ function App() {
                       <div><dt>경로</dt><dd>{task.source} {"->"} {task.destination}</dd></div>
                       <div><dt>AI</dt><dd>{task.aiProvider} / {task.aiModel}</dd></div>
                       <div><dt>API</dt><dd>{task.apiProvider}</dd></div>
+                      <div><dt>Last run</dt><dd><span className={`run-status compact ${getRunStatus(task.lastResult)}`}>{getRunStatus(task.lastResult)}</span></dd></div>
                       <div><dt>연동 프로필</dt><dd>{task.integrationProfile ? `${task.integrationProfile.name} / ${task.integrationProfile.sourceKind}` : "커스텀"}</dd></div>
                       <div><dt>템플릿</dt><dd>{task.templatePreset || "github_notion"}</dd></div>
                     </dl>
@@ -537,12 +538,13 @@ function App() {
                           const key = `${task.id}:${run.id}`;
                           const expanded = expandedRuns[key];
                           const retryState = retryRunState[key];
+                          const status = getRunStatus(run.result);
                           return (
-                            <div key={run.id} className="run-row">
+                            <div key={run.id} className={`run-row ${status}`}>
                               <div className="run-row-main">
                                 <span>#{run.id}</span>
                                 <span>{run.createdAt}</span>
-                                <span className={`run-status ${getRunStatus(run.result)}`}>{getRunStatus(run.result)}</span>
+                                <span className={`run-status ${status}`}>{status}</span>
                                 <p>{summarizeRunResult(run.result)}</p>
                                 <button type="button" className="inline-link retry" disabled={retryState?.status === "running"} onClick={() => retryTaskFromRun(task, run)}>
                                   {retryState?.status === "running" ? "Retrying" : "Retry"}
