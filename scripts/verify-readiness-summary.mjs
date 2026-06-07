@@ -1,10 +1,10 @@
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { serverRequiredCommands } from "./verification-command-lists.mjs";
 
-const compact = process.argv.includes("--compact");
-const forceFailCompactFixture = process.env.AI_BOARD_READINESS_FORCE_FAIL === "1";
+export const readinessNote = "This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick for end-to-end smoke.";
 
 function commandFor(cmd, args) {
   if (cmd === "node") return { executable: process.execPath, args };
@@ -39,7 +39,7 @@ function runCheck(name, cmd, args, opts = {}) {
   };
 }
 
-const checks = [
+export const checks = [
   ["hygiene", "node", ["scripts/verify-hygiene.mjs"]],
   ["text", "node", ["scripts/verify-text-integrity.mjs"]],
   ["text output", "node", ["scripts/verify-text-output.mjs"]],
@@ -53,57 +53,86 @@ const checks = [
   ["backend syntax", "python", ["-m", "py_compile", "backend/app/main.py", "backend/app/services.py"]],
 ];
 
-if (forceFailCompactFixture) {
-  const fixtureCheckIndex = checks.findIndex(([name]) => name === "readiness output fixture");
-  if (fixtureCheckIndex >= 0) {
-    checks.splice(fixtureCheckIndex, 1);
+export function getReadinessChecks({ forceFailCompactFixture = false } = {}) {
+  const selectedChecks = checks.map((check) => [...check]);
+
+  if (forceFailCompactFixture) {
+    const fixtureCheckIndex = selectedChecks.findIndex(([name]) => name === "readiness output fixture");
+    if (fixtureCheckIndex >= 0) {
+      selectedChecks.splice(fixtureCheckIndex, 1);
+    }
+    selectedChecks.push([
+      "synthetic compact failure",
+      "node",
+      ["-e", "console.log('synthetic injected compact failure summary'); process.exit(1);"],
+      { summaryLines: 4 },
+    ]);
   }
-  checks.push([
-    "synthetic compact failure",
-    "node",
-    ["-e", "console.log('synthetic injected compact failure summary'); process.exit(1);"],
-    { summaryLines: 4 },
-  ]);
+
+  return selectedChecks;
 }
 
-const results = checks.map(([name, cmd, args, opts]) => runCheck(name, cmd, args, opts));
-const failed = results.filter((item) => !item.ok);
-const serverRequired = serverRequiredCommands;
-const readinessNote = "This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick for end-to-end smoke.";
-const evaluationReportsResult = results.find((item) => item.name === "evaluation reports");
-let latestEvaluationRound = null;
-if (evaluationReportsResult?.ok) {
-  try {
-    latestEvaluationRound = JSON.parse(evaluationReportsResult.summary).latestRound ?? null;
-  } catch {
-    latestEvaluationRound = null;
-  }
-}
-
-const summary = {
-  ok: failed.length === 0,
-  checked: results.length,
-  passed: results.length - failed.length,
-  failed: failed.map((item) => item.name),
-  latestEvaluationRound,
-  serverRequired,
-  note: readinessNote,
-  results,
-};
-
-if (compact) {
-  console.log(`READINESS ${summary.ok ? "OK" : "FAILED"} ${summary.passed}/${summary.checked} passed; latest-evaluation-round: ${latestEvaluationRound}; server-required: ${serverRequired.join(", ")}`);
-  console.log(`NOTE ${readinessNote}`);
-  for (const result of results) {
-    console.log(`${result.ok ? "PASS" : "FAIL"} ${result.name} ${result.durationMs}ms`);
-    if (!result.ok && result.summary) {
-      console.log(result.summary);
+export function buildReadinessSummary({ forceFailCompactFixture = false } = {}) {
+  const results = getReadinessChecks({ forceFailCompactFixture })
+    .map(([name, cmd, args, opts]) => runCheck(name, cmd, args, opts));
+  const failed = results.filter((item) => !item.ok);
+  const serverRequired = serverRequiredCommands;
+  const evaluationReportsResult = results.find((item) => item.name === "evaluation reports");
+  let latestEvaluationRound = null;
+  if (evaluationReportsResult?.ok) {
+    try {
+      latestEvaluationRound = JSON.parse(evaluationReportsResult.summary).latestRound ?? null;
+    } catch {
+      latestEvaluationRound = null;
     }
   }
-} else {
-  console.log(JSON.stringify(summary, null, 2));
+
+  return {
+    ok: failed.length === 0,
+    checked: results.length,
+    passed: results.length - failed.length,
+    failed: failed.map((item) => item.name),
+    latestEvaluationRound,
+    serverRequired,
+    note: readinessNote,
+    results,
+  };
 }
 
-if (failed.length) {
-  process.exit(1);
+export function formatCompactReadinessSummary(summary) {
+  const lines = [
+    `READINESS ${summary.ok ? "OK" : "FAILED"} ${summary.passed}/${summary.checked} passed; latest-evaluation-round: ${summary.latestEvaluationRound}; server-required: ${summary.serverRequired.join(", ")}`,
+    `NOTE ${summary.note}`,
+  ];
+
+  for (const result of summary.results) {
+    lines.push(`${result.ok ? "PASS" : "FAIL"} ${result.name} ${result.durationMs}ms`);
+    if (!result.ok && result.summary) {
+      lines.push(result.summary);
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+export function runReadinessSummaryCli({
+  compact = process.argv.includes("--compact"),
+  forceFailCompactFixture = process.env.AI_BOARD_READINESS_FORCE_FAIL === "1",
+} = {}) {
+  const summary = buildReadinessSummary({ forceFailCompactFixture });
+  if (compact) {
+    process.stdout.write(formatCompactReadinessSummary(summary));
+  } else {
+    console.log(JSON.stringify(summary, null, 2));
+  }
+
+  if (!summary.ok) {
+    process.exitCode = 1;
+  }
+
+  return summary;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  runReadinessSummaryCli();
 }

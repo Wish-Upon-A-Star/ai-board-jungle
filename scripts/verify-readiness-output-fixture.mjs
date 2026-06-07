@@ -13,6 +13,10 @@ import {
 } from "./verify-readiness-output.mjs";
 import { serverRequiredCommands } from "./verification-command-lists.mjs";
 import {
+  formatCompactReadinessSummary,
+  readinessNote,
+} from "./verify-readiness-summary.mjs";
+import {
   buildEvaluationReportSummary,
   getLatestEvaluationRound,
   readEvaluationReportRounds,
@@ -714,9 +718,61 @@ function buildCompactReadinessOutput({ omitTotal = false, omitLatestRound = fals
   ].filter(Boolean).join("\n");
 }
 
+function buildFormatterSummaryFixture({ failed = false } = {}) {
+  const results = [
+    "hygiene",
+    "text",
+    "text output",
+    "frontend helpers",
+    "template presets",
+    "evaluation reports",
+    "readme",
+    "readme output",
+    "readiness output fixture",
+    "command scope",
+    "backend syntax",
+  ].map((name) => ({
+    name,
+    ok: true,
+    status: 0,
+    durationMs: 1,
+    summary: "",
+  }));
+
+  if (failed) {
+    results[2] = {
+      ...results[2],
+      ok: false,
+      status: 1,
+      summary: "simulated compact failure summary",
+    };
+  }
+
+  const failedResults = results.filter((item) => !item.ok);
+  return {
+    ok: failedResults.length === 0,
+    checked: results.length,
+    passed: results.length - failedResults.length,
+    failed: failedResults.map((item) => item.name),
+    latestEvaluationRound: expectedLatestEvaluationRound,
+    serverRequired: serverRequiredCommands,
+    note: readinessNote,
+    results,
+  };
+}
+
 assert.doesNotThrow(
   () => assertCompactReadinessOutput(buildCompactReadinessOutput()),
   "valid compact readiness fixture must satisfy compact output assertions"
+);
+const formattedCompactReadinessOutput = formatCompactReadinessSummary(buildFormatterSummaryFixture());
+assert.doesNotThrow(
+  () => assertCompactReadinessOutput(formattedCompactReadinessOutput),
+  "compact readiness formatter export must produce the same valid compact output shape without spawning a child process"
+);
+assert.ok(
+  formattedCompactReadinessOutput.endsWith("\n"),
+  "compact readiness formatter export must keep a trailing newline for CLI parity"
 );
 assert.throws(
   () => assertCompactReadinessOutput(buildCompactReadinessOutput({ omitTotal: true })),
@@ -765,6 +821,13 @@ assert.doesNotThrow(
     expectedSummary: "simulated compact failure summary",
   }),
   "valid failed compact readiness fixture must keep failed check summary assertions"
+);
+assert.doesNotThrow(
+  () => assertFailedCompactReadinessOutput(formatCompactReadinessSummary(buildFormatterSummaryFixture({ failed: true })), {
+    failedCheckName: "text output",
+    expectedSummary: "simulated compact failure summary",
+  }),
+  "compact readiness formatter export must produce failed compact output with captured summaries without spawning a child process"
 );
 assert.throws(
   () => assertFailedCompactReadinessOutput(buildFailedCompactReadinessOutput({ omitStatus: true }), {
