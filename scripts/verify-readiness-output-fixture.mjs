@@ -84,6 +84,10 @@ const expectedNegativeFixtureGuardNegativeScenarios = [
   "wrongNameNegativeFixtureGuard",
 ];
 
+const expectedNegativeFixtureGuardSourceRetentionChecks = [
+  "wrongNameNegativeFixtureGuard",
+];
+
 const expectedDirectHelperNegativeGuards = [
   "missingEvidenceIndex",
   "stringEvidenceIndex",
@@ -486,19 +490,20 @@ const validFixtureSummaryIndexes = {
   positiveFixtureGuardsIndex: 10,
   negativeFixtureGuardsIndex: 20,
   negativeFixtureGuardNegativeScenariosIndex: 30,
-  directHelperNegativeGuardsIndex: 40,
-  directHelperNegativeScenariosIndex: 50,
-  evaluationReportNegativeGuardsIndex: 60,
-  readinessOutputCliIndexPositiveGuardsIndex: 70,
-  readinessOutputCliIndexPositiveGuardNegativeScenariosIndex: 80,
-  readinessOutputCliIndexNegativeScenariosIndex: 90,
-  readinessImportNegativeGuardsIndex: 100,
-  readinessSummaryNegativeGuardsIndex: 110,
-  compactReadinessNegativeGuardsIndex: 120,
-  failedCompactReadinessNegativeGuardsIndex: 130,
-  failedCompactReadinessCliGuardsIndex: 140,
-  directCompactFormatterGuardsIndex: 150,
-  firstBooleanFailureFieldIndex: 160,
+  negativeFixtureGuardSourceRetentionChecksIndex: 40,
+  directHelperNegativeGuardsIndex: 50,
+  directHelperNegativeScenariosIndex: 60,
+  evaluationReportNegativeGuardsIndex: 70,
+  readinessOutputCliIndexPositiveGuardsIndex: 80,
+  readinessOutputCliIndexPositiveGuardNegativeScenariosIndex: 90,
+  readinessOutputCliIndexNegativeScenariosIndex: 100,
+  readinessImportNegativeGuardsIndex: 110,
+  readinessSummaryNegativeGuardsIndex: 120,
+  compactReadinessNegativeGuardsIndex: 130,
+  failedCompactReadinessNegativeGuardsIndex: 140,
+  failedCompactReadinessCliGuardsIndex: 150,
+  directCompactFormatterGuardsIndex: 160,
+  firstBooleanFailureFieldIndex: 170,
 };
 assertFixtureSummaryIndexes(validFixtureSummaryIndexes);
 assertFixtureEvidenceOrder(validFixtureSummaryIndexes);
@@ -731,6 +736,7 @@ const output = {
   positiveFixtureGuards: expectedPositiveFixtureGuards,
   negativeFixtureGuards: expectedNegativeFixtureGuards,
   negativeFixtureGuardNegativeScenarios: expectedNegativeFixtureGuardNegativeScenarios,
+  negativeFixtureGuardSourceRetentionChecks: expectedNegativeFixtureGuardSourceRetentionChecks,
   directHelperNegativeGuards: expectedDirectHelperNegativeGuards,
   directHelperNegativeScenarios: expectedDirectHelperNegativeScenarios,
   evaluationReportNegativeGuards: expectedEvaluationReportNegativeGuards,
@@ -803,6 +809,11 @@ assert.deepEqual(
   output.negativeFixtureGuardNegativeScenarios,
   expectedNegativeFixtureGuardNegativeScenarios,
   "fixture output must expose negative fixture guard negative scenario coverage"
+);
+assert.deepEqual(
+  output.negativeFixtureGuardSourceRetentionChecks,
+  expectedNegativeFixtureGuardSourceRetentionChecks,
+  "fixture output must expose negative fixture guard source-retention check coverage"
 );
 assert.deepEqual(
   output.directHelperNegativeGuards,
@@ -1100,6 +1111,7 @@ assertFixtureEvidenceOrder({
   positiveFixtureGuardsIndex: outputKeys.indexOf("positiveFixtureGuards"),
   negativeFixtureGuardsIndex: outputKeys.indexOf("negativeFixtureGuards"),
   negativeFixtureGuardNegativeScenariosIndex: outputKeys.indexOf("negativeFixtureGuardNegativeScenarios"),
+  negativeFixtureGuardSourceRetentionChecksIndex: outputKeys.indexOf("negativeFixtureGuardSourceRetentionChecks"),
   directHelperNegativeGuardsIndex: outputKeys.indexOf("directHelperNegativeGuards"),
   directHelperNegativeScenariosIndex: outputKeys.indexOf("directHelperNegativeScenarios"),
   evaluationReportNegativeGuardsIndex: outputKeys.indexOf("evaluationReportNegativeGuards"),
@@ -1143,19 +1155,21 @@ const validReadinessOutputCliSummaryArgs = {
     failureFlagsIndex: 1,
     positiveFixtureGuardsIndex: 2,
     negativeFixtureGuardsIndex: 3,
-    directHelperNegativeGuardsIndex: 4,
-    directHelperNegativeScenariosIndex: 5,
-    evaluationReportNegativeGuardsIndex: 6,
-    readinessOutputCliIndexPositiveGuardsIndex: 7,
-    readinessOutputCliIndexPositiveGuardNegativeScenariosIndex: 8,
-    readinessOutputCliIndexNegativeScenariosIndex: 9,
-    readinessImportNegativeGuardsIndex: 10,
-    readinessSummaryNegativeGuardsIndex: 11,
-    compactReadinessNegativeGuardsIndex: 12,
-    failedCompactReadinessNegativeGuardsIndex: 13,
-    failedCompactReadinessCliGuardsIndex: 14,
-    directCompactFormatterGuardsIndex: 15,
-    firstBooleanFailureFieldIndex: 16,
+    negativeFixtureGuardNegativeScenariosIndex: 4,
+    negativeFixtureGuardSourceRetentionChecksIndex: 5,
+    directHelperNegativeGuardsIndex: 6,
+    directHelperNegativeScenariosIndex: 7,
+    evaluationReportNegativeGuardsIndex: 8,
+    readinessOutputCliIndexPositiveGuardsIndex: 9,
+    readinessOutputCliIndexPositiveGuardNegativeScenariosIndex: 10,
+    readinessOutputCliIndexNegativeScenariosIndex: 11,
+    readinessImportNegativeGuardsIndex: 12,
+    readinessSummaryNegativeGuardsIndex: 13,
+    compactReadinessNegativeGuardsIndex: 14,
+    failedCompactReadinessNegativeGuardsIndex: 15,
+    failedCompactReadinessCliGuardsIndex: 16,
+    directCompactFormatterGuardsIndex: 17,
+    firstBooleanFailureFieldIndex: 18,
   },
 };
 const validReadinessOutputCliSummary = buildReadinessOutputCliSummary(validReadinessOutputCliSummaryArgs);
@@ -1194,6 +1208,7 @@ const misplacedValidScannedFileCountOutput = {
   positiveFixtureGuards: output.positiveFixtureGuards,
   negativeFixtureGuards: output.negativeFixtureGuards,
   negativeFixtureGuardNegativeScenarios: output.negativeFixtureGuardNegativeScenarios,
+  negativeFixtureGuardSourceRetentionChecks: output.negativeFixtureGuardSourceRetentionChecks,
   directHelperNegativeGuards: output.directHelperNegativeGuards,
   directHelperNegativeScenarios: output.directHelperNegativeScenarios,
   evaluationReportNegativeGuards: output.evaluationReportNegativeGuards,
@@ -1380,6 +1395,40 @@ assert.throws(
   }),
   /expected order/,
   "readiness fixture summary with reordered negative fixture guard negative scenarios must fail"
+);
+const missingNegativeFixtureGuardSourceRetentionChecksOutput = { ...output };
+delete missingNegativeFixtureGuardSourceRetentionChecksOutput.negativeFixtureGuardSourceRetentionChecks;
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(missingNegativeFixtureGuardSourceRetentionChecksOutput), {
+    requireFixtureSummary: true,
+  }),
+  /negativeFixtureGuardSourceRetentionChecks/,
+  "readiness fixture summary without negativeFixtureGuardSourceRetentionChecks must fail"
+);
+const staleNegativeFixtureGuardSourceRetentionChecksOutput = {
+  ...output,
+  negativeFixtureGuardSourceRetentionChecks: [],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(staleNegativeFixtureGuardSourceRetentionChecksOutput), {
+    requireFixtureSummary: true,
+  }),
+  /wrong-name source retention check/,
+  "readiness fixture summary without wrong-name source retention check must fail"
+);
+const expandedNegativeFixtureGuardSourceRetentionChecksOutput = {
+  ...output,
+  negativeFixtureGuardSourceRetentionChecks: [
+    ...expectedNegativeFixtureGuardSourceRetentionChecks,
+    "unexpectedNegativeFixtureGuardSourceRetentionCheck",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(expandedNegativeFixtureGuardSourceRetentionChecksOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with expanded negative fixture guard source-retention checks must fail"
 );
 const missingDirectHelperNegativeScenariosOutput = { ...output };
 delete missingDirectHelperNegativeScenariosOutput.directHelperNegativeScenarios;
@@ -2282,6 +2331,7 @@ const misplacedPositiveFixtureGuardsOutput = {
   failureFlags: output.failureFlags,
   negativeFixtureGuards: output.negativeFixtureGuards,
   negativeFixtureGuardNegativeScenarios: output.negativeFixtureGuardNegativeScenarios,
+  negativeFixtureGuardSourceRetentionChecks: output.negativeFixtureGuardSourceRetentionChecks,
   directHelperNegativeGuards: output.directHelperNegativeGuards,
   directHelperNegativeScenarios: output.directHelperNegativeScenarios,
   positiveFixtureGuards: output.positiveFixtureGuards,
@@ -2313,6 +2363,7 @@ const earlyBooleanFailureFieldsOutput = {
   positiveFixtureGuards: output.positiveFixtureGuards,
   negativeFixtureGuards: output.negativeFixtureGuards,
   negativeFixtureGuardNegativeScenarios: output.negativeFixtureGuardNegativeScenarios,
+  negativeFixtureGuardSourceRetentionChecks: output.negativeFixtureGuardSourceRetentionChecks,
   directHelperNegativeGuards: output.directHelperNegativeGuards,
   directHelperNegativeScenarios: output.directHelperNegativeScenarios,
   evaluationReportNegativeGuards: output.evaluationReportNegativeGuards,
@@ -2341,6 +2392,7 @@ const misplacedFailureFlagsOutput = {
   failureFlags: output.failureFlags,
   negativeFixtureGuards: output.negativeFixtureGuards,
   negativeFixtureGuardNegativeScenarios: output.negativeFixtureGuardNegativeScenarios,
+  negativeFixtureGuardSourceRetentionChecks: output.negativeFixtureGuardSourceRetentionChecks,
   directHelperNegativeGuards: output.directHelperNegativeGuards,
   directHelperNegativeScenarios: output.directHelperNegativeScenarios,
   evaluationReportNegativeGuards: output.evaluationReportNegativeGuards,

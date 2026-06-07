@@ -59,6 +59,10 @@ const expectedNegativeFixtureGuardNegativeScenarios = [
   "wrongNameNegativeFixtureGuard",
 ];
 
+const expectedNegativeFixtureGuardSourceRetentionChecks = [
+  "wrongNameNegativeFixtureGuard",
+];
+
 const expectedPositiveFixtureGuards = [
   "validFixtureSummaryIndexes",
 ];
@@ -140,6 +144,7 @@ export const expectedFixtureSummaryKeys = Object.freeze([
   "positiveFixtureGuards",
   "negativeFixtureGuards",
   "negativeFixtureGuardNegativeScenarios",
+  "negativeFixtureGuardSourceRetentionChecks",
   "directHelperNegativeGuards",
   "directHelperNegativeScenarios",
   "evaluationReportNegativeGuards",
@@ -197,6 +202,7 @@ export function assertFixtureEvidenceOrder({
   positiveFixtureGuardsIndex,
   negativeFixtureGuardsIndex,
   negativeFixtureGuardNegativeScenariosIndex,
+  negativeFixtureGuardSourceRetentionChecksIndex,
   directHelperNegativeGuardsIndex,
   directHelperNegativeScenariosIndex,
   evaluationReportNegativeGuardsIndex,
@@ -216,6 +222,7 @@ export function assertFixtureEvidenceOrder({
     positiveFixtureGuardsIndex,
     negativeFixtureGuardsIndex,
     negativeFixtureGuardNegativeScenariosIndex,
+    negativeFixtureGuardSourceRetentionChecksIndex,
     directHelperNegativeGuardsIndex,
     directHelperNegativeScenariosIndex,
     evaluationReportNegativeGuardsIndex,
@@ -235,7 +242,8 @@ export function assertFixtureEvidenceOrder({
       && positiveFixtureGuardsIndex > failureFlagsIndex
       && negativeFixtureGuardsIndex > positiveFixtureGuardsIndex
       && negativeFixtureGuardNegativeScenariosIndex > negativeFixtureGuardsIndex
-      && directHelperNegativeGuardsIndex > negativeFixtureGuardNegativeScenariosIndex
+      && negativeFixtureGuardSourceRetentionChecksIndex > negativeFixtureGuardNegativeScenariosIndex
+      && directHelperNegativeGuardsIndex > negativeFixtureGuardSourceRetentionChecksIndex
       && directHelperNegativeScenariosIndex > directHelperNegativeGuardsIndex
       && evaluationReportNegativeGuardsIndex > directHelperNegativeScenariosIndex
       && readinessOutputCliIndexPositiveGuardsIndex > evaluationReportNegativeGuardsIndex
@@ -248,7 +256,7 @@ export function assertFixtureEvidenceOrder({
       && failedCompactReadinessCliGuardsIndex > failedCompactReadinessNegativeGuardsIndex
       && directCompactFormatterGuardsIndex > failedCompactReadinessCliGuardsIndex
       && firstBooleanFailureFieldIndex > directCompactFormatterGuardsIndex,
-    "readiness output fixture summary must list failureFlags, positiveFixtureGuards, negativeFixtureGuards, negativeFixtureGuardNegativeScenarios, directHelperNegativeGuards, directHelperNegativeScenarios, evaluationReportNegativeGuards, readinessOutputCliIndexPositiveGuards, readinessOutputCliIndexPositiveGuardNegativeScenarios, readinessOutputCliIndexNegativeScenarios, readinessImportNegativeGuards, readinessSummaryNegativeGuards, compactReadinessNegativeGuards, failedCompactReadinessNegativeGuards, failedCompactReadinessCliGuards, directCompactFormatterGuards, then boolean *Fails fields"
+    "readiness output fixture summary must list failureFlags, positiveFixtureGuards, negativeFixtureGuards, negativeFixtureGuardNegativeScenarios, negativeFixtureGuardSourceRetentionChecks, directHelperNegativeGuards, directHelperNegativeScenarios, evaluationReportNegativeGuards, readinessOutputCliIndexPositiveGuards, readinessOutputCliIndexPositiveGuardNegativeScenarios, readinessOutputCliIndexNegativeScenarios, readinessImportNegativeGuards, readinessSummaryNegativeGuards, compactReadinessNegativeGuards, failedCompactReadinessNegativeGuards, failedCompactReadinessCliGuards, directCompactFormatterGuards, then boolean *Fails fields"
   );
 }
 
@@ -548,13 +556,26 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       "readiness output fixture summary must include missing summary count source guard scenario"
     );
     assert.ok(
-      readinessFixtureResult.summary.includes('"wrongNameNegativeFixtureGuard"'),
+      readinessFixtureOutput.negativeFixtureGuardNegativeScenarios.includes("wrongNameNegativeFixtureGuard"),
       "readiness output fixture summary must include wrong-name negative fixture guard scenario"
     );
     assert.deepEqual(
       readinessFixtureOutput.negativeFixtureGuardNegativeScenarios,
       expectedNegativeFixtureGuardNegativeScenarios,
       "readiness output fixture summary must list negativeFixtureGuardNegativeScenarios in the expected order"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"negativeFixtureGuardSourceRetentionChecks": ['),
+      "readiness output fixture summary must include negativeFixtureGuardSourceRetentionChecks list"
+    );
+    assert.ok(
+      readinessFixtureOutput.negativeFixtureGuardSourceRetentionChecks.includes("wrongNameNegativeFixtureGuard"),
+      "readiness output fixture summary must include wrong-name source retention check"
+    );
+    assert.deepEqual(
+      readinessFixtureOutput.negativeFixtureGuardSourceRetentionChecks,
+      expectedNegativeFixtureGuardSourceRetentionChecks,
+      "readiness output fixture summary must list negativeFixtureGuardSourceRetentionChecks in the expected order"
     );
     assert.ok(
       readinessFixtureResult.summary.includes('"missingEvidenceIndex"'),
@@ -802,6 +823,9 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     const negativeFixtureGuardNegativeScenariosIndex = readinessFixtureResult.summary.indexOf(
       '"negativeFixtureGuardNegativeScenarios": ['
     );
+    const negativeFixtureGuardSourceRetentionChecksIndex = readinessFixtureResult.summary.indexOf(
+      '"negativeFixtureGuardSourceRetentionChecks": ['
+    );
     const directHelperNegativeGuardsIndex = readinessFixtureResult.summary.indexOf('"directHelperNegativeGuards": [');
     const directHelperNegativeScenariosIndex = readinessFixtureResult.summary.indexOf('"directHelperNegativeScenarios": [');
     const evaluationReportNegativeGuardsIndex = readinessFixtureResult.summary.indexOf('"evaluationReportNegativeGuards": [');
@@ -820,6 +844,7 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       positiveFixtureGuardsIndex,
       negativeFixtureGuardsIndex,
       negativeFixtureGuardNegativeScenariosIndex,
+      negativeFixtureGuardSourceRetentionChecksIndex,
       directHelperNegativeGuardsIndex,
       directHelperNegativeScenariosIndex,
       evaluationReportNegativeGuardsIndex,
