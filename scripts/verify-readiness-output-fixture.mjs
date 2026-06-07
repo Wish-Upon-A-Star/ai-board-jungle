@@ -71,6 +71,23 @@ for (const scenario of negativeFixtureGuardNegativeScenarioSourceChecks) {
   );
 }
 
+const sourceRetentionCliScenarioSourceChecks = [
+  {
+    name: "staleNegativeFixtureGuardSourceRetentionChecksIndex",
+    pattern: /const missingSourceRetentionReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput = \{[\s\S]*"misplacedReadinessOutputCliIndexNegativeScenariosIndex"[\s\S]*source-retention CLI index helper scenario/,
+  },
+  {
+    name: "staleDirectHelperNegativeGuardsIndexAfterSourceRetentionChecks",
+    pattern: /const missingDirectHelperAfterSourceRetentionReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput = \{[\s\S]*"staleNegativeFixtureGuardSourceRetentionChecksIndex"[\s\S]*direct helper CLI index after source-retention scenario/,
+  },
+];
+for (const scenario of sourceRetentionCliScenarioSourceChecks) {
+  assert.ok(
+    scenario.pattern.test(fixtureSource),
+    `readiness output fixture source must retain ${scenario.name} source-retention CLI scenario`
+  );
+}
+
 const expectedNegativeFixtureGuards = [
   "extraBooleanFailureField",
   "missingBooleanFailureField",

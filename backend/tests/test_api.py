@@ -767,6 +767,20 @@ def test_sample_secret_adapter_roundtrip(tmp_path):
     assert json.loads(revealed.stdout)["value"] == "sample_secret_value"
 
 
+def test_rag_degrades_when_redis_handshake_is_malformed(monkeypatch):
+    class BrokenRedis:
+        def ping(self):
+            raise AttributeError("'list' object has no attribute 'get'")
+
+    monkeypatch.setattr("app.cache.Redis.from_url", lambda *args, **kwargs: BrokenRedis())
+
+    with TestClient(app) as client:
+        response = client.post("/api/ai/rag", json={"question": "GitHub Notion integration"})
+
+    assert response.status_code == 200
+    assert "answer" in response.json()
+
+
 def test_high_volume_query_indexes_exist():
     init_db()
     indexes = {
