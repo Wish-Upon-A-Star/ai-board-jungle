@@ -12,6 +12,7 @@ const requiredSnippets = [
   "## 전체 아키텍처 구조",
   "## AI 활용 기능과 구조",
   "## 사용자별 연동과 자동화",
+  "## 설정 우선순위와 사용 흐름",
   "## 실행 방법",
   "## 검증과 데모",
   "## 실제 외부 연동 검증 기록",
@@ -31,6 +32,10 @@ const requiredSnippets = [
   "docs/demo-screenshot.png",
   "docs/submission-checklist.md",
   "| 제출 요구 | README 위치 | 구현/검증 근거 |",
+  "사용자 기본값 적용",
+  "자동화 연결 미리보기",
+  "Integration Activity Log",
+  "System Readiness",
 ];
 
 const suspiciousPatterns = [
