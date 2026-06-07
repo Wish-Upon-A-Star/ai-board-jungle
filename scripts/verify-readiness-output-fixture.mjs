@@ -508,6 +508,11 @@ const validFixtureSummaryIndexes = {
 assertFixtureSummaryIndexes(validFixtureSummaryIndexes);
 assertFixtureEvidenceOrder(validFixtureSummaryIndexes);
 assertReadinessOutputCliIndexes(validFixtureSummaryIndexes);
+assert.equal(
+  validFixtureSummaryIndexes.negativeFixtureGuardSourceRetentionChecksIndex,
+  40,
+  "valid CLI fixture indexes must include the negative fixture guard source-retention check index"
+);
 assert.throws(
   () => assertFixtureEvidenceOrder({
     ...validFixtureSummaryIndexes,
@@ -515,6 +520,22 @@ assert.throws(
   }),
   /failureFlags, positiveFixtureGuards, negativeFixtureGuards/,
   "equal adjacent evidence indexes must fail the strict order guard"
+);
+assert.throws(
+  () => assertReadinessOutputCliIndexes({
+    ...validFixtureSummaryIndexes,
+    negativeFixtureGuardSourceRetentionChecksIndex: validFixtureSummaryIndexes.negativeFixtureGuardNegativeScenariosIndex,
+  }),
+  /after negativeFixtureGuardNegativeScenariosIndex/,
+  "stale CLI fixture source-retention index equal to negative fixture guard negative scenarios index must fail"
+);
+assert.throws(
+  () => assertReadinessOutputCliIndexes({
+    ...validFixtureSummaryIndexes,
+    directHelperNegativeGuardsIndex: validFixtureSummaryIndexes.negativeFixtureGuardSourceRetentionChecksIndex,
+  }),
+  /after negativeFixtureGuardSourceRetentionChecksIndex/,
+  "stale CLI fixture direct helper guard index equal to source-retention index must fail"
 );
 const missingEvidenceIndex = { ...validFixtureSummaryIndexes };
 delete missingEvidenceIndex.firstBooleanFailureFieldIndex;
@@ -1177,6 +1198,21 @@ assert.equal(
   validReadinessOutputCliSummary.fixtureSummaryKeyCount,
   expectedFixtureSummaryKeys.length,
   "readiness output CLI summary must surface the exported fixture schema key count"
+);
+assert.equal(
+  validReadinessOutputCliSummary.fixtureSummaryIndexes.negativeFixtureGuardSourceRetentionChecksIndex,
+  5,
+  "readiness output CLI summary must surface the source-retention check index"
+);
+assert.ok(
+  validReadinessOutputCliSummary.fixtureSummaryIndexes.negativeFixtureGuardSourceRetentionChecksIndex
+    > validReadinessOutputCliSummary.fixtureSummaryIndexes.negativeFixtureGuardNegativeScenariosIndex,
+  "readiness output CLI summary must keep source-retention check index after negative fixture guard negative scenarios index"
+);
+assert.ok(
+  validReadinessOutputCliSummary.fixtureSummaryIndexes.directHelperNegativeGuardsIndex
+    > validReadinessOutputCliSummary.fixtureSummaryIndexes.negativeFixtureGuardSourceRetentionChecksIndex,
+  "readiness output CLI summary must keep direct helper guard index after source-retention check index"
 );
 const { fixtureSummaryKeyCount: omittedFixtureSummaryKeyCount, ...missingFixtureSummaryKeyCountArgs } = validReadinessOutputCliSummaryArgs;
 assert.throws(

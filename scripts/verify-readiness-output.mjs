@@ -280,6 +280,16 @@ export function assertFixtureSummaryKeyCount(fixtureOutput, expectedKeyCount = e
 
 export function assertReadinessOutputCliIndexes(fixtureSummaryIndexes) {
   assert.ok(
+    fixtureSummaryIndexes.negativeFixtureGuardSourceRetentionChecksIndex
+      > fixtureSummaryIndexes.negativeFixtureGuardNegativeScenariosIndex,
+    "verify:readiness-output CLI must place negativeFixtureGuardSourceRetentionChecksIndex after negativeFixtureGuardNegativeScenariosIndex"
+  );
+  assert.ok(
+    fixtureSummaryIndexes.directHelperNegativeGuardsIndex
+      > fixtureSummaryIndexes.negativeFixtureGuardSourceRetentionChecksIndex,
+    "verify:readiness-output CLI must place directHelperNegativeGuardsIndex after negativeFixtureGuardSourceRetentionChecksIndex"
+  );
+  assert.ok(
     fixtureSummaryIndexes.evaluationReportNegativeGuardsIndex
       > fixtureSummaryIndexes.directHelperNegativeScenariosIndex,
     "verify:readiness-output CLI must place evaluationReportNegativeGuardsIndex after directHelperNegativeScenariosIndex"
