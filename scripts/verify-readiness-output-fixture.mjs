@@ -841,6 +841,35 @@ assert.throws(
   /misplaced CLI negative scenarios index negative scenario/,
   "readiness fixture summary without misplaced positive guard helper scenario must fail"
 );
+const wrongNameReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput = {
+  ...output,
+  readinessOutputCliIndexPositiveGuardNegativeScenarios: [
+    "staleReadinessOutputCliIndexPositiveGuardsIndex",
+    "staleReadinessOutputCliIndexNegativeScenariosIndex",
+    "misplacedReadinessOutputCliIndexScenariosIndex",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(wrongNameReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /misplaced CLI negative scenarios index negative scenario/,
+  "readiness fixture summary with wrong positive guard helper scenario name must fail"
+);
+const expandedReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput = {
+  ...output,
+  readinessOutputCliIndexPositiveGuardNegativeScenarios: [
+    ...expectedReadinessOutputCliIndexPositiveGuardNegativeScenarios,
+    "unexpectedReadinessOutputCliIndexPositiveGuardNegativeScenario",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(expandedReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with expanded positive guard helper scenarios must fail"
+);
 const reorderedReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput = {
   ...output,
   readinessOutputCliIndexPositiveGuardNegativeScenarios: [
