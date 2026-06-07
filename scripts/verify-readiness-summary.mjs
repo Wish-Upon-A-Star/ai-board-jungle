@@ -47,7 +47,7 @@ const checks = [
   ["evaluation reports", "node", ["scripts/verify-evaluation-reports.mjs"]],
   ["readme", "node", ["scripts/verify-readme.mjs"]],
   ["readme output", "node", ["scripts/verify-readme-output.mjs"], { summaryLines: 14 }],
-  ["readiness output fixture", "node", ["scripts/verify-readiness-output-fixture.mjs"], { summaryLines: 60 }],
+  ["readiness output fixture", "node", ["scripts/verify-readiness-output-fixture.mjs"], { summaryLines: 80 }],
   ["command scope", "node", ["scripts/verify-command-scope.mjs"]],
   ["backend syntax", "python", ["-m", "py_compile", "backend/app/main.py", "backend/app/services.py"]],
 ];
@@ -55,6 +55,7 @@ const checks = [
 const results = checks.map(([name, cmd, args, opts]) => runCheck(name, cmd, args, opts));
 const failed = results.filter((item) => !item.ok);
 const serverRequired = serverRequiredCommands;
+const readinessNote = "This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick for end-to-end smoke.";
 const evaluationReportsResult = results.find((item) => item.name === "evaluation reports");
 let latestEvaluationRound = null;
 if (evaluationReportsResult?.ok) {
@@ -72,12 +73,13 @@ const summary = {
   failed: failed.map((item) => item.name),
   latestEvaluationRound,
   serverRequired,
-  note: "This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick for end-to-end smoke.",
+  note: readinessNote,
   results,
 };
 
 if (compact) {
   console.log(`READINESS ${summary.ok ? "OK" : "FAILED"} ${summary.passed}/${summary.checked} passed; latest-evaluation-round: ${latestEvaluationRound}; server-required: ${serverRequired.join(", ")}`);
+  console.log(`NOTE ${readinessNote}`);
   for (const result of results) {
     console.log(`${result.ok ? "PASS" : "FAIL"} ${result.name} ${result.durationMs}ms`);
     if (!result.ok && result.summary) {

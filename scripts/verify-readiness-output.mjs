@@ -6,6 +6,7 @@ import { getLatestEvaluationRound } from "./verify-evaluation-reports.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
 const expectedServerRequiredLine = `server-required: ${serverRequiredCommands.join(", ")}`;
+const expectedReadinessNote = "This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick for end-to-end smoke.";
 const expectedLatestEvaluationRound = getLatestEvaluationRound();
 const requiredLines = [
   "PASS hygiene",
@@ -73,6 +74,12 @@ const expectedReadinessOutputCliIndexNegativeScenarios = [
   "misplacedEvaluationReportNegativeGuardsIndex",
 ];
 
+const expectedReadinessSummaryNegativeGuards = [
+  "missingServerRequiredCommands",
+  "missingReadinessNote",
+  "missingCompactReadinessNote",
+];
+
 export const expectedFixtureSummaryKeys = Object.freeze([
   "ok",
   "checked",
@@ -86,6 +93,7 @@ export const expectedFixtureSummaryKeys = Object.freeze([
   "readinessOutputCliIndexPositiveGuards",
   "readinessOutputCliIndexPositiveGuardNegativeScenarios",
   "readinessOutputCliIndexNegativeScenarios",
+  "readinessSummaryNegativeGuards",
   ...expectedFailureFlags,
 ]);
 
@@ -96,6 +104,9 @@ export function assertCompactReadinessOutput(output) {
     "compact output must include the latest evaluation report round"
   );
   assert.ok(output.includes(expectedServerRequiredLine), "compact output must list server-required checks");
+  assert.ok(output.includes(`NOTE ${expectedReadinessNote}`), "compact output must include the server-required warning note");
+  assert.ok(output.includes("FastAPI, Vite, or Chrome CDP"), "compact output must name the servers it does not start");
+  assert.ok(output.includes("npm run verify:full:quick"), "compact output must name the end-to-end smoke command");
 
   for (const line of requiredLines) {
     assert.ok(output.includes(line), `compact output missing ${line}`);
@@ -119,6 +130,7 @@ export function assertFixtureEvidenceOrder({
   readinessOutputCliIndexPositiveGuardsIndex,
   readinessOutputCliIndexPositiveGuardNegativeScenariosIndex,
   readinessOutputCliIndexNegativeScenariosIndex,
+  readinessSummaryNegativeGuardsIndex,
   firstBooleanFailureFieldIndex,
 }) {
   assertFixtureSummaryIndexes({
@@ -131,6 +143,7 @@ export function assertFixtureEvidenceOrder({
     readinessOutputCliIndexPositiveGuardsIndex,
     readinessOutputCliIndexPositiveGuardNegativeScenariosIndex,
     readinessOutputCliIndexNegativeScenariosIndex,
+    readinessSummaryNegativeGuardsIndex,
     firstBooleanFailureFieldIndex,
   });
   assert.ok(
@@ -143,8 +156,9 @@ export function assertFixtureEvidenceOrder({
       && readinessOutputCliIndexPositiveGuardsIndex > evaluationReportNegativeGuardsIndex
       && readinessOutputCliIndexPositiveGuardNegativeScenariosIndex > readinessOutputCliIndexPositiveGuardsIndex
       && readinessOutputCliIndexNegativeScenariosIndex > readinessOutputCliIndexPositiveGuardNegativeScenariosIndex
-      && firstBooleanFailureFieldIndex > readinessOutputCliIndexNegativeScenariosIndex,
-    "readiness output fixture summary must list failureFlags, positiveFixtureGuards, negativeFixtureGuards, directHelperNegativeGuards, directHelperNegativeScenarios, evaluationReportNegativeGuards, readinessOutputCliIndexPositiveGuards, readinessOutputCliIndexPositiveGuardNegativeScenarios, readinessOutputCliIndexNegativeScenarios, then boolean *Fails fields"
+      && readinessSummaryNegativeGuardsIndex > readinessOutputCliIndexNegativeScenariosIndex
+      && firstBooleanFailureFieldIndex > readinessSummaryNegativeGuardsIndex,
+    "readiness output fixture summary must list failureFlags, positiveFixtureGuards, negativeFixtureGuards, directHelperNegativeGuards, directHelperNegativeScenarios, evaluationReportNegativeGuards, readinessOutputCliIndexPositiveGuards, readinessOutputCliIndexPositiveGuardNegativeScenarios, readinessOutputCliIndexNegativeScenarios, readinessSummaryNegativeGuards, then boolean *Fails fields"
   );
 }
 
@@ -192,6 +206,16 @@ export function assertReadinessOutputCliIndexes(fixtureSummaryIndexes) {
       > fixtureSummaryIndexes.readinessOutputCliIndexNegativeScenariosIndex,
     "verify:readiness-output CLI must place firstBooleanFailureFieldIndex after readinessOutputCliIndexNegativeScenariosIndex"
   );
+  assert.ok(
+    fixtureSummaryIndexes.readinessSummaryNegativeGuardsIndex
+      > fixtureSummaryIndexes.readinessOutputCliIndexNegativeScenariosIndex,
+    "verify:readiness-output CLI must place readinessSummaryNegativeGuardsIndex after readinessOutputCliIndexNegativeScenariosIndex"
+  );
+  assert.ok(
+    fixtureSummaryIndexes.firstBooleanFailureFieldIndex
+      > fixtureSummaryIndexes.readinessSummaryNegativeGuardsIndex,
+    "verify:readiness-output CLI must place firstBooleanFailureFieldIndex after readinessSummaryNegativeGuardsIndex"
+  );
 }
 
 export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSummary = false } = {}) {
@@ -210,6 +234,16 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     readinessSummary.latestEvaluationRound,
     expectedLatestEvaluationRound,
     "json readiness must expose the latest evaluation report round"
+  );
+  assert.deepEqual(
+    readinessSummary.serverRequired,
+    serverRequiredCommands,
+    "json readiness must expose the server-required command list"
+  );
+  assert.equal(
+    readinessSummary.note,
+    expectedReadinessNote,
+    "json readiness must expose the server-required warning note"
   );
   assert.ok(
     evaluationReportsResult.summary.includes(`"latestRound": ${expectedLatestEvaluationRound}`),
@@ -425,6 +459,27 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       expectedReadinessOutputCliIndexNegativeScenarios,
       "readiness output fixture summary must list readinessOutputCliIndexNegativeScenarios in the expected order"
     );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"readinessSummaryNegativeGuards": ['),
+      "readiness output fixture summary must include readinessSummaryNegativeGuards list"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"missingServerRequiredCommands"'),
+      "readiness output fixture summary must include missing server-required commands guard"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"missingReadinessNote"'),
+      "readiness output fixture summary must include missing JSON readiness note guard"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"missingCompactReadinessNote"'),
+      "readiness output fixture summary must include missing compact readiness note guard"
+    );
+    assert.deepEqual(
+      readinessFixtureOutput.readinessSummaryNegativeGuards,
+      expectedReadinessSummaryNegativeGuards,
+      "readiness output fixture summary must list readinessSummaryNegativeGuards in the expected order"
+    );
     const failureFlagsIndex = readinessFixtureResult.summary.indexOf('"failureFlags": [');
     const positiveFixtureGuardsIndex = readinessFixtureResult.summary.indexOf('"positiveFixtureGuards": [');
     const negativeFixtureGuardsIndex = readinessFixtureResult.summary.indexOf('"negativeFixtureGuards": [');
@@ -434,6 +489,7 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     const readinessOutputCliIndexPositiveGuardsIndex = readinessFixtureResult.summary.indexOf('"readinessOutputCliIndexPositiveGuards": [');
     const readinessOutputCliIndexPositiveGuardNegativeScenariosIndex = readinessFixtureResult.summary.indexOf('"readinessOutputCliIndexPositiveGuardNegativeScenarios": [');
     const readinessOutputCliIndexNegativeScenariosIndex = readinessFixtureResult.summary.indexOf('"readinessOutputCliIndexNegativeScenarios": [');
+    const readinessSummaryNegativeGuardsIndex = readinessFixtureResult.summary.indexOf('"readinessSummaryNegativeGuards": [');
     const firstBooleanFailureFieldIndex = readinessFixtureResult.summary.indexOf('"missingScannedFileCountFails": true');
     fixtureSummaryIndexes = {
       failureFlagsIndex,
@@ -445,6 +501,7 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       readinessOutputCliIndexPositiveGuardsIndex,
       readinessOutputCliIndexPositiveGuardNegativeScenariosIndex,
       readinessOutputCliIndexNegativeScenariosIndex,
+      readinessSummaryNegativeGuardsIndex,
       firstBooleanFailureFieldIndex,
     };
     assertFixtureEvidenceOrder(fixtureSummaryIndexes);

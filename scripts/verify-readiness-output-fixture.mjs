@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+  assertCompactReadinessOutput,
   assertFixtureEvidenceOrder,
   assertFixtureSummaryIndexes,
   assertFixtureSummaryKeyCount,
@@ -9,6 +10,7 @@ import {
   assertReadinessOutputCliIndexes,
   expectedFixtureSummaryKeys,
 } from "./verify-readiness-output.mjs";
+import { serverRequiredCommands } from "./verification-command-lists.mjs";
 import {
   buildEvaluationReportSummary,
   getLatestEvaluationRound,
@@ -67,6 +69,14 @@ const expectedReadinessOutputCliIndexNegativeScenarios = [
   "staleEvaluationReportNegativeGuardsIndex",
   "misplacedEvaluationReportNegativeGuardsIndex",
 ];
+
+const expectedReadinessSummaryNegativeGuards = [
+  "missingServerRequiredCommands",
+  "missingReadinessNote",
+  "missingCompactReadinessNote",
+];
+
+const expectedReadinessNote = "This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick for end-to-end smoke.";
 
 const evaluationReportRounds = readEvaluationReportRounds();
 const expectedEvaluationReportSummary = buildEvaluationReportSummary(evaluationReportRounds);
@@ -228,6 +238,8 @@ function buildReadiness(textOutputOptions, {
   includeReadmeResult = true,
   includeReadmeOutputResult = true,
   includeEvaluationReportsResult = true,
+  includeServerRequired = true,
+  includeNote = true,
   readmeOptions,
   evaluationReportsOptions,
 } = {}) {
@@ -247,6 +259,8 @@ function buildReadiness(textOutputOptions, {
 
   return {
     latestEvaluationRound: expectedLatestEvaluationRound,
+    ...(includeServerRequired ? { serverRequired: serverRequiredCommands } : {}),
+    ...(includeNote ? { note: expectedReadinessNote } : {}),
     results,
   };
 }
@@ -275,6 +289,14 @@ const missingEvaluationReportsResult = buildReadiness(undefined, {
 
 const staleLatestEvaluationRound = buildReadiness(undefined, {
   evaluationReportsOptions: { latestRound: expectedLatestEvaluationRound - 1 },
+});
+
+const missingServerRequiredCommands = buildReadiness(undefined, {
+  includeServerRequired: false,
+});
+
+const missingReadinessNote = buildReadiness(undefined, {
+  includeNote: false,
 });
 
 const missingChecklistCommands = buildReadiness(undefined, {
@@ -329,7 +351,8 @@ const validFixtureSummaryIndexes = {
   readinessOutputCliIndexPositiveGuardsIndex: 60,
   readinessOutputCliIndexPositiveGuardNegativeScenariosIndex: 70,
   readinessOutputCliIndexNegativeScenariosIndex: 80,
-  firstBooleanFailureFieldIndex: 90,
+  readinessSummaryNegativeGuardsIndex: 90,
+  firstBooleanFailureFieldIndex: 100,
 };
 assertFixtureSummaryIndexes(validFixtureSummaryIndexes);
 assertFixtureEvidenceOrder(validFixtureSummaryIndexes);
@@ -409,6 +432,14 @@ assert.throws(
   /after readinessOutputCliIndexNegativeScenariosIndex/,
   "misplaced CLI fixture index equal to firstBooleanFailureFieldIndex must fail"
 );
+assert.throws(
+  () => assertReadinessOutputCliIndexes({
+    ...validFixtureSummaryIndexes,
+    readinessSummaryNegativeGuardsIndex: validFixtureSummaryIndexes.readinessOutputCliIndexNegativeScenariosIndex,
+  }),
+  /after readinessOutputCliIndexNegativeScenariosIndex/,
+  "stale readiness summary negative guard index equal to readinessOutputCliIndexNegativeScenariosIndex must fail"
+);
 
 assert.throws(
   () => assertReadinessJsonEvidence(missingScannedFileCount),
@@ -444,6 +475,18 @@ assert.throws(
   () => assertReadinessJsonEvidence(staleLatestEvaluationRound),
   /latest report round/,
   "stale latest evaluation round fixture must fail"
+);
+
+assert.throws(
+  () => assertReadinessJsonEvidence(missingServerRequiredCommands),
+  /server-required command list/,
+  "missing serverRequired fixture must fail"
+);
+
+assert.throws(
+  () => assertReadinessJsonEvidence(missingReadinessNote),
+  /server-required warning note/,
+  "missing readiness note fixture must fail"
 );
 
 assert.throws(
@@ -483,6 +526,7 @@ const output = {
   readinessOutputCliIndexPositiveGuards: expectedReadinessOutputCliIndexPositiveGuards,
   readinessOutputCliIndexPositiveGuardNegativeScenarios: expectedReadinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: expectedReadinessOutputCliIndexNegativeScenarios,
+  readinessSummaryNegativeGuards: expectedReadinessSummaryNegativeGuards,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 
@@ -496,6 +540,8 @@ function extraTopLevelFailureOutput() {
 function buildReadinessWithFixtureSummary(fixtureOutput) {
   return {
     latestEvaluationRound: expectedLatestEvaluationRound,
+    serverRequired: serverRequiredCommands,
+    note: expectedReadinessNote,
     results: [
       buildReadmeResult(),
       buildReadmeOutputResult(),
@@ -566,6 +612,29 @@ assert.deepEqual(
   expectedReadinessOutputCliIndexNegativeScenarios,
   "fixture output must expose readiness CLI index negative scenario coverage"
 );
+assert.deepEqual(
+  output.readinessSummaryNegativeGuards,
+  expectedReadinessSummaryNegativeGuards,
+  "fixture output must expose readiness summary warning negative guard coverage"
+);
+assert.throws(
+  () => assertCompactReadinessOutput([
+    `READINESS OK 11/11 passed; latest-evaluation-round: ${expectedLatestEvaluationRound}; server-required: ${serverRequiredCommands.join(", ")}`,
+    "PASS hygiene 1ms",
+    "PASS text 1ms",
+    "PASS text output 1ms",
+    "PASS frontend helpers 1ms",
+    "PASS template presets 1ms",
+    "PASS evaluation reports 1ms",
+    "PASS readme 1ms",
+    "PASS readme output 1ms",
+    "PASS readiness output fixture 1ms",
+    "PASS command scope 1ms",
+    "PASS backend syntax 1ms",
+  ].join("\n")),
+  /server-required warning note/,
+  "compact readiness output without note must fail"
+);
 const outputKeys = Object.keys(output);
 assert.deepEqual(
   expectedFixtureSummaryKeys,
@@ -603,6 +672,7 @@ assertFixtureEvidenceOrder({
   readinessOutputCliIndexPositiveGuardsIndex: outputKeys.indexOf("readinessOutputCliIndexPositiveGuards"),
   readinessOutputCliIndexPositiveGuardNegativeScenariosIndex: outputKeys.indexOf("readinessOutputCliIndexPositiveGuardNegativeScenarios"),
   readinessOutputCliIndexNegativeScenariosIndex: outputKeys.indexOf("readinessOutputCliIndexNegativeScenarios"),
+  readinessSummaryNegativeGuardsIndex: outputKeys.indexOf("readinessSummaryNegativeGuards"),
   firstBooleanFailureFieldIndex: outputKeys.findIndex((key) => key.endsWith("Fails")),
 });
 
@@ -627,6 +697,7 @@ const misplacedValidScannedFileCountOutput = {
   readinessOutputCliIndexPositiveGuards: output.readinessOutputCliIndexPositiveGuards,
   readinessOutputCliIndexPositiveGuardNegativeScenarios: output.readinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
+  readinessSummaryNegativeGuards: output.readinessSummaryNegativeGuards,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 assert.throws(
@@ -1110,6 +1181,80 @@ assert.throws(
   /expected order/,
   "readiness fixture summary with reordered CLI index negative scenarios must fail"
 );
+const missingReadinessSummaryNegativeGuardsOutput = { ...output };
+delete missingReadinessSummaryNegativeGuardsOutput.readinessSummaryNegativeGuards;
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(missingReadinessSummaryNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /readinessSummaryNegativeGuards/,
+  "readiness fixture summary without readinessSummaryNegativeGuards must fail"
+);
+const staleReadinessSummaryNegativeGuardsOutput = {
+  ...output,
+  readinessSummaryNegativeGuards: [],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(staleReadinessSummaryNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /missing server-required commands guard/,
+  "readiness fixture summary without readiness summary negative guard names must fail"
+);
+const partialReadinessSummaryNegativeGuardsOutput = {
+  ...output,
+  readinessSummaryNegativeGuards: [
+    "missingServerRequiredCommands",
+    "missingReadinessNote",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(partialReadinessSummaryNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /missing compact readiness note guard/,
+  "readiness fixture summary without compact readiness note guard must fail"
+);
+const wrongNameReadinessSummaryNegativeGuardsOutput = {
+  ...output,
+  readinessSummaryNegativeGuards: [
+    "missingServerRequiredCommands",
+    "missingReadinessNote",
+    "missingCompactReadinessWarning",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(wrongNameReadinessSummaryNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /missing compact readiness note guard/,
+  "readiness fixture summary with wrong readiness summary negative guard name must fail"
+);
+const expandedReadinessSummaryNegativeGuardsOutput = {
+  ...output,
+  readinessSummaryNegativeGuards: [
+    ...expectedReadinessSummaryNegativeGuards,
+    "unexpectedReadinessSummaryNegativeGuard",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(expandedReadinessSummaryNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with expanded readiness summary negative guards must fail"
+);
+const reorderedReadinessSummaryNegativeGuardsOutput = {
+  ...output,
+  readinessSummaryNegativeGuards: [...expectedReadinessSummaryNegativeGuards].reverse(),
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(reorderedReadinessSummaryNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with reordered readiness summary negative guards must fail"
+);
 const missingDirectHelperNegativeGuardsOutput = { ...output };
 delete missingDirectHelperNegativeGuardsOutput.directHelperNegativeGuards;
 assert.throws(
@@ -1246,6 +1391,7 @@ const misplacedPositiveFixtureGuardsOutput = {
   readinessOutputCliIndexPositiveGuards: output.readinessOutputCliIndexPositiveGuards,
   readinessOutputCliIndexPositiveGuardNegativeScenarios: output.readinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
+  readinessSummaryNegativeGuards: output.readinessSummaryNegativeGuards,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 assert.throws(
@@ -1269,6 +1415,7 @@ const earlyBooleanFailureFieldsOutput = {
   readinessOutputCliIndexPositiveGuards: output.readinessOutputCliIndexPositiveGuards,
   readinessOutputCliIndexPositiveGuardNegativeScenarios: output.readinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
+  readinessSummaryNegativeGuards: output.readinessSummaryNegativeGuards,
 };
 assert.throws(
   () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(earlyBooleanFailureFieldsOutput), {
@@ -1290,6 +1437,7 @@ const misplacedFailureFlagsOutput = {
   readinessOutputCliIndexPositiveGuards: output.readinessOutputCliIndexPositiveGuards,
   readinessOutputCliIndexPositiveGuardNegativeScenarios: output.readinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
+  readinessSummaryNegativeGuards: output.readinessSummaryNegativeGuards,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 assert.throws(
