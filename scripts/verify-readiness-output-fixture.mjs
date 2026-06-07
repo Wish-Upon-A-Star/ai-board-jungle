@@ -361,6 +361,17 @@ assert.throws(
   /stale direct helper guard scenario/,
   "readiness fixture summary without stale direct helper negative scenario must fail"
 );
+const reversedPartialDirectHelperNegativeScenariosOutput = {
+  ...output,
+  directHelperNegativeScenarios: ["staleDirectHelperNegativeGuards"],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(reversedPartialDirectHelperNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /missing direct helper guard scenario/,
+  "readiness fixture summary without missing direct helper negative scenario must fail"
+);
 const missingDirectHelperNegativeGuardsOutput = { ...output };
 delete missingDirectHelperNegativeGuardsOutput.directHelperNegativeGuards;
 assert.throws(
