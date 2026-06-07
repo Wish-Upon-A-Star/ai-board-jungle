@@ -802,6 +802,35 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
   return { scannedFileCount, fixtureSummaryIndexes, fixtureSummaryKeyCount, importFixtureEvidence };
 }
 
+export function buildReadinessOutputCliSummary({
+  scannedFileCount,
+  importFixtureEvidence,
+  fixtureSummaryKeyCount,
+  fixtureSummaryIndexes,
+}) {
+  assert.ok(Number.isInteger(fixtureSummaryKeyCount), "readiness output CLI summary must include fixtureSummaryKeyCount");
+  assert.equal(
+    fixtureSummaryKeyCount,
+    expectedFixtureSummaryKeys.length,
+    "readiness output CLI summary must surface the exported fixture schema key count"
+  );
+  return {
+    ok: true,
+    checked: "verify-readiness-summary --compact",
+    requiredLines,
+    latestEvaluationRound: expectedLatestEvaluationRound,
+    checklistCommands: expectedChecklistCommands,
+    checklistItems: expectedChecklistItems,
+    textOutputScannedFileCount: scannedFileCount,
+    importFixtureDurationMs: importFixtureEvidence.durationMs,
+    importFixtureStdoutBytes: importFixtureEvidence.stdoutBytes,
+    importFixtureStderrBytes: importFixtureEvidence.stderrBytes,
+    importFixtureExportCount: importFixtureEvidence.exportsChecked.length,
+    fixtureSummaryKeyCount,
+    fixtureSummaryIndexes,
+  };
+}
+
 function runReadinessOutputCheck() {
   const result = spawnSync(process.execPath, ["scripts/verify-readiness-summary.mjs", "--compact"], {
     shell: false,
@@ -827,21 +856,12 @@ function runReadinessOutputCheck() {
   });
   assertReadinessOutputCliIndexes(fixtureSummaryIndexes);
 
-  console.log(JSON.stringify({
-    ok: true,
-    checked: "verify-readiness-summary --compact",
-    requiredLines,
-    latestEvaluationRound: expectedLatestEvaluationRound,
-    checklistCommands: expectedChecklistCommands,
-    checklistItems: expectedChecklistItems,
-    textOutputScannedFileCount: scannedFileCount,
-    importFixtureDurationMs: importFixtureEvidence.durationMs,
-    importFixtureStdoutBytes: importFixtureEvidence.stdoutBytes,
-    importFixtureStderrBytes: importFixtureEvidence.stderrBytes,
-    importFixtureExportCount: importFixtureEvidence.exportsChecked.length,
+  console.log(JSON.stringify(buildReadinessOutputCliSummary({
+    scannedFileCount,
+    importFixtureEvidence,
     fixtureSummaryKeyCount,
     fixtureSummaryIndexes,
-  }, null, 2));
+  }), null, 2));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

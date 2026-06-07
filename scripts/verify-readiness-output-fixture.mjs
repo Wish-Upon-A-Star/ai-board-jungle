@@ -9,6 +9,7 @@ import {
   assertFixtureSummaryKeySchema,
   assertReadinessJsonEvidence,
   assertReadinessOutputCliIndexes,
+  buildReadinessOutputCliSummary,
   expectedFixtureSummaryKeys,
 } from "./verify-readiness-output.mjs";
 import { serverRequiredCommands } from "./verification-command-lists.mjs";
@@ -1069,6 +1070,68 @@ assert.equal(
   validSummaryResult.fixtureSummaryKeyCount,
   expectedFixtureSummaryKeys.length,
   "required fixture summary must report the exported schema key count"
+);
+const validReadinessOutputCliSummary = buildReadinessOutputCliSummary({
+  scannedFileCount: validSummaryResult.scannedFileCount,
+  importFixtureEvidence: {
+    durationMs: 101,
+    stdoutBytes: 0,
+    stderrBytes: 0,
+    exportsChecked: [
+      "readinessNote",
+      "checks",
+      "getReadinessChecks",
+      "buildReadinessSummary",
+      "formatCompactReadinessSummary",
+      "runReadinessSummaryCli",
+    ],
+  },
+  fixtureSummaryKeyCount: validSummaryResult.fixtureSummaryKeyCount,
+  fixtureSummaryIndexes: {
+    failureFlagsIndex: 1,
+    positiveFixtureGuardsIndex: 2,
+    negativeFixtureGuardsIndex: 3,
+    directHelperNegativeGuardsIndex: 4,
+    directHelperNegativeScenariosIndex: 5,
+    evaluationReportNegativeGuardsIndex: 6,
+    readinessOutputCliIndexPositiveGuardsIndex: 7,
+    readinessOutputCliIndexPositiveGuardNegativeScenariosIndex: 8,
+    readinessOutputCliIndexNegativeScenariosIndex: 9,
+    readinessImportNegativeGuardsIndex: 10,
+    readinessSummaryNegativeGuardsIndex: 11,
+    compactReadinessNegativeGuardsIndex: 12,
+    failedCompactReadinessNegativeGuardsIndex: 13,
+    failedCompactReadinessCliGuardsIndex: 14,
+    directCompactFormatterGuardsIndex: 15,
+    firstBooleanFailureFieldIndex: 16,
+  },
+});
+assert.equal(
+  validReadinessOutputCliSummary.fixtureSummaryKeyCount,
+  expectedFixtureSummaryKeys.length,
+  "readiness output CLI summary must surface the exported fixture schema key count"
+);
+assert.throws(
+  () => buildReadinessOutputCliSummary({
+    ...validReadinessOutputCliSummary,
+    scannedFileCount: validSummaryResult.scannedFileCount,
+    importFixtureEvidence: {
+      durationMs: 101,
+      stdoutBytes: 0,
+      stderrBytes: 0,
+      exportsChecked: [
+        "readinessNote",
+        "checks",
+        "getReadinessChecks",
+        "buildReadinessSummary",
+        "formatCompactReadinessSummary",
+        "runReadinessSummaryCli",
+      ],
+    },
+    fixtureSummaryKeyCount: expectedFixtureSummaryKeys.length - 1,
+  }),
+  /schema key count/,
+  "readiness output CLI summary with stale fixtureSummaryKeyCount must fail"
 );
 const misplacedValidScannedFileCountOutput = {
   ok: output.ok,
