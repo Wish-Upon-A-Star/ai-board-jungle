@@ -507,6 +507,104 @@ def test_regular_user_only_sees_own_automations():
         assert forbidden_profile_use.status_code == 403
 
 
+def test_selected_profile_custom_connections_are_part_of_skip_fingerprint():
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "profile-skip@example.com", "name": "Profile Skip", "password": "password123"},
+        )
+        assert register.status_code == 200
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+
+        profile = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Profile owned custom workflow",
+                "source_kind": "custom",
+                "base_url": "https://api.example.com/tasks",
+                "api_provider": "Custom REST API",
+                "token_name": "CUSTOM_API_KEY",
+                "token_value": "custom-secret",
+                "ai_provider": "OpenAI",
+                "ai_model": "gpt-4o-mini",
+                "ai_api_base": "https://api.openai.com/v1",
+                "rag_targets": ["custom_records"],
+                "custom_template": "profile-title: {title}",
+                "custom_connections": [
+                    {
+                        "label": "Profile Custom Endpoint",
+                        "service": "custom",
+                        "url": "https://api.example.com/tasks",
+                        "api": "Custom REST API",
+                        "auth_key_name": "CUSTOM_API_KEY",
+                        "operation": "upsert_task",
+                        "template": "title: {title}\nstatus: {status}",
+                    }
+                ],
+            },
+        )
+        assert profile.status_code == 200
+        profile_id = profile.json()["profile"]["id"]
+
+        automation = client.post(
+            "/api/automations",
+            headers=headers,
+            json={
+                "name": "Profile connection skip guard",
+                "integration_profile_id": profile_id,
+                "source": "Custom source",
+                "destination": "Custom target",
+                "interval_minutes": 5,
+                "instruction": "Use the selected profile connection and skip unchanged reruns.",
+                "template": "title / status",
+                "api_provider": "Custom REST API",
+                "ai_agent": "CustomWorkflowAgent",
+                "template_preset": "custom",
+                "custom_connections": [
+                    {
+                        "label": "Ignored form connection",
+                        "service": "notion",
+                        "url": "https://www.notion.so/workspace/db",
+                        "api": "Notion API",
+                        "auth_key_name": "NOTION_TOKEN",
+                        "operation": "upsert_task_page",
+                        "template": "title: {title}",
+                    }
+                ],
+            },
+        )
+        assert automation.status_code == 200
+        task = automation.json()["task"]
+        assert task["integrationProfile"]["id"] == profile_id
+        assert task["customConnections"][0]["service"] == "custom"
+        assert task["customConnections"][0]["operation"] == "upsert_task"
+
+        first_run = client.post(f"/api/automations/{task['id']}/run", headers=headers)
+        assert first_run.status_code == 200
+        assert first_run.json()["run"]["result"]["status"] == "changed"
+        assert first_run.json()["run"]["result"]["targets"][0]["target"] == "custom"
+        assert first_run.json()["run"]["result"]["targets"][0]["operation"] == "upsert_task"
+
+        second_run = client.post(f"/api/automations/{task['id']}/run", headers=headers)
+        assert second_run.status_code == 200
+        assert second_run.json()["run"]["result"]["status"] == "skipped"
+        assert second_run.json()["run"]["id"] is None
+
+        with SessionLocal() as db:
+            stored_task = db.get(AutomationTask, task["id"])
+            assert stored_task is not None
+            connections = json.loads(stored_task.custom_connections)
+            connections[0]["operation"] = "upsert_task_v2"
+            stored_task.custom_connections = json.dumps(connections, ensure_ascii=False)
+            db.commit()
+
+        third_run = client.post(f"/api/automations/{task['id']}/run", headers=headers)
+        assert third_run.status_code == 200
+        assert third_run.json()["run"]["result"]["status"] == "changed"
+        assert third_run.json()["run"]["result"]["targets"][0]["operation"] == "upsert_task_v2"
+
+
 def test_custom_connection_validation_rejects_incomplete_entries():
     with TestClient(app) as client:
         register = client.post(
