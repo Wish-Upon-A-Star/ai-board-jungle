@@ -56,6 +56,7 @@ const expectedNegativeFixtureGuards = [
 
 const expectedNegativeFixtureGuardNegativeScenarios = [
   "missingSummaryCountSourceGuard",
+  "wrongNameNegativeFixtureGuard",
 ];
 
 const expectedPositiveFixtureGuards = [
@@ -545,6 +546,10 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     assert.ok(
       readinessFixtureResult.summary.includes('"missingSummaryCountSourceGuard"'),
       "readiness output fixture summary must include missing summary count source guard scenario"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"wrongNameNegativeFixtureGuard"'),
+      "readiness output fixture summary must include wrong-name negative fixture guard scenario"
     );
     assert.deepEqual(
       readinessFixtureOutput.negativeFixtureGuardNegativeScenarios,

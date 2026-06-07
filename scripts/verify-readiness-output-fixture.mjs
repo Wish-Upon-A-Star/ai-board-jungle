@@ -68,6 +68,7 @@ const expectedNegativeFixtureGuards = [
 
 const expectedNegativeFixtureGuardNegativeScenarios = [
   "missingSummaryCountSourceGuard",
+  "wrongNameNegativeFixtureGuard",
 ];
 
 const expectedDirectHelperNegativeGuards = [
@@ -1310,6 +1311,62 @@ assert.throws(
   }),
   /expected order/,
   "readiness fixture summary with expanded negative fixture guards must fail"
+);
+const missingNegativeFixtureGuardNegativeScenariosOutput = { ...output };
+delete missingNegativeFixtureGuardNegativeScenariosOutput.negativeFixtureGuardNegativeScenarios;
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(missingNegativeFixtureGuardNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /negativeFixtureGuardNegativeScenarios/,
+  "readiness fixture summary without negativeFixtureGuardNegativeScenarios must fail"
+);
+const staleNegativeFixtureGuardNegativeScenariosOutput = {
+  ...output,
+  negativeFixtureGuardNegativeScenarios: [],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(staleNegativeFixtureGuardNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /missing summary count source guard scenario/,
+  "readiness fixture summary without negative fixture guard negative scenario names must fail"
+);
+const partialNegativeFixtureGuardNegativeScenariosOutput = {
+  ...output,
+  negativeFixtureGuardNegativeScenarios: ["missingSummaryCountSourceGuard"],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(partialNegativeFixtureGuardNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /wrong-name negative fixture guard scenario/,
+  "readiness fixture summary without wrong-name negative fixture guard scenario must fail"
+);
+const expandedNegativeFixtureGuardNegativeScenariosOutput = {
+  ...output,
+  negativeFixtureGuardNegativeScenarios: [
+    ...expectedNegativeFixtureGuardNegativeScenarios,
+    "unexpectedNegativeFixtureGuardNegativeScenario",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(expandedNegativeFixtureGuardNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with expanded negative fixture guard negative scenarios must fail"
+);
+const reorderedNegativeFixtureGuardNegativeScenariosOutput = {
+  ...output,
+  negativeFixtureGuardNegativeScenarios: [...expectedNegativeFixtureGuardNegativeScenarios].reverse(),
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(reorderedNegativeFixtureGuardNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with reordered negative fixture guard negative scenarios must fail"
 );
 const missingDirectHelperNegativeScenariosOutput = { ...output };
 delete missingDirectHelperNegativeScenariosOutput.directHelperNegativeScenarios;
