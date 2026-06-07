@@ -50,12 +50,15 @@ function buildTextOutputResult({
   };
 }
 
-function buildReadiness(textOutputOptions) {
+function buildReadiness(textOutputOptions, { includeReadmeResult = true } = {}) {
+  const results = [buildTextOutputResult(textOutputOptions)];
+
+  if (includeReadmeResult) {
+    results.unshift(buildReadmeResult());
+  }
+
   return {
-    results: [
-      buildReadmeResult(),
-      buildTextOutputResult(textOutputOptions),
-    ],
+    results,
   };
 }
 
@@ -71,6 +74,10 @@ const nonEmptyMissingRequiredFiles = buildReadiness({
 
 const missingRequiredScannedFiles = buildReadiness({
   includeRequiredScannedFiles: false,
+});
+
+const missingReadmeResult = buildReadiness(undefined, {
+  includeReadmeResult: false,
 });
 
 const validResult = assertReadinessJsonEvidence(validReadiness);
@@ -94,6 +101,12 @@ assert.throws(
   "missing requiredScannedFiles fixture must fail"
 );
 
+assert.throws(
+  () => assertReadinessJsonEvidence(missingReadmeResult),
+  /readme result/,
+  "missing readme result fixture must fail"
+);
+
 console.log(JSON.stringify({
   ok: true,
   checked: "verify-readiness-output negative fixture",
@@ -101,4 +114,5 @@ console.log(JSON.stringify({
   missingScannedFileCountFails: true,
   nonEmptyMissingRequiredFilesFails: true,
   missingRequiredScannedFilesFails: true,
+  missingReadmeResultFails: true,
 }, null, 2));
