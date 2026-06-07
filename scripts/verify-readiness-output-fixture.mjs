@@ -140,6 +140,11 @@ function assertFailureFlagFieldsMatch(output) {
 
 const validResult = assertReadinessJsonEvidence(validReadiness);
 assert.equal(validResult.scannedFileCount, 46, "valid fixture must parse scannedFileCount");
+assert.equal(
+  validResult.fixtureSummaryIndexes,
+  null,
+  "default fixture must not compute fixtureSummaryIndexes without requireFixtureSummary"
+);
 
 assert.throws(
   () => assertReadinessJsonEvidence(missingScannedFileCount),
