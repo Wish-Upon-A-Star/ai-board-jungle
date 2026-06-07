@@ -56,6 +56,8 @@ const serverRequired = [
   "smoke:ui",
   "verify:fastapi",
   "verify:full:quick",
+  "verify:full",
+  "test:live-integrations",
 ];
 
 const summary = {
