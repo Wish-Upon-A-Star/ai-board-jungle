@@ -98,6 +98,7 @@ const expectedFailedCompactReadinessCliGuards = [
   "syntheticFailedCompactCliStatus",
   "syntheticFailedCompactCliLine",
   "syntheticFailedCompactCliSummary",
+  "syntheticFailedCompactCliDuration",
 ];
 
 export const expectedFixtureSummaryKeys = Object.freeze([
@@ -621,6 +622,10 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     assert.ok(
       readinessFixtureResult.summary.includes('"syntheticFailedCompactCliSummary"'),
       "readiness output fixture summary must include synthetic failed compact CLI summary guard"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"syntheticFailedCompactCliDuration"'),
+      "readiness output fixture summary must include synthetic failed compact CLI duration guard"
     );
     assert.deepEqual(
       readinessFixtureOutput.failedCompactReadinessCliGuards,

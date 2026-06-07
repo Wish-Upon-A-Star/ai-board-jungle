@@ -95,6 +95,7 @@ const expectedFailedCompactReadinessCliGuards = [
   "syntheticFailedCompactCliStatus",
   "syntheticFailedCompactCliLine",
   "syntheticFailedCompactCliSummary",
+  "syntheticFailedCompactCliDuration",
 ];
 
 const expectedReadinessNote = "This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick for end-to-end smoke.";
@@ -791,6 +792,7 @@ assert.throws(
 );
 
 function runSyntheticFailedCompactReadinessCli() {
+  const startedAt = Date.now();
   const result = spawnSync(process.execPath, ["scripts/verify-readiness-summary.mjs", "--compact"], {
     shell: false,
     encoding: "utf8",
@@ -798,15 +800,29 @@ function runSyntheticFailedCompactReadinessCli() {
       ...process.env,
       AI_BOARD_READINESS_FORCE_FAIL: "1",
     },
-    timeout: 180000,
+    timeout: 30000,
   });
   return {
     status: result.status,
+    durationMs: Date.now() - startedAt,
     output: `${result.stdout || ""}${result.stderr || ""}`,
   };
 }
 
+function assertSyntheticFailedCompactReadinessCliPerformance(result, maxDurationMs = 30000) {
+  assert.ok(
+    result.durationMs < maxDurationMs,
+    `synthetic failed compact readiness CLI must finish before ${maxDurationMs}ms; observed ${result.durationMs}ms`
+  );
+}
+
 const syntheticFailedCompactReadinessCli = runSyntheticFailedCompactReadinessCli();
+assertSyntheticFailedCompactReadinessCliPerformance(syntheticFailedCompactReadinessCli);
+assert.throws(
+  () => assertSyntheticFailedCompactReadinessCliPerformance({ durationMs: 30000 }, 30000),
+  /finish before 30000ms/,
+  "synthetic failed compact readiness CLI duration guard must fail with a targeted message"
+);
 assert.equal(
   syntheticFailedCompactReadinessCli.status,
   1,
@@ -1627,6 +1643,22 @@ assert.throws(
   /synthetic failed compact CLI summary guard/,
   "readiness fixture summary without failed compact CLI summary guard must fail"
 );
+const partialFailedCompactReadinessCliDurationGuardsOutput = {
+  ...output,
+  failedCompactReadinessCliGuards: [
+    "syntheticFailedCompactCliExit",
+    "syntheticFailedCompactCliStatus",
+    "syntheticFailedCompactCliLine",
+    "syntheticFailedCompactCliSummary",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(partialFailedCompactReadinessCliDurationGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /synthetic failed compact CLI duration guard/,
+  "readiness fixture summary without failed compact CLI duration guard must fail"
+);
 const wrongNameFailedCompactReadinessCliGuardsOutput = {
   ...output,
   failedCompactReadinessCliGuards: [
@@ -1634,6 +1666,7 @@ const wrongNameFailedCompactReadinessCliGuardsOutput = {
     "syntheticFailedCompactCliStatus",
     "syntheticFailedCompactCliLine",
     "syntheticFailedCompactCliSummaries",
+    "syntheticFailedCompactCliDuration",
   ],
 };
 assert.throws(
