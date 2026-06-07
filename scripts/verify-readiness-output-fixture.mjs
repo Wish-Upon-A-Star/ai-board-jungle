@@ -2,81 +2,76 @@ import assert from "node:assert/strict";
 import { assertReadinessJsonEvidence } from "./verify-readiness-output.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
-const validReadiness = {
-  results: [
-    {
-      name: "readme",
-      summary: [
-        `  "checklistCommands": ${expectedChecklistCommands},`,
-        `  "checklistItems": ${expectedChecklistItems}`,
-      ].join("\n"),
-    },
-    {
-      name: "text output",
-      summary: [
-        '  "checked": "verify-text output",',
-        '  "requiredScannedFiles": [',
-        '    "scripts/verify-readme-contract.mjs"',
-        "  ],",
-        '  "missingRequiredFiles": [],',
-        '  "hits": [],',
-        '  "scannedFileCount": 46',
-      ].join("\n"),
-    },
-  ],
-};
+function buildReadmeResult() {
+  return {
+    name: "readme",
+    summary: [
+      `  "checklistCommands": ${expectedChecklistCommands},`,
+      `  "checklistItems": ${expectedChecklistItems}`,
+    ].join("\n"),
+  };
+}
 
-const missingScannedFileCount = {
-  results: [
-    validReadiness.results[0],
-    {
-      name: "text output",
-      summary: [
-        '  "checked": "verify-text output",',
-        '  "requiredScannedFiles": [',
-        '    "scripts/verify-readme-contract.mjs"',
-        "  ],",
-        '  "missingRequiredFiles": [],',
-        '  "hits": []',
-      ].join("\n"),
-    },
-  ],
-};
+function buildTextOutputResult({
+  includeRequiredScannedFiles = true,
+  includeScannedFileCount = true,
+  missingRequiredFiles = [],
+} = {}) {
+  const lines = ['  "checked": "verify-text output",'];
 
-const nonEmptyMissingRequiredFiles = {
-  results: [
-    validReadiness.results[0],
-    {
-      name: "text output",
-      summary: [
-        '  "checked": "verify-text output",',
-        '  "requiredScannedFiles": [',
-        '    "scripts/verify-readme-contract.mjs"',
-        "  ],",
-        '  "missingRequiredFiles": [',
-        '    "scripts/verify-readme-contract.mjs"',
-        "  ],",
-        '  "hits": [],',
-        '  "scannedFileCount": 46',
-      ].join("\n"),
-    },
-  ],
-};
+  if (includeRequiredScannedFiles) {
+    lines.push(
+      '  "requiredScannedFiles": [',
+      '    "scripts/verify-readme-contract.mjs"',
+      "  ],"
+    );
+  }
 
-const missingRequiredScannedFiles = {
-  results: [
-    validReadiness.results[0],
-    {
-      name: "text output",
-      summary: [
-        '  "checked": "verify-text output",',
-        '  "missingRequiredFiles": [],',
-        '  "hits": [],',
-        '  "scannedFileCount": 46',
-      ].join("\n"),
-    },
-  ],
-};
+  if (missingRequiredFiles.length) {
+    lines.push(
+      '  "missingRequiredFiles": [',
+      ...missingRequiredFiles.map((file) => `    "${file}"`),
+      "  ],"
+    );
+  } else {
+    lines.push('  "missingRequiredFiles": [],');
+  }
+
+  lines.push('  "hits": []');
+
+  if (includeScannedFileCount) {
+    lines[lines.length - 1] += ",";
+    lines.push('  "scannedFileCount": 46');
+  }
+
+  return {
+    name: "text output",
+    summary: lines.join("\n"),
+  };
+}
+
+function buildReadiness(textOutputOptions) {
+  return {
+    results: [
+      buildReadmeResult(),
+      buildTextOutputResult(textOutputOptions),
+    ],
+  };
+}
+
+const validReadiness = buildReadiness();
+
+const missingScannedFileCount = buildReadiness({
+  includeScannedFileCount: false,
+});
+
+const nonEmptyMissingRequiredFiles = buildReadiness({
+  missingRequiredFiles: ["scripts/verify-readme-contract.mjs"],
+});
+
+const missingRequiredScannedFiles = buildReadiness({
+  includeRequiredScannedFiles: false,
+});
 
 const validResult = assertReadinessJsonEvidence(validReadiness);
 assert.equal(validResult.scannedFileCount, 46, "valid fixture must parse scannedFileCount");
