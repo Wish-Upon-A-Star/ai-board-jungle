@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import {
   assertFixtureEvidenceOrder,
   assertFixtureSummaryIndexes,
@@ -43,6 +44,23 @@ const expectedPositiveFixtureGuards = [
 ];
 
 const expectedLatestEvaluationRound = getLatestEvaluationRound();
+
+function readEvaluationReportsCliLatestRound() {
+  const result = spawnSync(process.execPath, ["scripts/verify-evaluation-reports.mjs"], {
+    shell: false,
+    encoding: "utf8",
+    timeout: 120000,
+  });
+  const output = `${result.stdout || ""}${result.stderr || ""}`;
+  assert.equal(result.status, 0, `verify-evaluation-reports CLI fixture exited with ${result.status}\n${output}`);
+  return JSON.parse(output).latestRound;
+}
+
+assert.equal(
+  readEvaluationReportsCliLatestRound(),
+  expectedLatestEvaluationRound,
+  "getLatestEvaluationRound helper must match verify:evaluation-reports CLI latestRound"
+);
 
 function buildEvaluationReportsResult({ latestRound = expectedLatestEvaluationRound } = {}) {
   return {
