@@ -26,6 +26,11 @@ const expectedDirectHelperNegativeScenarios = [
   "reversedPartialDirectHelperNegativeGuards",
 ];
 
+const expectedDirectHelperNegativeGuards = [
+  "missingEvidenceIndex",
+  "stringEvidenceIndex",
+];
+
 export function assertCompactReadinessOutput(output) {
   assert.ok(output.includes("READINESS OK 11/11 passed"), "compact output must include the readiness total");
   assert.ok(output.includes(expectedServerRequiredLine), "compact output must list server-required checks");
@@ -156,6 +161,11 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     assert.ok(
       readinessFixtureResult.summary.includes('"stringEvidenceIndex"'),
       "readiness output fixture summary must include string evidence index direct helper guard"
+    );
+    assert.deepEqual(
+      readinessFixtureOutput.directHelperNegativeGuards,
+      expectedDirectHelperNegativeGuards,
+      "readiness output fixture summary must list directHelperNegativeGuards in the expected order"
     );
     assert.ok(
       readinessFixtureResult.summary.includes('"missingDirectHelperNegativeGuards"'),

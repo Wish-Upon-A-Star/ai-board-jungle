@@ -425,6 +425,17 @@ assert.throws(
   /missing evidence index direct helper guard/,
   "readiness fixture summary without missing evidence direct helper guard must fail"
 );
+const reorderedDirectHelperNegativeGuardsOutput = {
+  ...output,
+  directHelperNegativeGuards: [...expectedDirectHelperNegativeGuards].reverse(),
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(reorderedDirectHelperNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with reordered direct helper negative guards must fail"
+);
 const missingPositiveFixtureGuardsOutput = { ...output };
 delete missingPositiveFixtureGuardsOutput.positiveFixtureGuards;
 assert.throws(
