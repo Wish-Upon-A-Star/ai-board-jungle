@@ -80,6 +80,13 @@ const expectedReadinessSummaryNegativeGuards = [
   "missingCompactReadinessNote",
 ];
 
+const expectedCompactReadinessNegativeGuards = [
+  "missingCompactTotal",
+  "missingCompactLatestRound",
+  "missingCompactServerRequiredLine",
+  "missingCompactPassLine",
+];
+
 export const expectedFixtureSummaryKeys = Object.freeze([
   "ok",
   "checked",
@@ -94,6 +101,7 @@ export const expectedFixtureSummaryKeys = Object.freeze([
   "readinessOutputCliIndexPositiveGuardNegativeScenarios",
   "readinessOutputCliIndexNegativeScenarios",
   "readinessSummaryNegativeGuards",
+  "compactReadinessNegativeGuards",
   ...expectedFailureFlags,
 ]);
 
@@ -131,6 +139,7 @@ export function assertFixtureEvidenceOrder({
   readinessOutputCliIndexPositiveGuardNegativeScenariosIndex,
   readinessOutputCliIndexNegativeScenariosIndex,
   readinessSummaryNegativeGuardsIndex,
+  compactReadinessNegativeGuardsIndex,
   firstBooleanFailureFieldIndex,
 }) {
   assertFixtureSummaryIndexes({
@@ -144,6 +153,7 @@ export function assertFixtureEvidenceOrder({
     readinessOutputCliIndexPositiveGuardNegativeScenariosIndex,
     readinessOutputCliIndexNegativeScenariosIndex,
     readinessSummaryNegativeGuardsIndex,
+    compactReadinessNegativeGuardsIndex,
     firstBooleanFailureFieldIndex,
   });
   assert.ok(
@@ -157,8 +167,9 @@ export function assertFixtureEvidenceOrder({
       && readinessOutputCliIndexPositiveGuardNegativeScenariosIndex > readinessOutputCliIndexPositiveGuardsIndex
       && readinessOutputCliIndexNegativeScenariosIndex > readinessOutputCliIndexPositiveGuardNegativeScenariosIndex
       && readinessSummaryNegativeGuardsIndex > readinessOutputCliIndexNegativeScenariosIndex
-      && firstBooleanFailureFieldIndex > readinessSummaryNegativeGuardsIndex,
-    "readiness output fixture summary must list failureFlags, positiveFixtureGuards, negativeFixtureGuards, directHelperNegativeGuards, directHelperNegativeScenarios, evaluationReportNegativeGuards, readinessOutputCliIndexPositiveGuards, readinessOutputCliIndexPositiveGuardNegativeScenarios, readinessOutputCliIndexNegativeScenarios, readinessSummaryNegativeGuards, then boolean *Fails fields"
+      && compactReadinessNegativeGuardsIndex > readinessSummaryNegativeGuardsIndex
+      && firstBooleanFailureFieldIndex > compactReadinessNegativeGuardsIndex,
+    "readiness output fixture summary must list failureFlags, positiveFixtureGuards, negativeFixtureGuards, directHelperNegativeGuards, directHelperNegativeScenarios, evaluationReportNegativeGuards, readinessOutputCliIndexPositiveGuards, readinessOutputCliIndexPositiveGuardNegativeScenarios, readinessOutputCliIndexNegativeScenarios, readinessSummaryNegativeGuards, compactReadinessNegativeGuards, then boolean *Fails fields"
   );
 }
 
@@ -215,6 +226,16 @@ export function assertReadinessOutputCliIndexes(fixtureSummaryIndexes) {
     fixtureSummaryIndexes.firstBooleanFailureFieldIndex
       > fixtureSummaryIndexes.readinessSummaryNegativeGuardsIndex,
     "verify:readiness-output CLI must place firstBooleanFailureFieldIndex after readinessSummaryNegativeGuardsIndex"
+  );
+  assert.ok(
+    fixtureSummaryIndexes.compactReadinessNegativeGuardsIndex
+      > fixtureSummaryIndexes.readinessSummaryNegativeGuardsIndex,
+    "verify:readiness-output CLI must place compactReadinessNegativeGuardsIndex after readinessSummaryNegativeGuardsIndex"
+  );
+  assert.ok(
+    fixtureSummaryIndexes.firstBooleanFailureFieldIndex
+      > fixtureSummaryIndexes.compactReadinessNegativeGuardsIndex,
+    "verify:readiness-output CLI must place firstBooleanFailureFieldIndex after compactReadinessNegativeGuardsIndex"
   );
 }
 
@@ -480,6 +501,31 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       expectedReadinessSummaryNegativeGuards,
       "readiness output fixture summary must list readinessSummaryNegativeGuards in the expected order"
     );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"compactReadinessNegativeGuards": ['),
+      "readiness output fixture summary must include compactReadinessNegativeGuards list"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"missingCompactTotal"'),
+      "readiness output fixture summary must include missing compact total guard"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"missingCompactLatestRound"'),
+      "readiness output fixture summary must include missing compact latest round guard"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"missingCompactServerRequiredLine"'),
+      "readiness output fixture summary must include missing compact server-required line guard"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"missingCompactPassLine"'),
+      "readiness output fixture summary must include missing compact PASS line guard"
+    );
+    assert.deepEqual(
+      readinessFixtureOutput.compactReadinessNegativeGuards,
+      expectedCompactReadinessNegativeGuards,
+      "readiness output fixture summary must list compactReadinessNegativeGuards in the expected order"
+    );
     const failureFlagsIndex = readinessFixtureResult.summary.indexOf('"failureFlags": [');
     const positiveFixtureGuardsIndex = readinessFixtureResult.summary.indexOf('"positiveFixtureGuards": [');
     const negativeFixtureGuardsIndex = readinessFixtureResult.summary.indexOf('"negativeFixtureGuards": [');
@@ -490,6 +536,7 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     const readinessOutputCliIndexPositiveGuardNegativeScenariosIndex = readinessFixtureResult.summary.indexOf('"readinessOutputCliIndexPositiveGuardNegativeScenarios": [');
     const readinessOutputCliIndexNegativeScenariosIndex = readinessFixtureResult.summary.indexOf('"readinessOutputCliIndexNegativeScenarios": [');
     const readinessSummaryNegativeGuardsIndex = readinessFixtureResult.summary.indexOf('"readinessSummaryNegativeGuards": [');
+    const compactReadinessNegativeGuardsIndex = readinessFixtureResult.summary.indexOf('"compactReadinessNegativeGuards": [');
     const firstBooleanFailureFieldIndex = readinessFixtureResult.summary.indexOf('"missingScannedFileCountFails": true');
     fixtureSummaryIndexes = {
       failureFlagsIndex,
@@ -502,6 +549,7 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       readinessOutputCliIndexPositiveGuardNegativeScenariosIndex,
       readinessOutputCliIndexNegativeScenariosIndex,
       readinessSummaryNegativeGuardsIndex,
+      compactReadinessNegativeGuardsIndex,
       firstBooleanFailureFieldIndex,
     };
     assertFixtureEvidenceOrder(fixtureSummaryIndexes);
