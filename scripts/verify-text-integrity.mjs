@@ -4,6 +4,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 const scanTargets = ["README.md", "backend", "frontend/src", "scripts", "docs/submission-checklist.md", "package.json"];
 const ignoredParts = new Set(["node_modules", "dist", "__pycache__", ".pytest_cache", ".chrome-verify"]);
 const ignoredFiles = new Set(["scripts/verify-text-integrity.mjs"]);
+const requiredScannedFiles = ["scripts/verify-readme-contract.mjs"];
 const suspiciousChars = [
   "\u5bc3",
   "\u8e42",
@@ -51,8 +52,8 @@ function listFiles(target) {
   if (!existsSync(target)) return [];
   if (statSync(target).isFile()) return [target];
   const output = runGit(["ls-files", target]);
-  if (output) return output.split(/\r?\n/).filter(Boolean);
-  return listLocalFiles(target);
+  const gitFiles = output ? output.split(/\r?\n/).filter(Boolean) : [];
+  return [...new Set([...gitFiles, ...listLocalFiles(target)])];
 }
 
 const hits = [];
@@ -79,9 +80,11 @@ for (const target of scanTargets) {
   }
 }
 
-if (hits.length) {
-  console.error(JSON.stringify({ ok: false, checked: scannedFiles.length, hits }, null, 2));
+const missingRequiredScans = requiredScannedFiles.filter((file) => !scannedFiles.includes(file));
+
+if (hits.length || missingRequiredScans.length) {
+  console.error(JSON.stringify({ ok: false, checked: scannedFiles.length, hits, missingRequiredScans }, null, 2));
   process.exit(1);
 }
 
-console.log(JSON.stringify({ ok: true, checked: scannedFiles.length, hits: [] }, null, 2));
+console.log(JSON.stringify({ ok: true, checked: scannedFiles.length, requiredScannedFiles, hits: [] }, null, 2));
