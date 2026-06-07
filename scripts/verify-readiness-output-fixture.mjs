@@ -2,6 +2,17 @@ import assert from "node:assert/strict";
 import { assertReadinessJsonEvidence } from "./verify-readiness-output.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
+const expectedFailureFlags = [
+  "missingScannedFileCountFails",
+  "nonEmptyMissingRequiredFilesFails",
+  "missingRequiredScannedFilesFails",
+  "missingReadmeResultFails",
+  "missingChecklistCommandsFails",
+  "staleChecklistCommandsFails",
+  "missingChecklistItemsFails",
+  "staleChecklistItemsFails",
+];
+
 function buildReadmeResult({
   includeChecklistCommands = true,
   includeChecklistItems = true,
@@ -159,16 +170,16 @@ assert.throws(
   "stale checklistItems fixture must fail"
 );
 
-console.log(JSON.stringify({
+const output = {
   ok: true,
   checked: "verify-readiness-output negative fixture",
   validScannedFileCount: validResult.scannedFileCount,
-  missingScannedFileCountFails: true,
-  nonEmptyMissingRequiredFilesFails: true,
-  missingRequiredScannedFilesFails: true,
-  missingReadmeResultFails: true,
-  missingChecklistCommandsFails: true,
-  staleChecklistCommandsFails: true,
-  missingChecklistItemsFails: true,
-  staleChecklistItemsFails: true,
-}, null, 2));
+  failureFlags: expectedFailureFlags,
+  ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
+};
+
+for (const flag of expectedFailureFlags) {
+  assert.equal(output[flag], true, `fixture output must expose ${flag}`);
+}
+
+console.log(JSON.stringify(output, null, 2));
