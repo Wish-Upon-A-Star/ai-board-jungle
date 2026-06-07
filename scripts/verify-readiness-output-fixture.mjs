@@ -925,6 +925,34 @@ assert.throws(
   /stale CLI index negative scenario/,
   "readiness fixture summary without stale CLI index negative scenario must fail"
 );
+const wrongNameReadinessOutputCliIndexNegativeScenariosOutput = {
+  ...output,
+  readinessOutputCliIndexNegativeScenarios: [
+    "staleEvaluationReportNegativeGuardsIndex",
+    "misplacedEvaluationReportGuardsIndex",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(wrongNameReadinessOutputCliIndexNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /misplaced CLI index negative scenario/,
+  "readiness fixture summary with wrong CLI index negative scenario name must fail"
+);
+const expandedReadinessOutputCliIndexNegativeScenariosOutput = {
+  ...output,
+  readinessOutputCliIndexNegativeScenarios: [
+    ...expectedReadinessOutputCliIndexNegativeScenarios,
+    "unexpectedReadinessOutputCliIndexNegativeScenario",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(expandedReadinessOutputCliIndexNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with expanded CLI index negative scenarios must fail"
+);
 const reorderedReadinessOutputCliIndexNegativeScenariosOutput = {
   ...output,
   readinessOutputCliIndexNegativeScenarios: [...expectedReadinessOutputCliIndexNegativeScenarios].reverse(),
