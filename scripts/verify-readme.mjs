@@ -69,18 +69,8 @@ const missingCommandExplanations = allVerificationCommands
 const suspicious = suspiciousPatterns.filter((pattern) => pattern.test(readme)).map(String);
 const checklistRequired = [
   "npm run demo:screenshot",
-  "npm run verify:hygiene",
-  "npm run verify:text",
-  "npm run verify:frontend-helpers",
-  "npm run verify:evaluation-reports",
-  "npm run verify:readiness",
-  "npm run verify:readiness:compact",
-  "npm run verify:readiness-output",
-  "npm run verify:command-scope",
+  ...allVerificationCommands.map((command) => `npm run ${command}`),
   "Serverless checks can run without starting FastAPI, Vite, or Chrome CDP",
-  "npm run verify:contract",
-  "npm run verify:readme",
-  "npm run verify:full:quick",
 ];
 const checklistMissing = checklistRequired.filter((snippet) => !checklist.includes(snippet));
 const screenshotPath = "docs/demo-screenshot.png";

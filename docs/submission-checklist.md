@@ -20,6 +20,7 @@ Serverless checks can run without starting FastAPI, Vite, or Chrome CDP. Server-
    npm run verify:hygiene
    npm run verify:text
    npm run verify:frontend-helpers
+   npm run verify:template-presets
    npm run verify:evaluation-reports
    npm run verify:readiness
    npm run verify:readiness:compact
@@ -32,6 +33,8 @@ Serverless checks can run without starting FastAPI, Vite, or Chrome CDP. Server-
 
    ```powershell
    npm run verify:full:quick
+   npm run smoke:http
+   npm run smoke:ui
    ```
 
    This includes `npm run verify:frontend-helpers` and `npm run verify:evaluation-reports` before the build, then `npm run verify:contract` after the managed FastAPI and React servers are available.
