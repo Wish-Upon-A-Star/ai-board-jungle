@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import {
   assertCompactReadinessOutput,
   assertFailedCompactReadinessOutput,
@@ -34,6 +35,28 @@ const expectedFailureFlags = [
   "missingChecklistItemsFails",
   "staleChecklistItemsFails",
 ];
+
+const fixtureSource = readFileSync(new URL(import.meta.url), "utf8");
+const summaryCountNegativeScenarioSourceChecks = [
+  {
+    name: "missingFixtureSummaryKeyCount",
+    pattern: /assert\.throws\([\s\S]*buildReadinessOutputCliSummary\(missingFixtureSummaryKeyCountArgs\)[\s\S]*without fixtureSummaryKeyCount must fail/,
+  },
+  {
+    name: "nonIntegerFixtureSummaryKeyCount",
+    pattern: /assert\.throws\([\s\S]*fixtureSummaryKeyCount: String\(expectedFixtureSummaryKeys\.length\)[\s\S]*non-integer fixtureSummaryKeyCount must fail/,
+  },
+  {
+    name: "staleFixtureSummaryKeyCount",
+    pattern: /assert\.throws\([\s\S]*fixtureSummaryKeyCount: expectedFixtureSummaryKeys\.length - 1[\s\S]*stale fixtureSummaryKeyCount must fail/,
+  },
+];
+for (const scenario of summaryCountNegativeScenarioSourceChecks) {
+  assert.ok(
+    scenario.pattern.test(fixtureSource),
+    `readiness output fixture source must retain ${scenario.name} summary count negative scenario`
+  );
+}
 
 const expectedNegativeFixtureGuards = [
   "extraBooleanFailureField",
