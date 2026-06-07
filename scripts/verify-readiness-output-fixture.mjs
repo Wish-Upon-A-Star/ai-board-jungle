@@ -102,6 +102,12 @@ const expectedFailedCompactReadinessCliGuards = [
   "syntheticFailedCompactCliDuration",
 ];
 
+const expectedDirectCompactFormatterGuards = [
+  "directCompactFormatterSuccess",
+  "directCompactFormatterFailure",
+  "directCompactFormatterTrailingNewline",
+];
+
 const expectedReadinessNote = "This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick for end-to-end smoke.";
 
 const evaluationReportRounds = readEvaluationReportRounds();
@@ -381,7 +387,8 @@ const validFixtureSummaryIndexes = {
   compactReadinessNegativeGuardsIndex: 100,
   failedCompactReadinessNegativeGuardsIndex: 110,
   failedCompactReadinessCliGuardsIndex: 120,
-  firstBooleanFailureFieldIndex: 130,
+  directCompactFormatterGuardsIndex: 130,
+  firstBooleanFailureFieldIndex: 140,
 };
 assertFixtureSummaryIndexes(validFixtureSummaryIndexes);
 assertFixtureEvidenceOrder(validFixtureSummaryIndexes);
@@ -493,6 +500,14 @@ assert.throws(
   /after failedCompactReadinessNegativeGuardsIndex/,
   "stale failed compact readiness CLI guard index equal to failedCompactReadinessNegativeGuardsIndex must fail"
 );
+assert.throws(
+  () => assertReadinessOutputCliIndexes({
+    ...validFixtureSummaryIndexes,
+    directCompactFormatterGuardsIndex: validFixtureSummaryIndexes.failedCompactReadinessCliGuardsIndex,
+  }),
+  /after failedCompactReadinessCliGuardsIndex/,
+  "stale direct compact formatter guard index equal to failedCompactReadinessCliGuardsIndex must fail"
+);
 
 assert.throws(
   () => assertReadinessJsonEvidence(missingScannedFileCount),
@@ -583,6 +598,7 @@ const output = {
   compactReadinessNegativeGuards: expectedCompactReadinessNegativeGuards,
   failedCompactReadinessNegativeGuards: expectedFailedCompactReadinessNegativeGuards,
   failedCompactReadinessCliGuards: expectedFailedCompactReadinessCliGuards,
+  directCompactFormatterGuards: expectedDirectCompactFormatterGuards,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 
@@ -687,6 +703,11 @@ assert.deepEqual(
   output.failedCompactReadinessCliGuards,
   expectedFailedCompactReadinessCliGuards,
   "fixture output must expose failed compact readiness CLI formatter guard coverage"
+);
+assert.deepEqual(
+  output.directCompactFormatterGuards,
+  expectedDirectCompactFormatterGuards,
+  "fixture output must expose direct compact formatter unit guard coverage"
 );
 
 function buildCompactReadinessOutput({ omitTotal = false, omitLatestRound = false, omitServerRequired = false, omitPassLine = false, omitNote = false } = {}) {
@@ -936,6 +957,7 @@ assertFixtureEvidenceOrder({
   compactReadinessNegativeGuardsIndex: outputKeys.indexOf("compactReadinessNegativeGuards"),
   failedCompactReadinessNegativeGuardsIndex: outputKeys.indexOf("failedCompactReadinessNegativeGuards"),
   failedCompactReadinessCliGuardsIndex: outputKeys.indexOf("failedCompactReadinessCliGuards"),
+  directCompactFormatterGuardsIndex: outputKeys.indexOf("directCompactFormatterGuards"),
   firstBooleanFailureFieldIndex: outputKeys.findIndex((key) => key.endsWith("Fails")),
 });
 
@@ -964,6 +986,7 @@ const misplacedValidScannedFileCountOutput = {
   compactReadinessNegativeGuards: output.compactReadinessNegativeGuards,
   failedCompactReadinessNegativeGuards: output.failedCompactReadinessNegativeGuards,
   failedCompactReadinessCliGuards: output.failedCompactReadinessCliGuards,
+  directCompactFormatterGuards: output.directCompactFormatterGuards,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 assert.throws(
@@ -1764,6 +1787,80 @@ assert.throws(
   /expected order/,
   "readiness fixture summary with reordered failed compact CLI guards must fail"
 );
+const missingDirectCompactFormatterGuardsOutput = { ...output };
+delete missingDirectCompactFormatterGuardsOutput.directCompactFormatterGuards;
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(missingDirectCompactFormatterGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /directCompactFormatterGuards/,
+  "readiness fixture summary without directCompactFormatterGuards must fail"
+);
+const staleDirectCompactFormatterGuardsOutput = {
+  ...output,
+  directCompactFormatterGuards: [],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(staleDirectCompactFormatterGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /direct compact formatter success guard/,
+  "readiness fixture summary without direct compact formatter guard names must fail"
+);
+const partialDirectCompactFormatterGuardsOutput = {
+  ...output,
+  directCompactFormatterGuards: [
+    "directCompactFormatterSuccess",
+    "directCompactFormatterFailure",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(partialDirectCompactFormatterGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /direct compact formatter trailing newline guard/,
+  "readiness fixture summary without direct compact formatter trailing newline guard must fail"
+);
+const wrongNameDirectCompactFormatterGuardsOutput = {
+  ...output,
+  directCompactFormatterGuards: [
+    "directCompactFormatterSuccess",
+    "directCompactFormatterFailures",
+    "directCompactFormatterTrailingNewline",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(wrongNameDirectCompactFormatterGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /direct compact formatter failure guard/,
+  "readiness fixture summary with wrong direct compact formatter guard name must fail"
+);
+const expandedDirectCompactFormatterGuardsOutput = {
+  ...output,
+  directCompactFormatterGuards: [
+    ...expectedDirectCompactFormatterGuards,
+    "unexpectedDirectCompactFormatterGuard",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(expandedDirectCompactFormatterGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with expanded direct compact formatter guards must fail"
+);
+const reorderedDirectCompactFormatterGuardsOutput = {
+  ...output,
+  directCompactFormatterGuards: [...expectedDirectCompactFormatterGuards].reverse(),
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(reorderedDirectCompactFormatterGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with reordered direct compact formatter guards must fail"
+);
 const missingDirectHelperNegativeGuardsOutput = { ...output };
 delete missingDirectHelperNegativeGuardsOutput.directHelperNegativeGuards;
 assert.throws(
@@ -1904,6 +2001,7 @@ const misplacedPositiveFixtureGuardsOutput = {
   compactReadinessNegativeGuards: output.compactReadinessNegativeGuards,
   failedCompactReadinessNegativeGuards: output.failedCompactReadinessNegativeGuards,
   failedCompactReadinessCliGuards: output.failedCompactReadinessCliGuards,
+  directCompactFormatterGuards: output.directCompactFormatterGuards,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 assert.throws(
@@ -1931,6 +2029,7 @@ const earlyBooleanFailureFieldsOutput = {
   compactReadinessNegativeGuards: output.compactReadinessNegativeGuards,
   failedCompactReadinessNegativeGuards: output.failedCompactReadinessNegativeGuards,
   failedCompactReadinessCliGuards: output.failedCompactReadinessCliGuards,
+  directCompactFormatterGuards: output.directCompactFormatterGuards,
 };
 assert.throws(
   () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(earlyBooleanFailureFieldsOutput), {
@@ -1956,6 +2055,7 @@ const misplacedFailureFlagsOutput = {
   compactReadinessNegativeGuards: output.compactReadinessNegativeGuards,
   failedCompactReadinessNegativeGuards: output.failedCompactReadinessNegativeGuards,
   failedCompactReadinessCliGuards: output.failedCompactReadinessCliGuards,
+  directCompactFormatterGuards: output.directCompactFormatterGuards,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 assert.throws(
