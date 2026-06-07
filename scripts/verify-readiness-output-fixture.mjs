@@ -57,6 +57,12 @@ const expectedReadinessOutputCliIndexPositiveGuards = [
   "validReadinessOutputCliIndexOrder",
 ];
 
+const expectedReadinessOutputCliIndexPositiveGuardNegativeScenarios = [
+  "staleReadinessOutputCliIndexPositiveGuardsIndex",
+  "staleReadinessOutputCliIndexNegativeScenariosIndex",
+  "misplacedReadinessOutputCliIndexNegativeScenariosIndex",
+];
+
 const expectedReadinessOutputCliIndexNegativeScenarios = [
   "staleEvaluationReportNegativeGuardsIndex",
   "misplacedEvaluationReportNegativeGuardsIndex",
@@ -296,8 +302,9 @@ const validFixtureSummaryIndexes = {
   directHelperNegativeScenariosIndex: 40,
   evaluationReportNegativeGuardsIndex: 50,
   readinessOutputCliIndexPositiveGuardsIndex: 60,
-  readinessOutputCliIndexNegativeScenariosIndex: 70,
-  firstBooleanFailureFieldIndex: 80,
+  readinessOutputCliIndexPositiveGuardNegativeScenariosIndex: 70,
+  readinessOutputCliIndexNegativeScenariosIndex: 80,
+  firstBooleanFailureFieldIndex: 90,
 };
 assertFixtureSummaryIndexes(validFixtureSummaryIndexes);
 assertFixtureEvidenceOrder(validFixtureSummaryIndexes);
@@ -358,8 +365,16 @@ assert.throws(
     ...validFixtureSummaryIndexes,
     readinessOutputCliIndexNegativeScenariosIndex: validFixtureSummaryIndexes.readinessOutputCliIndexPositiveGuardsIndex,
   }),
-  /after readinessOutputCliIndexPositiveGuardsIndex/,
+  /after readinessOutputCliIndexPositiveGuardNegativeScenariosIndex/,
   "stale CLI fixture negative scenarios index equal to positive guard index must fail"
+);
+assert.throws(
+  () => assertReadinessOutputCliIndexes({
+    ...validFixtureSummaryIndexes,
+    readinessOutputCliIndexPositiveGuardNegativeScenariosIndex: validFixtureSummaryIndexes.readinessOutputCliIndexPositiveGuardsIndex,
+  }),
+  /after readinessOutputCliIndexPositiveGuardsIndex/,
+  "stale CLI fixture positive guard scenario index equal to positive guard index must fail"
 );
 assert.throws(
   () => assertReadinessOutputCliIndexes({
@@ -441,6 +456,7 @@ const output = {
   directHelperNegativeScenarios: expectedDirectHelperNegativeScenarios,
   evaluationReportNegativeGuards: expectedEvaluationReportNegativeGuards,
   readinessOutputCliIndexPositiveGuards: expectedReadinessOutputCliIndexPositiveGuards,
+  readinessOutputCliIndexPositiveGuardNegativeScenarios: expectedReadinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: expectedReadinessOutputCliIndexNegativeScenarios,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
@@ -515,6 +531,11 @@ assert.deepEqual(
   "fixture output must expose readiness CLI index positive guard coverage"
 );
 assert.deepEqual(
+  output.readinessOutputCliIndexPositiveGuardNegativeScenarios,
+  expectedReadinessOutputCliIndexPositiveGuardNegativeScenarios,
+  "fixture output must expose readiness CLI index positive helper negative scenario coverage"
+);
+assert.deepEqual(
   output.readinessOutputCliIndexNegativeScenarios,
   expectedReadinessOutputCliIndexNegativeScenarios,
   "fixture output must expose readiness CLI index negative scenario coverage"
@@ -554,6 +575,7 @@ assertFixtureEvidenceOrder({
   directHelperNegativeScenariosIndex: outputKeys.indexOf("directHelperNegativeScenarios"),
   evaluationReportNegativeGuardsIndex: outputKeys.indexOf("evaluationReportNegativeGuards"),
   readinessOutputCliIndexPositiveGuardsIndex: outputKeys.indexOf("readinessOutputCliIndexPositiveGuards"),
+  readinessOutputCliIndexPositiveGuardNegativeScenariosIndex: outputKeys.indexOf("readinessOutputCliIndexPositiveGuardNegativeScenarios"),
   readinessOutputCliIndexNegativeScenariosIndex: outputKeys.indexOf("readinessOutputCliIndexNegativeScenarios"),
   firstBooleanFailureFieldIndex: outputKeys.findIndex((key) => key.endsWith("Fails")),
 });
@@ -577,6 +599,7 @@ const misplacedValidScannedFileCountOutput = {
   directHelperNegativeScenarios: output.directHelperNegativeScenarios,
   evaluationReportNegativeGuards: output.evaluationReportNegativeGuards,
   readinessOutputCliIndexPositiveGuards: output.readinessOutputCliIndexPositiveGuards,
+  readinessOutputCliIndexPositiveGuardNegativeScenarios: output.readinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
@@ -784,6 +807,53 @@ assert.throws(
   /expected order/,
   "readiness fixture summary with reordered CLI index positive guards must fail"
 );
+const missingReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput = { ...output };
+delete missingReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput.readinessOutputCliIndexPositiveGuardNegativeScenarios;
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(missingReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /readinessOutputCliIndexPositiveGuardNegativeScenarios/,
+  "readiness fixture summary without readinessOutputCliIndexPositiveGuardNegativeScenarios must fail"
+);
+const staleReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput = {
+  ...output,
+  readinessOutputCliIndexPositiveGuardNegativeScenarios: [],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(staleReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /stale CLI positive guard index negative scenario/,
+  "readiness fixture summary without CLI index positive guard negative scenario names must fail"
+);
+const partialReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput = {
+  ...output,
+  readinessOutputCliIndexPositiveGuardNegativeScenarios: [
+    "staleReadinessOutputCliIndexPositiveGuardsIndex",
+    "staleReadinessOutputCliIndexNegativeScenariosIndex",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(partialReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /misplaced CLI negative scenarios index negative scenario/,
+  "readiness fixture summary without misplaced positive guard helper scenario must fail"
+);
+const reorderedReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput = {
+  ...output,
+  readinessOutputCliIndexPositiveGuardNegativeScenarios: [
+    ...expectedReadinessOutputCliIndexPositiveGuardNegativeScenarios,
+  ].reverse(),
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(reorderedReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with reordered positive guard helper scenarios must fail"
+);
 const missingReadinessOutputCliIndexNegativeScenariosOutput = { ...output };
 delete missingReadinessOutputCliIndexNegativeScenariosOutput.readinessOutputCliIndexNegativeScenarios;
 assert.throws(
@@ -932,6 +1002,7 @@ const misplacedPositiveFixtureGuardsOutput = {
   positiveFixtureGuards: output.positiveFixtureGuards,
   evaluationReportNegativeGuards: output.evaluationReportNegativeGuards,
   readinessOutputCliIndexPositiveGuards: output.readinessOutputCliIndexPositiveGuards,
+  readinessOutputCliIndexPositiveGuardNegativeScenarios: output.readinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
@@ -954,6 +1025,7 @@ const earlyBooleanFailureFieldsOutput = {
   directHelperNegativeScenarios: output.directHelperNegativeScenarios,
   evaluationReportNegativeGuards: output.evaluationReportNegativeGuards,
   readinessOutputCliIndexPositiveGuards: output.readinessOutputCliIndexPositiveGuards,
+  readinessOutputCliIndexPositiveGuardNegativeScenarios: output.readinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
 };
 assert.throws(
@@ -974,6 +1046,7 @@ const misplacedFailureFlagsOutput = {
   directHelperNegativeScenarios: output.directHelperNegativeScenarios,
   evaluationReportNegativeGuards: output.evaluationReportNegativeGuards,
   readinessOutputCliIndexPositiveGuards: output.readinessOutputCliIndexPositiveGuards,
+  readinessOutputCliIndexPositiveGuardNegativeScenarios: output.readinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
