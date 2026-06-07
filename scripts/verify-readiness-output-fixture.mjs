@@ -346,6 +346,17 @@ assert.throws(
   /string evidence index direct helper guard/,
   "readiness fixture summary without string evidence direct helper guard must fail"
 );
+const reversedPartialDirectHelperNegativeGuardsOutput = {
+  ...output,
+  directHelperNegativeGuards: ["stringEvidenceIndex"],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(reversedPartialDirectHelperNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /missing evidence index direct helper guard/,
+  "readiness fixture summary without missing evidence direct helper guard must fail"
+);
 const missingPositiveFixtureGuardsOutput = { ...output };
 delete missingPositiveFixtureGuardsOutput.positiveFixtureGuards;
 assert.throws(
