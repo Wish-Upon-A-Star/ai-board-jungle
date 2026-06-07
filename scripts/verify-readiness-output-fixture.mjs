@@ -1071,7 +1071,7 @@ assert.equal(
   expectedFixtureSummaryKeys.length,
   "required fixture summary must report the exported schema key count"
 );
-const validReadinessOutputCliSummary = buildReadinessOutputCliSummary({
+const validReadinessOutputCliSummaryArgs = {
   scannedFileCount: validSummaryResult.scannedFileCount,
   importFixtureEvidence: {
     durationMs: 101,
@@ -1105,29 +1105,30 @@ const validReadinessOutputCliSummary = buildReadinessOutputCliSummary({
     directCompactFormatterGuardsIndex: 15,
     firstBooleanFailureFieldIndex: 16,
   },
-});
+};
+const validReadinessOutputCliSummary = buildReadinessOutputCliSummary(validReadinessOutputCliSummaryArgs);
 assert.equal(
   validReadinessOutputCliSummary.fixtureSummaryKeyCount,
   expectedFixtureSummaryKeys.length,
   "readiness output CLI summary must surface the exported fixture schema key count"
 );
+const { fixtureSummaryKeyCount: omittedFixtureSummaryKeyCount, ...missingFixtureSummaryKeyCountArgs } = validReadinessOutputCliSummaryArgs;
+assert.throws(
+  () => buildReadinessOutputCliSummary(missingFixtureSummaryKeyCountArgs),
+  /fixtureSummaryKeyCount/,
+  "readiness output CLI summary without fixtureSummaryKeyCount must fail"
+);
 assert.throws(
   () => buildReadinessOutputCliSummary({
-    ...validReadinessOutputCliSummary,
-    scannedFileCount: validSummaryResult.scannedFileCount,
-    importFixtureEvidence: {
-      durationMs: 101,
-      stdoutBytes: 0,
-      stderrBytes: 0,
-      exportsChecked: [
-        "readinessNote",
-        "checks",
-        "getReadinessChecks",
-        "buildReadinessSummary",
-        "formatCompactReadinessSummary",
-        "runReadinessSummaryCli",
-      ],
-    },
+    ...validReadinessOutputCliSummaryArgs,
+    fixtureSummaryKeyCount: String(expectedFixtureSummaryKeys.length),
+  }),
+  /fixtureSummaryKeyCount/,
+  "readiness output CLI summary with non-integer fixtureSummaryKeyCount must fail"
+);
+assert.throws(
+  () => buildReadinessOutputCliSummary({
+    ...validReadinessOutputCliSummaryArgs,
     fixtureSummaryKeyCount: expectedFixtureSummaryKeys.length - 1,
   }),
   /schema key count/,
