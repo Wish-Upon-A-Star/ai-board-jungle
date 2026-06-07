@@ -145,14 +145,25 @@ assert.equal(
   null,
   "default fixture must not compute fixtureSummaryIndexes without requireFixtureSummary"
 );
+const validFixtureSummaryIndexes = {
+  failureFlagsIndex: 0,
+  negativeFixtureGuardsIndex: 10,
+  firstBooleanFailureFieldIndex: 20,
+};
 assert.throws(
-  () => assertFixtureSummaryIndexes({
-    failureFlagsIndex: -1,
-    negativeFixtureGuardsIndex: 10,
-    firstBooleanFailureFieldIndex: 20,
-  }),
+  () => assertFixtureSummaryIndexes({ ...validFixtureSummaryIndexes, failureFlagsIndex: -1 }),
   /non-negative integers/,
   "mutated fixtureSummaryIndexes with -1 must fail the index-shape guard"
+);
+assert.throws(
+  () => assertFixtureSummaryIndexes({ ...validFixtureSummaryIndexes, failureFlagsIndex: 1.5 }),
+  /non-negative integers/,
+  "mutated fixtureSummaryIndexes with a decimal must fail the index-shape guard"
+);
+assert.throws(
+  () => assertFixtureSummaryIndexes({ ...validFixtureSummaryIndexes, failureFlagsIndex: "0" }),
+  /non-negative integers/,
+  "mutated fixtureSummaryIndexes with a string must fail the index-shape guard"
 );
 
 assert.throws(
