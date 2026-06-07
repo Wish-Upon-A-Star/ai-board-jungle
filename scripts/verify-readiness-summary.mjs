@@ -2,6 +2,8 @@ import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 
+const compact = process.argv.includes("--compact");
+
 function commandFor(cmd, args) {
   if (cmd === "node") return { executable: process.execPath, args };
   if (cmd === "npm") {
@@ -65,7 +67,17 @@ const summary = {
   results,
 };
 
-console.log(JSON.stringify(summary, null, 2));
+if (compact) {
+  console.log(`READINESS ${summary.ok ? "OK" : "FAILED"} ${summary.passed}/${summary.checked} passed; server-required: ${serverRequired.join(", ")}`);
+  for (const result of results) {
+    console.log(`${result.ok ? "PASS" : "FAIL"} ${result.name} ${result.durationMs}ms`);
+    if (!result.ok && result.summary) {
+      console.log(result.summary);
+    }
+  }
+} else {
+  console.log(JSON.stringify(summary, null, 2));
+}
 
 if (failed.length) {
   process.exit(1);
