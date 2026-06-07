@@ -58,6 +58,19 @@ for (const scenario of summaryCountNegativeScenarioSourceChecks) {
   );
 }
 
+const negativeFixtureGuardNegativeScenarioSourceChecks = [
+  {
+    name: "wrongNameNegativeFixtureGuard",
+    pattern: /const wrongNameNegativeFixtureGuardsOutput = \{[\s\S]*"missingBooleanFailureFields"[\s\S]*readiness fixture summary with wrong negative fixture guard name must fail/,
+  },
+];
+for (const scenario of negativeFixtureGuardNegativeScenarioSourceChecks) {
+  assert.ok(
+    scenario.pattern.test(fixtureSource),
+    `readiness output fixture source must retain ${scenario.name} negative fixture guard scenario`
+  );
+}
+
 const expectedNegativeFixtureGuards = [
   "extraBooleanFailureField",
   "missingBooleanFailureField",
