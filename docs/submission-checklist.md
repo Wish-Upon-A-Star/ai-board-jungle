@@ -21,6 +21,7 @@ Run these checks before final submission or when the UI changes:
    npm run verify:evaluation-reports
    npm run verify:readiness
    npm run verify:readiness:compact
+   npm run verify:readiness-output
    npm run verify:readme
    ```
 
