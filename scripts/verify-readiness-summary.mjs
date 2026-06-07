@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { serverRequiredCommands } from "./verification-command-lists.mjs";
 
 const compact = process.argv.includes("--compact");
+const forceFailCompactFixture = process.env.AI_BOARD_READINESS_FORCE_FAIL === "1";
 
 function commandFor(cmd, args) {
   if (cmd === "node") return { executable: process.execPath, args };
@@ -47,10 +48,23 @@ const checks = [
   ["evaluation reports", "node", ["scripts/verify-evaluation-reports.mjs"]],
   ["readme", "node", ["scripts/verify-readme.mjs"]],
   ["readme output", "node", ["scripts/verify-readme-output.mjs"], { summaryLines: 14 }],
-  ["readiness output fixture", "node", ["scripts/verify-readiness-output-fixture.mjs"], { summaryLines: 110 }],
+  ["readiness output fixture", "node", ["scripts/verify-readiness-output-fixture.mjs"], { summaryLines: 130 }],
   ["command scope", "node", ["scripts/verify-command-scope.mjs"]],
   ["backend syntax", "python", ["-m", "py_compile", "backend/app/main.py", "backend/app/services.py"]],
 ];
+
+if (forceFailCompactFixture) {
+  const fixtureCheckIndex = checks.findIndex(([name]) => name === "readiness output fixture");
+  if (fixtureCheckIndex >= 0) {
+    checks.splice(fixtureCheckIndex, 1);
+  }
+  checks.push([
+    "synthetic compact failure",
+    "node",
+    ["-e", "console.log('synthetic injected compact failure summary'); process.exit(1);"],
+    { summaryLines: 4 },
+  ]);
+}
 
 const results = checks.map(([name, cmd, args, opts]) => runCheck(name, cmd, args, opts));
 const failed = results.filter((item) => !item.ok);
