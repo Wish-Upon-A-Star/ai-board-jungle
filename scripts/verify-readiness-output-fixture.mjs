@@ -737,6 +737,34 @@ assert.throws(
   /truncated evaluation report guard/,
   "readiness fixture summary without truncated evaluation report guard must fail"
 );
+const wrongNameEvaluationReportNegativeGuardsOutput = {
+  ...output,
+  evaluationReportNegativeGuards: [
+    "truncatedEvaluationReportRounds",
+    "duplicatedEvaluationReportRounds",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(wrongNameEvaluationReportNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /duplicate evaluation report guard/,
+  "readiness fixture summary with wrong evaluation report negative guard name must fail"
+);
+const expandedEvaluationReportNegativeGuardsOutput = {
+  ...output,
+  evaluationReportNegativeGuards: [
+    ...expectedEvaluationReportNegativeGuards,
+    "unexpectedEvaluationReportNegativeGuard",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(expandedEvaluationReportNegativeGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with expanded evaluation report negative guards must fail"
+);
 const reorderedEvaluationReportNegativeGuardsOutput = {
   ...output,
   evaluationReportNegativeGuards: [...expectedEvaluationReportNegativeGuards].reverse(),
