@@ -51,6 +51,18 @@ const expectedPositiveFixtureGuards = [
   "validFixtureSummaryIndexes",
 ];
 
+const expectedFixtureSummaryKeys = [
+  "ok",
+  "checked",
+  "validScannedFileCount",
+  "failureFlags",
+  "positiveFixtureGuards",
+  "negativeFixtureGuards",
+  "directHelperNegativeGuards",
+  "directHelperNegativeScenarios",
+  ...expectedFailureFlags,
+];
+
 export function assertCompactReadinessOutput(output) {
   assert.ok(output.includes("READINESS OK 11/11 passed"), "compact output must include the readiness total");
   assert.ok(output.includes(expectedServerRequiredLine), "compact output must list server-required checks");
@@ -238,6 +250,11 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       firstBooleanFailureFieldIndex,
     };
     assertFixtureEvidenceOrder(fixtureSummaryIndexes);
+    assert.deepEqual(
+      Object.keys(readinessFixtureOutput),
+      expectedFixtureSummaryKeys,
+      "readiness output fixture summary must list top-level keys in the expected schema order"
+    );
   }
 
   const scannedFileCountMatch = textOutputResult.summary.match(/"scannedFileCount":\s*(\d+)/);

@@ -330,6 +330,24 @@ assertFixtureEvidenceOrder({
 assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(output), {
   requireFixtureSummary: true,
 });
+const misplacedValidScannedFileCountOutput = {
+  ok: output.ok,
+  checked: output.checked,
+  failureFlags: output.failureFlags,
+  validScannedFileCount: output.validScannedFileCount,
+  positiveFixtureGuards: output.positiveFixtureGuards,
+  negativeFixtureGuards: output.negativeFixtureGuards,
+  directHelperNegativeGuards: output.directHelperNegativeGuards,
+  directHelperNegativeScenarios: output.directHelperNegativeScenarios,
+  ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(misplacedValidScannedFileCountOutput), {
+    requireFixtureSummary: true,
+  }),
+  /top-level keys/,
+  "readiness fixture summary with validScannedFileCount after failureFlags must fail"
+);
 const reorderedFailureFlagsOutput = {
   ...output,
   failureFlags: [...expectedFailureFlags].reverse(),
