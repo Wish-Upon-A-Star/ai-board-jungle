@@ -33,7 +33,7 @@ function runCheck(name, cmd, args, opts = {}) {
     summary: output
       .split(/\r?\n/)
       .filter((line) => line.trim())
-      .slice(-8)
+      .slice(-(opts.summaryLines ?? 8))
       .join("\n"),
   };
 }
@@ -47,12 +47,12 @@ const checks = [
   ["evaluation reports", "node", ["scripts/verify-evaluation-reports.mjs"]],
   ["readme", "node", ["scripts/verify-readme.mjs"]],
   ["readme output", "node", ["scripts/verify-readme-output.mjs"]],
-  ["readiness output fixture", "node", ["scripts/verify-readiness-output-fixture.mjs"]],
+  ["readiness output fixture", "node", ["scripts/verify-readiness-output-fixture.mjs"], { summaryLines: 20 }],
   ["command scope", "node", ["scripts/verify-command-scope.mjs"]],
   ["backend syntax", "python", ["-m", "py_compile", "backend/app/main.py", "backend/app/services.py"]],
 ];
 
-const results = checks.map(([name, cmd, args]) => runCheck(name, cmd, args));
+const results = checks.map(([name, cmd, args, opts]) => runCheck(name, cmd, args, opts));
 const failed = results.filter((item) => !item.ok);
 const serverRequired = serverRequiredCommands;
 

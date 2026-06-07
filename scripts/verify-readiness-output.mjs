@@ -28,11 +28,15 @@ export function assertCompactReadinessOutput(output) {
   }
 }
 
-export function assertReadinessJsonEvidence(readinessSummary) {
+export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSummary = false } = {}) {
   const readmeResult = readinessSummary.results.find((item) => item.name === "readme");
   assert.ok(readmeResult, "json readiness must include readme result");
   const textOutputResult = readinessSummary.results.find((item) => item.name === "text output");
   assert.ok(textOutputResult, "json readiness must include text output result");
+  const readinessFixtureResult = readinessSummary.results.find((item) => item.name === "readiness output fixture");
+  if (requireFixtureSummary) {
+    assert.ok(readinessFixtureResult, "json readiness must include readiness output fixture result");
+  }
   assert.ok(
     readmeResult.summary.includes(`"checklistCommands": ${expectedChecklistCommands}`),
     "readme summary must include checklistCommands count"
@@ -57,6 +61,20 @@ export function assertReadinessJsonEvidence(readinessSummary) {
     textOutputResult.summary.includes('"missingRequiredFiles": []'),
     "text output summary must include missingRequiredFiles empty evidence"
   );
+  if (requireFixtureSummary) {
+    assert.ok(
+      readinessFixtureResult.summary.includes('"failureFlags": ['),
+      "readiness output fixture summary must include failureFlags list"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"missingScannedFileCountFails"'),
+      "readiness output fixture summary must include first failure flag"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"staleChecklistItemsFails"'),
+      "readiness output fixture summary must include last failure flag"
+    );
+  }
 
   const scannedFileCountMatch = textOutputResult.summary.match(/"scannedFileCount":\s*(\d+)/);
   assert.ok(scannedFileCountMatch, "text output scannedFileCount must be parseable");
@@ -86,7 +104,7 @@ function runReadinessOutputCheck() {
   assert.equal(jsonResult.status, 0, `json readiness exited with ${jsonResult.status}\n${jsonOutput}`);
 
   const readinessSummary = JSON.parse(jsonOutput);
-  const { scannedFileCount } = assertReadinessJsonEvidence(readinessSummary);
+  const { scannedFileCount } = assertReadinessJsonEvidence(readinessSummary, { requireFixtureSummary: true });
 
   console.log(JSON.stringify({
     ok: true,
