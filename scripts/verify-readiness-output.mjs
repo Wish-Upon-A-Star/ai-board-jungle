@@ -87,6 +87,14 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       "readiness output fixture summary must include negativeFixtureGuards list"
     );
     assert.ok(
+      readinessFixtureResult.summary.includes('"positiveFixtureGuards": ['),
+      "readiness output fixture summary must include positiveFixtureGuards list"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"validFixtureSummaryIndexes"'),
+      "readiness output fixture summary must include valid index-shape positive guard"
+    );
+    assert.ok(
       readinessFixtureResult.summary.includes('"extraBooleanFailureField"'),
       "readiness output fixture summary must include extra-field negative guard"
     );
@@ -95,16 +103,19 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       "readiness output fixture summary must include missing-field negative guard"
     );
     const failureFlagsIndex = readinessFixtureResult.summary.indexOf('"failureFlags": [');
+    const positiveFixtureGuardsIndex = readinessFixtureResult.summary.indexOf('"positiveFixtureGuards": [');
     const negativeFixtureGuardsIndex = readinessFixtureResult.summary.indexOf('"negativeFixtureGuards": [');
     const firstBooleanFailureFieldIndex = readinessFixtureResult.summary.indexOf('"missingScannedFileCountFails": true');
     assert.ok(
       failureFlagsIndex >= 0
-        && negativeFixtureGuardsIndex > failureFlagsIndex
+        && positiveFixtureGuardsIndex > failureFlagsIndex
+        && negativeFixtureGuardsIndex > positiveFixtureGuardsIndex
         && firstBooleanFailureFieldIndex > negativeFixtureGuardsIndex,
-      "readiness output fixture summary must list failureFlags, negativeFixtureGuards, then boolean *Fails fields"
+      "readiness output fixture summary must list failureFlags, positiveFixtureGuards, negativeFixtureGuards, then boolean *Fails fields"
     );
     fixtureSummaryIndexes = {
       failureFlagsIndex,
+      positiveFixtureGuardsIndex,
       negativeFixtureGuardsIndex,
       firstBooleanFailureFieldIndex,
     };

@@ -18,6 +18,10 @@ const expectedNegativeFixtureGuards = [
   "missingBooleanFailureField",
 ];
 
+const expectedPositiveFixtureGuards = [
+  "validFixtureSummaryIndexes",
+];
+
 function buildReadmeResult({
   includeChecklistCommands = true,
   includeChecklistItems = true,
@@ -220,6 +224,7 @@ const output = {
   checked: "verify-readiness-output negative fixture",
   validScannedFileCount: validResult.scannedFileCount,
   failureFlags: expectedFailureFlags,
+  positiveFixtureGuards: expectedPositiveFixtureGuards,
   negativeFixtureGuards: expectedNegativeFixtureGuards,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
@@ -242,16 +247,24 @@ assert.throws(
   "missing boolean *Fails fixture must fail the failureFlags guard"
 );
 assert.deepEqual(
+  output.positiveFixtureGuards,
+  expectedPositiveFixtureGuards,
+  "fixture output must expose covered positive guard directions"
+);
+assert.deepEqual(
   output.negativeFixtureGuards,
   expectedNegativeFixtureGuards,
   "fixture output must expose covered failureFlags guard directions"
 );
 const outputKeys = Object.keys(output);
+const positiveFixtureGuardsIndex = outputKeys.indexOf("positiveFixtureGuards");
 const negativeFixtureGuardsIndex = outputKeys.indexOf("negativeFixtureGuards");
 const firstBooleanFailureFieldIndex = outputKeys.findIndex((key) => key.endsWith("Fails"));
 assert.ok(
-  negativeFixtureGuardsIndex >= 0 && negativeFixtureGuardsIndex < firstBooleanFailureFieldIndex,
-  "fixture output must list negativeFixtureGuards before boolean *Fails fields"
+  positiveFixtureGuardsIndex >= 0
+    && negativeFixtureGuardsIndex > positiveFixtureGuardsIndex
+    && negativeFixtureGuardsIndex < firstBooleanFailureFieldIndex,
+  "fixture output must list positiveFixtureGuards, negativeFixtureGuards, then boolean *Fails fields"
 );
 
 console.log(JSON.stringify(output, null, 2));
