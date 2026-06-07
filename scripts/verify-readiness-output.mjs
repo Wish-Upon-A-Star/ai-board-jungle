@@ -114,6 +114,16 @@ export function assertFixtureSummaryKeySchema(fixtureOutput) {
   );
 }
 
+export function assertFixtureSummaryKeyCount(fixtureOutput, expectedKeyCount = expectedFixtureSummaryKeys.length) {
+  const fixtureSummaryKeyCount = Object.keys(fixtureOutput).length;
+  assert.equal(
+    fixtureSummaryKeyCount,
+    expectedKeyCount,
+    "readiness output fixture summary key count must match exported schema length"
+  );
+  return fixtureSummaryKeyCount;
+}
+
 export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSummary = false } = {}) {
   let fixtureSummaryIndexes = null;
   let fixtureSummaryKeyCount = null;
@@ -260,12 +270,7 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     };
     assertFixtureEvidenceOrder(fixtureSummaryIndexes);
     assertFixtureSummaryKeySchema(readinessFixtureOutput);
-    fixtureSummaryKeyCount = Object.keys(readinessFixtureOutput).length;
-    assert.equal(
-      fixtureSummaryKeyCount,
-      expectedFixtureSummaryKeys.length,
-      "readiness output fixture summary key count must match exported schema length"
-    );
+    fixtureSummaryKeyCount = assertFixtureSummaryKeyCount(readinessFixtureOutput);
   }
 
   const scannedFileCountMatch = textOutputResult.summary.match(/"scannedFileCount":\s*(\d+)/);

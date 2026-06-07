@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   assertFixtureEvidenceOrder,
   assertFixtureSummaryIndexes,
+  assertFixtureSummaryKeyCount,
   assertFixtureSummaryKeySchema,
   assertReadinessJsonEvidence,
   expectedFixtureSummaryKeys,
@@ -347,6 +348,16 @@ assert.throws(
   "exported fixture summary key schema must be read-only"
 );
 assertFixtureSummaryKeySchema(output);
+assert.equal(
+  assertFixtureSummaryKeyCount(output),
+  expectedFixtureSummaryKeys.length,
+  "direct fixture summary key count helper must report the exported schema length"
+);
+assert.throws(
+  () => assertFixtureSummaryKeyCount(output, expectedFixtureSummaryKeys.length - 1),
+  /key count/,
+  "direct fixture summary key count helper must reject a shortened expected schema count"
+);
 assert.throws(
   () => assertFixtureSummaryKeySchema(extraTopLevelFailureOutput()),
   /top-level keys/,
