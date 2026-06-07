@@ -19,6 +19,13 @@ const requiredLines = [
   "PASS backend syntax",
 ];
 
+const expectedDirectHelperNegativeScenarios = [
+  "missingDirectHelperNegativeGuards",
+  "staleDirectHelperNegativeGuards",
+  "partialDirectHelperNegativeGuards",
+  "reversedPartialDirectHelperNegativeGuards",
+];
+
 export function assertCompactReadinessOutput(output) {
   assert.ok(output.includes("READINESS OK 11/11 passed"), "compact output must include the readiness total");
   assert.ok(output.includes(expectedServerRequiredLine), "compact output must list server-required checks");
@@ -64,6 +71,7 @@ export function assertFixtureEvidenceOrder({
 
 export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSummary = false } = {}) {
   let fixtureSummaryIndexes = null;
+  let readinessFixtureOutput = null;
   const readmeResult = readinessSummary.results.find((item) => item.name === "readme");
   assert.ok(readmeResult, "json readiness must include readme result");
   const textOutputResult = readinessSummary.results.find((item) => item.name === "text output");
@@ -100,6 +108,10 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     assert.ok(
       readinessFixtureResult.summary.includes('"failureFlags": ['),
       "readiness output fixture summary must include failureFlags list"
+    );
+    assert.doesNotThrow(
+      () => { readinessFixtureOutput = JSON.parse(readinessFixtureResult.summary); },
+      "readiness output fixture summary must be valid JSON"
     );
     assert.ok(
       readinessFixtureResult.summary.includes('"missingScannedFileCountFails"'),
@@ -160,6 +172,11 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     assert.ok(
       readinessFixtureResult.summary.includes('"reversedPartialDirectHelperNegativeGuards"'),
       "readiness output fixture summary must include reversed partial direct helper guard scenario"
+    );
+    assert.deepEqual(
+      readinessFixtureOutput.directHelperNegativeScenarios,
+      expectedDirectHelperNegativeScenarios,
+      "readiness output fixture summary must list directHelperNegativeScenarios in the expected order"
     );
     const failureFlagsIndex = readinessFixtureResult.summary.indexOf('"failureFlags": [');
     const positiveFixtureGuardsIndex = readinessFixtureResult.summary.indexOf('"positiveFixtureGuards": [');
