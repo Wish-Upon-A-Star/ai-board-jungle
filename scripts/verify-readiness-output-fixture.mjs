@@ -1185,6 +1185,17 @@ assert.throws(
   /valid index-shape positive guard/,
   "readiness fixture summary without validFixtureSummaryIndexes positive guard must fail"
 );
+const wrongNamePositiveFixtureGuardsOutput = {
+  ...output,
+  positiveFixtureGuards: ["validFixtureSummaryIndex"],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(wrongNamePositiveFixtureGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /valid index-shape positive guard/,
+  "readiness fixture summary with wrong positive fixture guard name must fail"
+);
 const expandedPositiveFixtureGuardsOutput = {
   ...output,
   positiveFixtureGuards: [...expectedPositiveFixtureGuards, "unexpectedPositiveGuard"],
