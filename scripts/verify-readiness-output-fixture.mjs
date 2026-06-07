@@ -7,6 +7,7 @@ import {
   assertReadinessJsonEvidence,
   expectedFixtureSummaryKeys,
 } from "./verify-readiness-output.mjs";
+import { getLatestEvaluationRound } from "./verify-evaluation-reports.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
 const expectedFailureFlags = [
@@ -41,7 +42,7 @@ const expectedPositiveFixtureGuards = [
   "validFixtureSummaryIndexes",
 ];
 
-const expectedLatestEvaluationRound = 138;
+const expectedLatestEvaluationRound = getLatestEvaluationRound();
 
 function buildEvaluationReportsResult({ latestRound = expectedLatestEvaluationRound } = {}) {
   return {

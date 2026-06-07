@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { serverRequiredCommands } from "./verification-command-lists.mjs";
+import { getLatestEvaluationRound } from "./verify-evaluation-reports.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
 const expectedServerRequiredLine = `server-required: ${serverRequiredCommands.join(", ")}`;
-const expectedLatestEvaluationRound = 138;
+const expectedLatestEvaluationRound = getLatestEvaluationRound();
 const requiredLines = [
   "PASS hygiene",
   "PASS text",
