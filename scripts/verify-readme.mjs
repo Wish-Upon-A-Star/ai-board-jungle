@@ -28,6 +28,7 @@ const requiredSnippets = [
   "AI Agent",
   "npm run verify:full",
   "npm run verify:contract",
+  "npm run verify:evaluation-reports",
   "docs/evaluation-reports",
   "docs/demo-screenshot.png",
   "docs/submission-checklist.md",
@@ -37,6 +38,7 @@ const requiredSnippets = [
   "Integration Activity Log",
   "System Readiness",
   "Automation Run Status Policy",
+  "Evaluation Report Verification",
   "`changed` executions create persisted run-history snapshots",
   "`skipped` executions mean watched inputs did not change",
 ];
@@ -54,6 +56,7 @@ const checklistRequired = [
   "npm run verify:hygiene",
   "npm run verify:text",
   "npm run verify:frontend-helpers",
+  "npm run verify:evaluation-reports",
   "npm run verify:contract",
   "npm run verify:readme",
   "npm run verify:full:quick",

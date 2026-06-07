@@ -255,6 +255,7 @@ npm run verify:full
 ```powershell
 npm run verify:hygiene
 npm run verify:frontend-helpers
+npm run verify:evaluation-reports
 npm run verify:readme
 npm run verify:contract
 npm run verify:fastapi
@@ -329,3 +330,8 @@ npm run test:live-integrations
 - `skipped` executions mean watched inputs did not change. They update the automation card `Last run` badge and are audited in `Integration Activity Log`.
 - `Retry` and `Scheduler tick` both use the same fingerprint guard, so unchanged user/profile/API/template/custom connection settings are skipped consistently.
 - This keeps run history focused on changed execution snapshots while preserving skipped execution evidence in the task card and activity log.
+
+## Evaluation Report Verification
+
+- `npm run verify:evaluation-reports` checks that `docs/evaluation-reports` has a contiguous round sequence, no duplicate round numbers, and score/next-risk evidence in every report.
+- `npm run verify:full:quick` runs this report continuity check before backend tests, frontend build, API contract, HTTP smoke, and UI CDP smoke.
