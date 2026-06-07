@@ -89,5 +89,7 @@ console.log(JSON.stringify({
   required: requiredSnippets.length,
   commandMentions: allVerificationCommands.length,
   commandExplanations: allVerificationCommands.length,
+  checklistCommands: allVerificationCommands.length,
+  checklistItems: checklistRequired.length,
   screenshotOk,
 }, null, 2));
