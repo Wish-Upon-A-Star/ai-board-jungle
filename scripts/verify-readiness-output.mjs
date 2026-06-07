@@ -116,6 +116,7 @@ export function assertFixtureSummaryKeySchema(fixtureOutput) {
 
 export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSummary = false } = {}) {
   let fixtureSummaryIndexes = null;
+  let fixtureSummaryKeyCount = null;
   let readinessFixtureOutput = null;
   const readmeResult = readinessSummary.results.find((item) => item.name === "readme");
   assert.ok(readmeResult, "json readiness must include readme result");
@@ -259,6 +260,12 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     };
     assertFixtureEvidenceOrder(fixtureSummaryIndexes);
     assertFixtureSummaryKeySchema(readinessFixtureOutput);
+    fixtureSummaryKeyCount = Object.keys(readinessFixtureOutput).length;
+    assert.equal(
+      fixtureSummaryKeyCount,
+      expectedFixtureSummaryKeys.length,
+      "readiness output fixture summary key count must match exported schema length"
+    );
   }
 
   const scannedFileCountMatch = textOutputResult.summary.match(/"scannedFileCount":\s*(\d+)/);
@@ -266,7 +273,7 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
   const scannedFileCount = Number(scannedFileCountMatch[1]);
   assert.ok(scannedFileCount > 0, "text output scannedFileCount must be positive");
 
-  return { scannedFileCount, fixtureSummaryIndexes };
+  return { scannedFileCount, fixtureSummaryIndexes, fixtureSummaryKeyCount };
 }
 
 function runReadinessOutputCheck() {
@@ -289,7 +296,7 @@ function runReadinessOutputCheck() {
   assert.equal(jsonResult.status, 0, `json readiness exited with ${jsonResult.status}\n${jsonOutput}`);
 
   const readinessSummary = JSON.parse(jsonOutput);
-  const { scannedFileCount, fixtureSummaryIndexes } = assertReadinessJsonEvidence(readinessSummary, {
+  const { scannedFileCount, fixtureSummaryIndexes, fixtureSummaryKeyCount } = assertReadinessJsonEvidence(readinessSummary, {
     requireFixtureSummary: true,
   });
 
@@ -300,6 +307,7 @@ function runReadinessOutputCheck() {
     checklistCommands: expectedChecklistCommands,
     checklistItems: expectedChecklistItems,
     textOutputScannedFileCount: scannedFileCount,
+    fixtureSummaryKeyCount,
     fixtureSummaryIndexes,
   }, null, 2));
 }

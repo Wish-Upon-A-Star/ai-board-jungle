@@ -167,6 +167,11 @@ assert.equal(
   null,
   "default fixture must not compute fixtureSummaryIndexes without requireFixtureSummary"
 );
+assert.equal(
+  validResult.fixtureSummaryKeyCount,
+  null,
+  "default fixture must not compute fixtureSummaryKeyCount without requireFixtureSummary"
+);
 const validFixtureSummaryIndexes = {
   failureFlagsIndex: 0,
   positiveFixtureGuardsIndex: 10,
@@ -356,9 +361,14 @@ assertFixtureEvidenceOrder({
   firstBooleanFailureFieldIndex: outputKeys.findIndex((key) => key.endsWith("Fails")),
 });
 
-assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(output), {
+const validSummaryResult = assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(output), {
   requireFixtureSummary: true,
 });
+assert.equal(
+  validSummaryResult.fixtureSummaryKeyCount,
+  expectedFixtureSummaryKeys.length,
+  "required fixture summary must report the exported schema key count"
+);
 const misplacedValidScannedFileCountOutput = {
   ok: output.ok,
   checked: output.checked,
