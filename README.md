@@ -323,3 +323,9 @@ npm run test:live-integrations
 - 사용자별 토큰 KMS/Vault 연동
 - GitHub/Notion webhook 기반 변경 감지
 - CI에서 `npm run verify:full:quick` 자동 실행
+## Automation Run Status Policy
+
+- `changed` executions create persisted run-history snapshots and appear in `Run history`.
+- `skipped` executions mean watched inputs did not change. They update the automation card `Last run` badge and are audited in `Integration Activity Log`.
+- `Retry` and `Scheduler tick` both use the same fingerprint guard, so unchanged user/profile/API/template/custom connection settings are skipped consistently.
+- This keeps run history focused on changed execution snapshots while preserving skipped execution evidence in the task card and activity log.

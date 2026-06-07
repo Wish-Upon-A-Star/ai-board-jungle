@@ -36,6 +36,9 @@ const requiredSnippets = [
   "자동화 연결 미리보기",
   "Integration Activity Log",
   "System Readiness",
+  "Automation Run Status Policy",
+  "`changed` executions create persisted run-history snapshots",
+  "`skipped` executions mean watched inputs did not change",
 ];
 
 const suspiciousPatterns = [
