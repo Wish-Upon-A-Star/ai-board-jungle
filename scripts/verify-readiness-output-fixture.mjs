@@ -6,6 +6,7 @@ import {
   assertFixtureSummaryKeyCount,
   assertFixtureSummaryKeySchema,
   assertReadinessJsonEvidence,
+  assertReadinessOutputCliIndexes,
   expectedFixtureSummaryKeys,
 } from "./verify-readiness-output.mjs";
 import {
@@ -289,6 +290,7 @@ const validFixtureSummaryIndexes = {
 };
 assertFixtureSummaryIndexes(validFixtureSummaryIndexes);
 assertFixtureEvidenceOrder(validFixtureSummaryIndexes);
+assertReadinessOutputCliIndexes(validFixtureSummaryIndexes);
 assert.throws(
   () => assertFixtureEvidenceOrder({
     ...validFixtureSummaryIndexes,
@@ -323,6 +325,22 @@ assert.throws(
   () => assertFixtureSummaryIndexes({ ...validFixtureSummaryIndexes, failureFlagsIndex: "0" }),
   /non-negative integers/,
   "mutated fixtureSummaryIndexes with a string must fail the index-shape guard"
+);
+assert.throws(
+  () => assertReadinessOutputCliIndexes({
+    ...validFixtureSummaryIndexes,
+    evaluationReportNegativeGuardsIndex: validFixtureSummaryIndexes.directHelperNegativeScenariosIndex,
+  }),
+  /after directHelperNegativeScenariosIndex/,
+  "stale CLI fixture index equal to directHelperNegativeScenariosIndex must fail"
+);
+assert.throws(
+  () => assertReadinessOutputCliIndexes({
+    ...validFixtureSummaryIndexes,
+    evaluationReportNegativeGuardsIndex: validFixtureSummaryIndexes.firstBooleanFailureFieldIndex,
+  }),
+  /after evaluationReportNegativeGuardsIndex/,
+  "misplaced CLI fixture index equal to firstBooleanFailureFieldIndex must fail"
 );
 
 assert.throws(

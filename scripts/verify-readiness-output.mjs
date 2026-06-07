@@ -139,6 +139,19 @@ export function assertFixtureSummaryKeyCount(fixtureOutput, expectedKeyCount = e
   return fixtureSummaryKeyCount;
 }
 
+export function assertReadinessOutputCliIndexes(fixtureSummaryIndexes) {
+  assert.ok(
+    fixtureSummaryIndexes.evaluationReportNegativeGuardsIndex
+      > fixtureSummaryIndexes.directHelperNegativeScenariosIndex,
+    "verify:readiness-output CLI must place evaluationReportNegativeGuardsIndex after directHelperNegativeScenariosIndex"
+  );
+  assert.ok(
+    fixtureSummaryIndexes.firstBooleanFailureFieldIndex
+      > fixtureSummaryIndexes.evaluationReportNegativeGuardsIndex,
+    "verify:readiness-output CLI must place firstBooleanFailureFieldIndex after evaluationReportNegativeGuardsIndex"
+  );
+}
+
 export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSummary = false } = {}) {
   let fixtureSummaryIndexes = null;
   let fixtureSummaryKeyCount = null;
@@ -349,16 +362,7 @@ function runReadinessOutputCheck() {
   const { scannedFileCount, fixtureSummaryIndexes, fixtureSummaryKeyCount } = assertReadinessJsonEvidence(readinessSummary, {
     requireFixtureSummary: true,
   });
-  assert.ok(
-    fixtureSummaryIndexes.evaluationReportNegativeGuardsIndex
-      > fixtureSummaryIndexes.directHelperNegativeScenariosIndex,
-    "verify:readiness-output CLI must place evaluationReportNegativeGuardsIndex after directHelperNegativeScenariosIndex"
-  );
-  assert.ok(
-    fixtureSummaryIndexes.firstBooleanFailureFieldIndex
-      > fixtureSummaryIndexes.evaluationReportNegativeGuardsIndex,
-    "verify:readiness-output CLI must place firstBooleanFailureFieldIndex after evaluationReportNegativeGuardsIndex"
-  );
+  assertReadinessOutputCliIndexes(fixtureSummaryIndexes);
 
   console.log(JSON.stringify({
     ok: true,
