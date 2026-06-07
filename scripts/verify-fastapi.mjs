@@ -4,6 +4,7 @@ const env = { PYTHONPATH: "backend", AI_BOARD_DATABASE_URL: "sqlite:///./data/fa
 const verifyDbPath = "data/fastapi-verify.db";
 stopLocalServers();
 resetSqliteDb(verifyDbPath);
+run("node", ["scripts/verify-template-presets.mjs"]);
 run("python", ["-m", "pip", "install", "-r", "backend/requirements.txt"], { timeout: 180000 });
 run("python", ["-m", "pytest", "backend/tests"], { env });
 run("npm", ["--prefix", "frontend", "install"], { timeout: 180000 });

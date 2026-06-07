@@ -9,6 +9,7 @@ resetSqliteDb(verifyDbPath);
 run("node", ["scripts/verify-hygiene.mjs"]);
 run("node", ["scripts/verify-text-integrity.mjs"]);
 run("node", ["scripts/verify-frontend-helpers.mjs"]);
+run("node", ["scripts/verify-template-presets.mjs"]);
 run("node", ["scripts/verify-readme.mjs"]);
 run("python", ["-m", "py_compile", "backend/app/main.py", "backend/app/services.py"]);
 if (!skipInstall) {
