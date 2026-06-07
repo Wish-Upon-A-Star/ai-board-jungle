@@ -2,6 +2,8 @@
 
 Run these checks before final submission or when the UI changes:
 
+Serverless checks can run without starting FastAPI, Vite, or Chrome CDP. Server-required checks are covered by `npm run verify:full:quick`, `npm run verify:fastapi`, and live integration tests.
+
 1. Refresh the demo screenshot when the visible dashboard changes.
 
    ```powershell

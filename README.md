@@ -346,3 +346,27 @@ npm run test:live-integrations
 - `npm run verify:readiness-output` asserts the compact output keeps the `READINESS OK` summary and required `PASS` lines.
 - It runs hygiene, text, frontend helper, template preset, evaluation report, README, and backend syntax checks.
 - Server-required checks are listed separately in the output so users know when to run `npm run verify:full:quick`.
+
+## Verification Command Scope
+
+Serverless checks do not start FastAPI, Vite, or Chrome CDP:
+
+- `npm run verify:hygiene`
+- `npm run verify:text`
+- `npm run verify:frontend-helpers`
+- `npm run verify:template-presets`
+- `npm run verify:evaluation-reports`
+- `npm run verify:readiness`
+- `npm run verify:readiness:compact`
+- `npm run verify:readiness-output`
+- `npm run verify:readme`
+
+Server-required checks start or expect FastAPI, Vite, Chrome CDP, or live API credentials:
+
+- `npm run verify:contract`
+- `npm run smoke:http`
+- `npm run smoke:ui`
+- `npm run verify:fastapi`
+- `npm run verify:full:quick`
+- `npm run verify:full`
+- `npm run test:live-integrations`

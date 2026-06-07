@@ -43,6 +43,9 @@ const requiredSnippets = [
   "Automation Run Status Policy",
   "Evaluation Report Verification",
   "Readiness Summary",
+  "Verification Command Scope",
+  "Serverless checks do not start FastAPI, Vite, or Chrome CDP",
+  "Server-required checks start or expect FastAPI, Vite, Chrome CDP, or live API credentials",
   "`changed` executions create persisted run-history snapshots",
   "`skipped` executions mean watched inputs did not change",
 ];
@@ -64,6 +67,7 @@ const checklistRequired = [
   "npm run verify:readiness",
   "npm run verify:readiness:compact",
   "npm run verify:readiness-output",
+  "Serverless checks can run without starting FastAPI, Vite, or Chrome CDP",
   "npm run verify:contract",
   "npm run verify:readme",
   "npm run verify:full:quick",
