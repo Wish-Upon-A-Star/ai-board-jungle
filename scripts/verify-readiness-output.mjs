@@ -31,6 +31,11 @@ const expectedDirectHelperNegativeGuards = [
   "stringEvidenceIndex",
 ];
 
+const expectedNegativeFixtureGuards = [
+  "extraBooleanFailureField",
+  "missingBooleanFailureField",
+];
+
 export function assertCompactReadinessOutput(output) {
   assert.ok(output.includes("READINESS OK 11/11 passed"), "compact output must include the readiness total");
   assert.ok(output.includes(expectedServerRequiredLine), "compact output must list server-required checks");
@@ -153,6 +158,11 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     assert.ok(
       readinessFixtureResult.summary.includes('"missingBooleanFailureField"'),
       "readiness output fixture summary must include missing-field negative guard"
+    );
+    assert.deepEqual(
+      readinessFixtureOutput.negativeFixtureGuards,
+      expectedNegativeFixtureGuards,
+      "readiness output fixture summary must list negativeFixtureGuards in the expected order"
     );
     assert.ok(
       readinessFixtureResult.summary.includes('"missingEvidenceIndex"'),
