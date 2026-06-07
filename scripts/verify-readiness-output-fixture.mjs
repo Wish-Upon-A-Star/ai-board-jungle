@@ -320,5 +320,21 @@ assert.throws(
   /failureFlags, positiveFixtureGuards, negativeFixtureGuards/,
   "readiness fixture summary with positiveFixtureGuards after negativeFixtureGuards must fail"
 );
+const earlyBooleanFailureFieldsOutput = {
+  ok: output.ok,
+  checked: output.checked,
+  validScannedFileCount: output.validScannedFileCount,
+  failureFlags: output.failureFlags,
+  ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
+  positiveFixtureGuards: output.positiveFixtureGuards,
+  negativeFixtureGuards: output.negativeFixtureGuards,
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(earlyBooleanFailureFieldsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /then boolean \*Fails fields/,
+  "readiness fixture summary with boolean *Fails before guard evidence must fail"
+);
 
 console.log(JSON.stringify(output, null, 2));

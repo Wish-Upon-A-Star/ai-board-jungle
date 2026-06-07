@@ -64,8 +64,8 @@ export function stopLocalServers() {
   run("powershell", [
     "-NoProfile",
     "-Command",
-    "1..8 | ForEach-Object { Get-NetTCPConnection -LocalPort 3000,8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 1000 }; exit 0",
-  ], { timeout: 30000 });
+    "$ports=@(3000,8000); 1..8 | ForEach-Object { $pids=Get-NetTCPConnection -LocalPort $ports -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique; foreach ($targetPid in $pids) { if ($targetPid -and $targetPid -ne $PID) { & taskkill.exe /PID $targetPid /T /F *> $null } }; Start-Sleep -Milliseconds 750 }; exit 0",
+  ], { timeout: 60000 });
 }
 
 export function resetSqliteDb(dbPath) {
