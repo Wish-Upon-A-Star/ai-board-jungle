@@ -75,6 +75,13 @@ const expectedReadinessOutputCliIndexNegativeScenarios = [
   "misplacedEvaluationReportNegativeGuardsIndex",
 ];
 
+const expectedReadinessImportNegativeGuards = [
+  "importStdoutBytesNonZero",
+  "importStderrBytesNonZero",
+  "importDurationTooHigh",
+  "importExportsStale",
+];
+
 const expectedReadinessSummaryNegativeGuards = [
   "missingServerRequiredCommands",
   "missingReadinessNote",
@@ -270,20 +277,21 @@ function buildReadinessImportResult({
   durationMs = 101,
   stdoutBytes = 0,
   stderrBytes = 0,
+  exportsChecked = [
+    "readinessNote",
+    "checks",
+    "getReadinessChecks",
+    "buildReadinessSummary",
+    "formatCompactReadinessSummary",
+    "runReadinessSummaryCli",
+  ],
 } = {}) {
   return {
     name: "readiness import fixture",
     summary: JSON.stringify({
       ok: true,
       checked: "verify-readiness-summary import fixture",
-      exportsChecked: [
-        "readinessNote",
-        "checks",
-        "getReadinessChecks",
-        "buildReadinessSummary",
-        "formatCompactReadinessSummary",
-        "runReadinessSummaryCli",
-      ],
+      exportsChecked,
       durationMs,
       stdoutBytes,
       stderrBytes,
@@ -378,6 +386,30 @@ const staleChecklistItems = buildReadiness(undefined, {
   readmeOptions: { checklistItems: expectedChecklistItems - 1 },
 });
 
+const importStdoutBytesNonZero = buildReadiness(undefined, {
+  readinessImportOptions: { stdoutBytes: 1 },
+});
+
+const importStderrBytesNonZero = buildReadiness(undefined, {
+  readinessImportOptions: { stderrBytes: 1 },
+});
+
+const importDurationTooHigh = buildReadiness(undefined, {
+  readinessImportOptions: { durationMs: 2000 },
+});
+
+const importExportsStale = buildReadiness(undefined, {
+  readinessImportOptions: {
+    exportsChecked: [
+      "readinessNote",
+      "checks",
+      "getReadinessChecks",
+      "buildReadinessSummary",
+      "runReadinessSummaryCli",
+    ],
+  },
+});
+
 function assertFailureFlagFieldsMatch(output) {
   const booleanFailureFields = Object.keys(output).filter((key) => key.endsWith("Fails"));
   assert.deepEqual(
@@ -414,12 +446,13 @@ const validFixtureSummaryIndexes = {
   readinessOutputCliIndexPositiveGuardsIndex: 60,
   readinessOutputCliIndexPositiveGuardNegativeScenariosIndex: 70,
   readinessOutputCliIndexNegativeScenariosIndex: 80,
-  readinessSummaryNegativeGuardsIndex: 90,
-  compactReadinessNegativeGuardsIndex: 100,
-  failedCompactReadinessNegativeGuardsIndex: 110,
-  failedCompactReadinessCliGuardsIndex: 120,
-  directCompactFormatterGuardsIndex: 130,
-  firstBooleanFailureFieldIndex: 140,
+  readinessImportNegativeGuardsIndex: 90,
+  readinessSummaryNegativeGuardsIndex: 100,
+  compactReadinessNegativeGuardsIndex: 110,
+  failedCompactReadinessNegativeGuardsIndex: 120,
+  failedCompactReadinessCliGuardsIndex: 130,
+  directCompactFormatterGuardsIndex: 140,
+  firstBooleanFailureFieldIndex: 150,
 };
 assertFixtureSummaryIndexes(validFixtureSummaryIndexes);
 assertFixtureEvidenceOrder(validFixtureSummaryIndexes);
@@ -504,8 +537,16 @@ assert.throws(
     ...validFixtureSummaryIndexes,
     readinessSummaryNegativeGuardsIndex: validFixtureSummaryIndexes.readinessOutputCliIndexNegativeScenariosIndex,
   }),
-  /after readinessOutputCliIndexNegativeScenariosIndex/,
+  /after readinessImportNegativeGuardsIndex/,
   "stale readiness summary negative guard index equal to readinessOutputCliIndexNegativeScenariosIndex must fail"
+);
+assert.throws(
+  () => assertReadinessOutputCliIndexes({
+    ...validFixtureSummaryIndexes,
+    readinessImportNegativeGuardsIndex: validFixtureSummaryIndexes.readinessOutputCliIndexNegativeScenariosIndex,
+  }),
+  /after readinessOutputCliIndexNegativeScenariosIndex/,
+  "stale readiness import negative guard index equal to readinessOutputCliIndexNegativeScenariosIndex must fail"
 );
 assert.throws(
   () => assertReadinessOutputCliIndexes({
@@ -612,6 +653,30 @@ assert.throws(
   "stale checklistItems fixture must fail"
 );
 
+assert.throws(
+  () => assertReadinessJsonEvidence(importStdoutBytesNonZero),
+  /stdout stayed empty/,
+  "readiness import fixture with non-zero stdoutBytes must fail"
+);
+
+assert.throws(
+  () => assertReadinessJsonEvidence(importStderrBytesNonZero),
+  /stderr stayed empty/,
+  "readiness import fixture with non-zero stderrBytes must fail"
+);
+
+assert.throws(
+  () => assertReadinessJsonEvidence(importDurationTooHigh),
+  /duration stayed below/,
+  "readiness import fixture at or above duration guard must fail"
+);
+
+assert.throws(
+  () => assertReadinessJsonEvidence(importExportsStale),
+  /expected imported exports/,
+  "readiness import fixture with stale export list must fail"
+);
+
 const output = {
   ok: true,
   checked: "verify-readiness-output negative fixture",
@@ -625,6 +690,7 @@ const output = {
   readinessOutputCliIndexPositiveGuards: expectedReadinessOutputCliIndexPositiveGuards,
   readinessOutputCliIndexPositiveGuardNegativeScenarios: expectedReadinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: expectedReadinessOutputCliIndexNegativeScenarios,
+  readinessImportNegativeGuards: expectedReadinessImportNegativeGuards,
   readinessSummaryNegativeGuards: expectedReadinessSummaryNegativeGuards,
   compactReadinessNegativeGuards: expectedCompactReadinessNegativeGuards,
   failedCompactReadinessNegativeGuards: expectedFailedCompactReadinessNegativeGuards,
@@ -987,6 +1053,7 @@ assertFixtureEvidenceOrder({
   readinessOutputCliIndexPositiveGuardsIndex: outputKeys.indexOf("readinessOutputCliIndexPositiveGuards"),
   readinessOutputCliIndexPositiveGuardNegativeScenariosIndex: outputKeys.indexOf("readinessOutputCliIndexPositiveGuardNegativeScenarios"),
   readinessOutputCliIndexNegativeScenariosIndex: outputKeys.indexOf("readinessOutputCliIndexNegativeScenarios"),
+  readinessImportNegativeGuardsIndex: outputKeys.indexOf("readinessImportNegativeGuards"),
   readinessSummaryNegativeGuardsIndex: outputKeys.indexOf("readinessSummaryNegativeGuards"),
   compactReadinessNegativeGuardsIndex: outputKeys.indexOf("compactReadinessNegativeGuards"),
   failedCompactReadinessNegativeGuardsIndex: outputKeys.indexOf("failedCompactReadinessNegativeGuards"),
@@ -1016,6 +1083,7 @@ const misplacedValidScannedFileCountOutput = {
   readinessOutputCliIndexPositiveGuards: output.readinessOutputCliIndexPositiveGuards,
   readinessOutputCliIndexPositiveGuardNegativeScenarios: output.readinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
+  readinessImportNegativeGuards: output.readinessImportNegativeGuards,
   readinessSummaryNegativeGuards: output.readinessSummaryNegativeGuards,
   compactReadinessNegativeGuards: output.compactReadinessNegativeGuards,
   failedCompactReadinessNegativeGuards: output.failedCompactReadinessNegativeGuards,
@@ -2031,6 +2099,7 @@ const misplacedPositiveFixtureGuardsOutput = {
   readinessOutputCliIndexPositiveGuards: output.readinessOutputCliIndexPositiveGuards,
   readinessOutputCliIndexPositiveGuardNegativeScenarios: output.readinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
+  readinessImportNegativeGuards: output.readinessImportNegativeGuards,
   readinessSummaryNegativeGuards: output.readinessSummaryNegativeGuards,
   compactReadinessNegativeGuards: output.compactReadinessNegativeGuards,
   failedCompactReadinessNegativeGuards: output.failedCompactReadinessNegativeGuards,
@@ -2059,6 +2128,7 @@ const earlyBooleanFailureFieldsOutput = {
   readinessOutputCliIndexPositiveGuards: output.readinessOutputCliIndexPositiveGuards,
   readinessOutputCliIndexPositiveGuardNegativeScenarios: output.readinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
+  readinessImportNegativeGuards: output.readinessImportNegativeGuards,
   readinessSummaryNegativeGuards: output.readinessSummaryNegativeGuards,
   compactReadinessNegativeGuards: output.compactReadinessNegativeGuards,
   failedCompactReadinessNegativeGuards: output.failedCompactReadinessNegativeGuards,
@@ -2085,6 +2155,7 @@ const misplacedFailureFlagsOutput = {
   readinessOutputCliIndexPositiveGuards: output.readinessOutputCliIndexPositiveGuards,
   readinessOutputCliIndexPositiveGuardNegativeScenarios: output.readinessOutputCliIndexPositiveGuardNegativeScenarios,
   readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
+  readinessImportNegativeGuards: output.readinessImportNegativeGuards,
   readinessSummaryNegativeGuards: output.readinessSummaryNegativeGuards,
   compactReadinessNegativeGuards: output.compactReadinessNegativeGuards,
   failedCompactReadinessNegativeGuards: output.failedCompactReadinessNegativeGuards,
