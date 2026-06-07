@@ -13,6 +13,11 @@ const expectedFailureFlags = [
   "staleChecklistItemsFails",
 ];
 
+const expectedNegativeFixtureGuards = [
+  "extraBooleanFailureField",
+  "missingBooleanFailureField",
+];
+
 function buildReadmeResult({
   includeChecklistCommands = true,
   includeChecklistItems = true,
@@ -189,6 +194,7 @@ const output = {
   checked: "verify-readiness-output negative fixture",
   validScannedFileCount: validResult.scannedFileCount,
   failureFlags: expectedFailureFlags,
+  negativeFixtureGuards: expectedNegativeFixtureGuards,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 
@@ -208,6 +214,11 @@ assert.throws(
   () => assertFailureFlagFieldsMatch(missingBooleanFailureOutput),
   /failureFlags/,
   "missing boolean *Fails fixture must fail the failureFlags guard"
+);
+assert.deepEqual(
+  output.negativeFixtureGuards,
+  expectedNegativeFixtureGuards,
+  "fixture output must expose covered failureFlags guard directions"
 );
 
 console.log(JSON.stringify(output, null, 2));
