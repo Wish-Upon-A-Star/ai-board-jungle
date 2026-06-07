@@ -19,6 +19,7 @@ Run these checks before final submission or when the UI changes:
    npm run verify:text
    npm run verify:frontend-helpers
    npm run verify:evaluation-reports
+   npm run verify:readiness
    npm run verify:readme
    ```
 

@@ -15,6 +15,7 @@
     "verify:frontend-helpers": "node scripts/verify-frontend-helpers.mjs",
     "verify:template-presets": "node scripts/verify-template-presets.mjs",
     "verify:evaluation-reports": "node scripts/verify-evaluation-reports.mjs",
+    "verify:readiness": "node scripts/verify-readiness-summary.mjs",
     "verify:text": "node scripts/verify-text-integrity.mjs",
     "verify:contract": "node scripts/verify-api-contract.mjs",
     "verify:readme": "node scripts/verify-readme.mjs",

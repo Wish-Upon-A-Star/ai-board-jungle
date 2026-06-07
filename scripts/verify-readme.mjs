@@ -29,6 +29,7 @@ const requiredSnippets = [
   "npm run verify:full",
   "npm run verify:contract",
   "npm run verify:evaluation-reports",
+  "npm run verify:readiness",
   "docs/evaluation-reports",
   "docs/demo-screenshot.png",
   "docs/submission-checklist.md",
@@ -39,6 +40,7 @@ const requiredSnippets = [
   "System Readiness",
   "Automation Run Status Policy",
   "Evaluation Report Verification",
+  "Readiness Summary",
   "`changed` executions create persisted run-history snapshots",
   "`skipped` executions mean watched inputs did not change",
 ];
@@ -57,6 +59,7 @@ const checklistRequired = [
   "npm run verify:text",
   "npm run verify:frontend-helpers",
   "npm run verify:evaluation-reports",
+  "npm run verify:readiness",
   "npm run verify:contract",
   "npm run verify:readme",
   "npm run verify:full:quick",

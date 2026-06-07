@@ -256,6 +256,7 @@ npm run verify:full
 npm run verify:hygiene
 npm run verify:frontend-helpers
 npm run verify:evaluation-reports
+npm run verify:readiness
 npm run verify:readme
 npm run verify:contract
 npm run verify:fastapi
@@ -335,3 +336,9 @@ npm run test:live-integrations
 
 - `npm run verify:evaluation-reports` checks that `docs/evaluation-reports` has a contiguous round sequence, no duplicate round numbers, and score/next-risk evidence in every report.
 - `npm run verify:full:quick` runs this report continuity check before backend tests, frontend build, API contract, HTTP smoke, and UI CDP smoke.
+
+## Readiness Summary
+
+- `npm run verify:readiness` prints a JSON readiness summary without starting FastAPI, Vite, or Chrome CDP.
+- It runs hygiene, text, frontend helper, template preset, evaluation report, README, and backend syntax checks.
+- Server-required checks are listed separately in the output so users know when to run `npm run verify:full:quick`.
