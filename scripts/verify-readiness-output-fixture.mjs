@@ -631,6 +631,40 @@ assert.throws(
   /expected order/,
   "readiness fixture summary with reordered failureFlags must fail"
 );
+const wrongNameFailureFlagsOutput = {
+  ...output,
+  failureFlags: [
+    "missingScannedFileCountFails",
+    "nonEmptyMissingRequiredFilesFails",
+    "missingRequiredScannedFilesFails",
+    "missingReadmeResultFails",
+    "missingChecklistCommandsFails",
+    "staleChecklistCommandsFails",
+    "missingChecklistItemsFails",
+    "staleChecklistItemFails",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(wrongNameFailureFlagsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with wrong failureFlags name must fail"
+);
+const expandedFailureFlagsOutput = {
+  ...output,
+  failureFlags: [
+    ...expectedFailureFlags,
+    "unexpectedFailureFlagFails",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(expandedFailureFlagsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with expanded failureFlags must fail"
+);
 const reorderedNegativeFixtureGuardsOutput = {
   ...output,
   negativeFixtureGuards: [...expectedNegativeFixtureGuards].reverse(),
