@@ -330,6 +330,15 @@ assertFixtureEvidenceOrder({
 assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(output), {
   requireFixtureSummary: true,
 });
+const missingDirectHelperNegativeScenariosOutput = { ...output };
+delete missingDirectHelperNegativeScenariosOutput.directHelperNegativeScenarios;
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(missingDirectHelperNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /directHelperNegativeScenarios/,
+  "readiness fixture summary without directHelperNegativeScenarios must fail"
+);
 const missingDirectHelperNegativeGuardsOutput = { ...output };
 delete missingDirectHelperNegativeGuardsOutput.directHelperNegativeGuards;
 assert.throws(
