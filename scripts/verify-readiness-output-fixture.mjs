@@ -182,4 +182,16 @@ for (const flag of expectedFailureFlags) {
   assert.equal(output[flag], true, `fixture output must expose ${flag}`);
 }
 
+const booleanFailureFields = Object.keys(output).filter((key) => key.endsWith("Fails"));
+assert.deepEqual(
+  booleanFailureFields.sort(),
+  [...expectedFailureFlags].sort(),
+  "fixture output failureFlags must match boolean *Fails fields"
+);
+assert.equal(
+  output.failureFlags.length,
+  booleanFailureFields.length,
+  "fixture output failureFlags length must match boolean *Fails field count"
+);
+
 console.log(JSON.stringify(output, null, 2));
