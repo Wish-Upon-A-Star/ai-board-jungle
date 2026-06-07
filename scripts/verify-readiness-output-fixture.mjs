@@ -61,6 +61,9 @@ for (const scenario of summaryCountNegativeScenarioSourceChecks) {
 const expectedNegativeFixtureGuards = [
   "extraBooleanFailureField",
   "missingBooleanFailureField",
+  "missingFixtureSummaryKeyCount",
+  "nonIntegerFixtureSummaryKeyCount",
+  "staleFixtureSummaryKeyCount",
 ];
 
 const expectedDirectHelperNegativeGuards = [

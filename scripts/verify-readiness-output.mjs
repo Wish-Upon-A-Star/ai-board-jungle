@@ -49,6 +49,9 @@ const expectedDirectHelperNegativeGuards = [
 const expectedNegativeFixtureGuards = [
   "extraBooleanFailureField",
   "missingBooleanFailureField",
+  "missingFixtureSummaryKeyCount",
+  "nonIntegerFixtureSummaryKeyCount",
+  "staleFixtureSummaryKeyCount",
 ];
 
 const expectedPositiveFixtureGuards = [
@@ -509,6 +512,18 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     assert.ok(
       readinessFixtureResult.summary.includes('"missingBooleanFailureField"'),
       "readiness output fixture summary must include missing-field negative guard"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"missingFixtureSummaryKeyCount"'),
+      "readiness output fixture summary must include missing summary count source guard"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"nonIntegerFixtureSummaryKeyCount"'),
+      "readiness output fixture summary must include non-integer summary count source guard"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"staleFixtureSummaryKeyCount"'),
+      "readiness output fixture summary must include stale summary count source guard"
     );
     assert.deepEqual(
       readinessFixtureOutput.negativeFixtureGuards,
