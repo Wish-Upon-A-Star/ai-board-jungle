@@ -43,7 +43,10 @@ const expectedPositiveFixtureGuards = [
   "validFixtureSummaryIndexes",
 ];
 
-const expectedEvaluationReportCount = readEvaluationReportRounds().length;
+const evaluationReportRounds = readEvaluationReportRounds();
+const expectedEvaluationReportCount = evaluationReportRounds.length;
+const expectedFirstEvaluationReport = evaluationReportRounds[0].file;
+const expectedLatestEvaluationReport = evaluationReportRounds.at(-1).file;
 const expectedLatestEvaluationRound = getLatestEvaluationRound();
 
 function readEvaluationReportsCliSummary() {
@@ -60,6 +63,11 @@ function readEvaluationReportsCliSummary() {
 const evaluationReportsCliSummary = readEvaluationReportsCliSummary();
 
 assert.equal(
+  evaluationReportsCliSummary.ok,
+  true,
+  "verify:evaluation-reports CLI ok flag must stay true in parity fixture"
+);
+assert.equal(
   evaluationReportsCliSummary.latestRound,
   expectedLatestEvaluationRound,
   "getLatestEvaluationRound helper must match verify:evaluation-reports CLI latestRound"
@@ -68,6 +76,16 @@ assert.equal(
   evaluationReportsCliSummary.checked,
   expectedEvaluationReportCount,
   "readEvaluationReportRounds helper count must match verify:evaluation-reports CLI checked count"
+);
+assert.equal(
+  evaluationReportsCliSummary.first,
+  expectedFirstEvaluationReport,
+  "readEvaluationReportRounds first file must match verify:evaluation-reports CLI first file"
+);
+assert.equal(
+  evaluationReportsCliSummary.latest,
+  expectedLatestEvaluationReport,
+  "readEvaluationReportRounds latest file must match verify:evaluation-reports CLI latest file"
 );
 
 function buildEvaluationReportsResult({ latestRound = expectedLatestEvaluationRound } = {}) {
