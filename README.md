@@ -259,6 +259,7 @@ npm run verify:evaluation-reports
 npm run verify:readiness
 npm run verify:readiness:compact
 npm run verify:readiness-output
+npm run verify:command-scope
 npm run verify:readme
 npm run verify:contract
 npm run verify:fastapi
@@ -344,6 +345,7 @@ npm run test:live-integrations
 - `npm run verify:readiness` prints a JSON readiness summary without starting FastAPI, Vite, or Chrome CDP.
 - `npm run verify:readiness:compact` prints the same serverless readiness checks as one line per check for CI logs.
 - `npm run verify:readiness-output` asserts the compact output keeps the `READINESS OK` summary and required `PASS` lines.
+- `npm run verify:command-scope` asserts the README serverless/server-required command lists stay synchronized with `package.json`.
 - It runs hygiene, text, frontend helper, template preset, evaluation report, README, and backend syntax checks.
 - Server-required checks are listed separately in the output so users know when to run `npm run verify:full:quick`.
 
@@ -359,6 +361,7 @@ Serverless checks do not start FastAPI, Vite, or Chrome CDP:
 - `npm run verify:readiness`
 - `npm run verify:readiness:compact`
 - `npm run verify:readiness-output`
+- `npm run verify:command-scope`
 - `npm run verify:readme`
 
 Server-required checks start or expect FastAPI, Vite, Chrome CDP, or live API credentials:

@@ -12,6 +12,7 @@ run("node", ["scripts/verify-frontend-helpers.mjs"]);
 run("node", ["scripts/verify-template-presets.mjs"]);
 run("node", ["scripts/verify-evaluation-reports.mjs"]);
 run("node", ["scripts/verify-readiness-output.mjs"]);
+run("node", ["scripts/verify-command-scope.mjs"]);
 run("node", ["scripts/verify-readme.mjs"]);
 run("python", ["-m", "py_compile", "backend/app/main.py", "backend/app/services.py"]);
 if (!skipInstall) {
