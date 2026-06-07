@@ -349,6 +349,16 @@ function runReadinessOutputCheck() {
   const { scannedFileCount, fixtureSummaryIndexes, fixtureSummaryKeyCount } = assertReadinessJsonEvidence(readinessSummary, {
     requireFixtureSummary: true,
   });
+  assert.ok(
+    fixtureSummaryIndexes.evaluationReportNegativeGuardsIndex
+      > fixtureSummaryIndexes.directHelperNegativeScenariosIndex,
+    "verify:readiness-output CLI must place evaluationReportNegativeGuardsIndex after directHelperNegativeScenariosIndex"
+  );
+  assert.ok(
+    fixtureSummaryIndexes.firstBooleanFailureFieldIndex
+      > fixtureSummaryIndexes.evaluationReportNegativeGuardsIndex,
+    "verify:readiness-output CLI must place firstBooleanFailureFieldIndex after evaluationReportNegativeGuardsIndex"
+  );
 
   console.log(JSON.stringify({
     ok: true,
