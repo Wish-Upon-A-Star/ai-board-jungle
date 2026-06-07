@@ -18,6 +18,11 @@ const expectedNegativeFixtureGuards = [
   "missingBooleanFailureField",
 ];
 
+const expectedDirectHelperNegativeGuards = [
+  "missingEvidenceIndex",
+  "stringEvidenceIndex",
+];
+
 const expectedPositiveFixtureGuards = [
   "validFixtureSummaryIndexes",
 ];
@@ -153,7 +158,8 @@ const validFixtureSummaryIndexes = {
   failureFlagsIndex: 0,
   positiveFixtureGuardsIndex: 10,
   negativeFixtureGuardsIndex: 20,
-  firstBooleanFailureFieldIndex: 30,
+  directHelperNegativeGuardsIndex: 30,
+  firstBooleanFailureFieldIndex: 40,
 };
 assertFixtureSummaryIndexes(validFixtureSummaryIndexes);
 assertFixtureEvidenceOrder(validFixtureSummaryIndexes);
@@ -248,6 +254,7 @@ const output = {
   failureFlags: expectedFailureFlags,
   positiveFixtureGuards: expectedPositiveFixtureGuards,
   negativeFixtureGuards: expectedNegativeFixtureGuards,
+  directHelperNegativeGuards: expectedDirectHelperNegativeGuards,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 
@@ -291,11 +298,17 @@ assert.deepEqual(
   expectedNegativeFixtureGuards,
   "fixture output must expose covered failureFlags guard directions"
 );
+assert.deepEqual(
+  output.directHelperNegativeGuards,
+  expectedDirectHelperNegativeGuards,
+  "fixture output must expose direct helper negative guard directions"
+);
 const outputKeys = Object.keys(output);
 assertFixtureEvidenceOrder({
   failureFlagsIndex: outputKeys.indexOf("failureFlags"),
   positiveFixtureGuardsIndex: outputKeys.indexOf("positiveFixtureGuards"),
   negativeFixtureGuardsIndex: outputKeys.indexOf("negativeFixtureGuards"),
+  directHelperNegativeGuardsIndex: outputKeys.indexOf("directHelperNegativeGuards"),
   firstBooleanFailureFieldIndex: outputKeys.findIndex((key) => key.endsWith("Fails")),
 });
 
@@ -328,6 +341,7 @@ const misplacedPositiveFixtureGuardsOutput = {
   validScannedFileCount: output.validScannedFileCount,
   failureFlags: output.failureFlags,
   negativeFixtureGuards: output.negativeFixtureGuards,
+  directHelperNegativeGuards: output.directHelperNegativeGuards,
   positiveFixtureGuards: output.positiveFixtureGuards,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
@@ -346,6 +360,7 @@ const earlyBooleanFailureFieldsOutput = {
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
   positiveFixtureGuards: output.positiveFixtureGuards,
   negativeFixtureGuards: output.negativeFixtureGuards,
+  directHelperNegativeGuards: output.directHelperNegativeGuards,
 };
 assert.throws(
   () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(earlyBooleanFailureFieldsOutput), {
@@ -361,6 +376,7 @@ const misplacedFailureFlagsOutput = {
   positiveFixtureGuards: output.positiveFixtureGuards,
   failureFlags: output.failureFlags,
   negativeFixtureGuards: output.negativeFixtureGuards,
+  directHelperNegativeGuards: output.directHelperNegativeGuards,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 assert.throws(

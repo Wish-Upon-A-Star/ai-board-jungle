@@ -39,20 +39,23 @@ export function assertFixtureEvidenceOrder({
   failureFlagsIndex,
   positiveFixtureGuardsIndex,
   negativeFixtureGuardsIndex,
+  directHelperNegativeGuardsIndex,
   firstBooleanFailureFieldIndex,
 }) {
   assertFixtureSummaryIndexes({
     failureFlagsIndex,
     positiveFixtureGuardsIndex,
     negativeFixtureGuardsIndex,
+    directHelperNegativeGuardsIndex,
     firstBooleanFailureFieldIndex,
   });
   assert.ok(
     failureFlagsIndex >= 0
       && positiveFixtureGuardsIndex > failureFlagsIndex
       && negativeFixtureGuardsIndex > positiveFixtureGuardsIndex
-      && firstBooleanFailureFieldIndex > negativeFixtureGuardsIndex,
-    "readiness output fixture summary must list failureFlags, positiveFixtureGuards, negativeFixtureGuards, then boolean *Fails fields"
+      && directHelperNegativeGuardsIndex > negativeFixtureGuardsIndex
+      && firstBooleanFailureFieldIndex > directHelperNegativeGuardsIndex,
+    "readiness output fixture summary must list failureFlags, positiveFixtureGuards, negativeFixtureGuards, directHelperNegativeGuards, then boolean *Fails fields"
   );
 }
 
@@ -108,6 +111,10 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       "readiness output fixture summary must include negativeFixtureGuards list"
     );
     assert.ok(
+      readinessFixtureResult.summary.includes('"directHelperNegativeGuards": ['),
+      "readiness output fixture summary must include directHelperNegativeGuards list"
+    );
+    assert.ok(
       readinessFixtureResult.summary.includes('"positiveFixtureGuards": ['),
       "readiness output fixture summary must include positiveFixtureGuards list"
     );
@@ -123,14 +130,24 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       readinessFixtureResult.summary.includes('"missingBooleanFailureField"'),
       "readiness output fixture summary must include missing-field negative guard"
     );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"missingEvidenceIndex"'),
+      "readiness output fixture summary must include missing evidence index direct helper guard"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"stringEvidenceIndex"'),
+      "readiness output fixture summary must include string evidence index direct helper guard"
+    );
     const failureFlagsIndex = readinessFixtureResult.summary.indexOf('"failureFlags": [');
     const positiveFixtureGuardsIndex = readinessFixtureResult.summary.indexOf('"positiveFixtureGuards": [');
     const negativeFixtureGuardsIndex = readinessFixtureResult.summary.indexOf('"negativeFixtureGuards": [');
+    const directHelperNegativeGuardsIndex = readinessFixtureResult.summary.indexOf('"directHelperNegativeGuards": [');
     const firstBooleanFailureFieldIndex = readinessFixtureResult.summary.indexOf('"missingScannedFileCountFails": true');
     fixtureSummaryIndexes = {
       failureFlagsIndex,
       positiveFixtureGuardsIndex,
       negativeFixtureGuardsIndex,
+      directHelperNegativeGuardsIndex,
       firstBooleanFailureFieldIndex,
     };
     assertFixtureEvidenceOrder(fixtureSummaryIndexes);
