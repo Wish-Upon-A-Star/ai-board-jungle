@@ -150,6 +150,7 @@ const validFixtureSummaryIndexes = {
   negativeFixtureGuardsIndex: 10,
   firstBooleanFailureFieldIndex: 20,
 };
+assertFixtureSummaryIndexes(validFixtureSummaryIndexes);
 assert.throws(
   () => assertFixtureSummaryIndexes({ ...validFixtureSummaryIndexes, failureFlagsIndex: -1 }),
   /non-negative integers/,
