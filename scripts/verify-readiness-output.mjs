@@ -17,6 +17,7 @@ const requiredLines = [
   "PASS evaluation reports",
   "PASS readme",
   "PASS readme output",
+  "PASS readiness import fixture",
   "PASS readiness output fixture",
   "PASS command scope",
   "PASS backend syntax",
@@ -129,7 +130,7 @@ export const expectedFixtureSummaryKeys = Object.freeze([
 ]);
 
 export function assertCompactReadinessOutput(output) {
-  assert.ok(output.includes("READINESS OK 11/11 passed"), "compact output must include the readiness total");
+  assert.ok(output.includes("READINESS OK 12/12 passed"), "compact output must include the readiness total");
   assert.ok(
     output.includes(`latest-evaluation-round: ${expectedLatestEvaluationRound}`),
     "compact output must include the latest evaluation report round"

@@ -712,7 +712,7 @@ assert.deepEqual(
 
 function buildCompactReadinessOutput({ omitTotal = false, omitLatestRound = false, omitServerRequired = false, omitPassLine = false, omitNote = false } = {}) {
   const headerParts = [
-    omitTotal ? null : "READINESS OK 11/11 passed",
+    omitTotal ? null : "READINESS OK 12/12 passed",
     omitLatestRound ? null : `latest-evaluation-round: ${expectedLatestEvaluationRound}`,
     omitServerRequired ? null : `server-required: ${serverRequiredCommands.join(", ")}`,
   ].filter(Boolean);
@@ -725,6 +725,7 @@ function buildCompactReadinessOutput({ omitTotal = false, omitLatestRound = fals
     "PASS evaluation reports 1ms",
     "PASS readme 1ms",
     "PASS readme output 1ms",
+    "PASS readiness import fixture 1ms",
     "PASS readiness output fixture 1ms",
     "PASS command scope 1ms",
     "PASS backend syntax 1ms",
@@ -749,6 +750,7 @@ function buildFormatterSummaryFixture({ failed = false } = {}) {
     "evaluation reports",
     "readme",
     "readme output",
+    "readiness import fixture",
     "readiness output fixture",
     "command scope",
     "backend syntax",
@@ -827,7 +829,7 @@ function buildFailedCompactReadinessOutput({
   omitSummary = false,
 } = {}) {
   return [
-    omitStatus ? null : `READINESS FAILED 10/11 passed; latest-evaluation-round: ${expectedLatestEvaluationRound}; server-required: ${serverRequiredCommands.join(", ")}`,
+    omitStatus ? null : `READINESS FAILED 11/12 passed; latest-evaluation-round: ${expectedLatestEvaluationRound}; server-required: ${serverRequiredCommands.join(", ")}`,
     `NOTE ${expectedReadinessNote}`,
     "PASS hygiene 1ms",
     "PASS text 1ms",
