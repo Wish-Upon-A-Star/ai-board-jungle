@@ -293,5 +293,16 @@ assert.throws(
   /positiveFixtureGuards/,
   "readiness fixture summary without positiveFixtureGuards must fail"
 );
+const stalePositiveFixtureGuardsOutput = {
+  ...output,
+  positiveFixtureGuards: [],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(stalePositiveFixtureGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /valid index-shape positive guard/,
+  "readiness fixture summary without validFixtureSummaryIndexes positive guard must fail"
+);
 
 console.log(JSON.stringify(output, null, 2));
