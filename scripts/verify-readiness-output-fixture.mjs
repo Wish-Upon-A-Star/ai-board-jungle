@@ -348,6 +348,17 @@ assert.throws(
   /top-level keys/,
   "readiness fixture summary with validScannedFileCount after failureFlags must fail"
 );
+const extraTopLevelEvidenceOutput = {
+  ...output,
+  unexpectedEvidence: "unexpected",
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(extraTopLevelEvidenceOutput), {
+    requireFixtureSummary: true,
+  }),
+  /top-level keys/,
+  "readiness fixture summary with an extra top-level evidence key must fail"
+);
 const reorderedFailureFlagsOutput = {
   ...output,
   failureFlags: [...expectedFailureFlags].reverse(),
