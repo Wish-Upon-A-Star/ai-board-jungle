@@ -196,6 +196,7 @@ async function main() {
     "Google Calendar",
     "Figma",
     "Health",
+    "프로필 커스텀 연결",
   ];
   const missing = requiredUi.filter((item) => !text.includes(item));
   const hasLiveWritePlaceholder = await evalJs(
@@ -232,6 +233,38 @@ async function main() {
     });
     return dryRun.write?.dryRun === true || dryRun.write?.status === "dry-run";
   });
+  const profileConnectionEditorVisible = await evalJs(`(() => {
+    const text = document.body.innerText;
+    const buttons = Array.from(document.querySelectorAll("button")).map((button) => button.innerText.trim());
+    return text.includes("프로필 커스텀 연결") && buttons.some((label) => label.includes("google_calendar")) && buttons.some((label) => label.includes("custom"));
+  })()`);
+  const profileConnectionCreateApi = await apiJson("/api/integration-profiles", {
+    method: "POST",
+    body: JSON.stringify({
+      name: "CDP custom connection profile",
+      source_kind: "custom",
+      base_url: "",
+      api_provider: "Custom API",
+      token_name: "CUSTOM_API_KEY",
+      token_value: "",
+      ai_provider: "OpenAI",
+      ai_model: "gpt-4o-mini",
+      ai_api_base: "https://api.openai.com/v1",
+      rag_targets: [],
+      collect_limit: 5,
+      collect_pages: 1,
+      custom_template: "title: {title}",
+      custom_connections: [{
+        label: "Calendar target",
+        service: "google_calendar",
+        url: "primary",
+        api: "Google Calendar API",
+        auth_key_name: "GOOGLE_CALENDAR_TOKEN",
+        operation: "create_event",
+        template: "일정 제목: {title}"
+      }]
+    }),
+  }).then((data) => Array.isArray(data.profile?.customConnections) && data.profile.customConnections[0]?.service === "google_calendar");
   const activityApi = await apiJson("/api/integration-activities").then((data) => Array.isArray(data.activities));
   const activityFilterApi = await apiJson("/api/integration-activities?event_type=integration_profile.write&dry_run=true").then((data) =>
     Array.isArray(data.activities)
@@ -351,6 +384,8 @@ async function main() {
     collectorApi,
     readinessApi,
     liveWriteApi,
+    profileConnectionEditorVisible,
+    profileConnectionCreateApi,
     activityApi,
     activityFilterApi,
     activityPageApi,
@@ -378,6 +413,8 @@ async function main() {
     !collectorApi ||
     !readinessApi ||
     !liveWriteApi ||
+    !profileConnectionEditorVisible ||
+    !profileConnectionCreateApi ||
     !activityApi ||
     !activityFilterApi ||
     !activityPageApi ||

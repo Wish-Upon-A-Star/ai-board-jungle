@@ -86,7 +86,18 @@ export const defaultIntegration = {
   rag_targets: "issues,commits,pull_requests",
   collect_limit: 20,
   collect_pages: 2,
+  custom_connections: [
+    { label: "GitHub 저장소", service: "github", url: "https://github.com/<owner>/<repo>", api: "GitHub REST API", auth_key_name: "GITHUB_TOKEN", operation: "rag_collect_issues_commits_prs", template: "제목: {title}\n요약: {summary}\n링크: {url}" },
+  ],
   custom_template: "출처: {source}\n제목: {title}\n요약: {summary}\n링크: {url}",
+};
+
+export const integrationConnectionPresets = {
+  github: { label: "GitHub 저장소", service: "github", url: "https://github.com/<owner>/<repo>", api: "GitHub REST API", auth_key_name: "GITHUB_TOKEN", operation: "rag_collect_issues_commits_prs", template: "제목: {title}\n요약: {summary}\n링크: {url}" },
+  notion: { label: "Notion 업무 DB", service: "notion", url: "https://www.notion.so/<workspace>/<database-id>", api: "Notion API", auth_key_name: "NOTION_TOKEN", operation: "upsert_task_page", template: "업무명: {title}\n상태: {status}\n요약: {summary}" },
+  figma: { label: "Figma 파일", service: "figma", url: "https://www.figma.com/design/<fileKey>/<fileName>", api: "Figma REST API", auth_key_name: "FIGMA_TOKEN", operation: "create_review_comment", template: "섹션명: {title}\n확인 기준: {checklist}" },
+  google_calendar: { label: "Google Calendar", service: "google_calendar", url: "primary", api: "Google Calendar API", auth_key_name: "GOOGLE_CALENDAR_TOKEN", operation: "create_event", template: "일정 제목: {title}\n시작: {start}\n종료: {end}" },
+  custom: { label: "커스텀 연결", service: "custom", url: "", api: "Custom REST API", auth_key_name: "CUSTOM_API_KEY", operation: "custom_action", template: "필드명: {value}\n링크: {source_url}\n다음 액션: {next_action}" },
 };
 
 export const automationPresets = [defaultAutomation, figmaCalendarPreset, customPreset];

@@ -13,6 +13,7 @@ import {
   defaultIntegration,
   defaultKnowledge,
   figmaCalendarPreset,
+  integrationConnectionPresets,
 } from "../frontend/src/presets.js";
 
 const parsed = parseRunResult('{"agent":"SyncPlannerAgent","route":"GitHub -> Notion","targets":[1,2],"externalRagSources":[3],"status":"CHANGED"}');
@@ -63,6 +64,12 @@ assert.equal(defaultKnowledge.source_type, "document");
 assert.ok(defaultKnowledge.extracted_text.includes("GitHub 이슈"));
 assert.equal(defaultIntegration.source_kind, "github");
 assert.ok(defaultIntegration.rag_targets.includes("pull_requests"));
+assert.deepEqual(defaultIntegration.custom_connections.map((connection) => connection.service), ["github"]);
+assert.deepEqual(Object.keys(integrationConnectionPresets), ["github", "notion", "figma", "google_calendar", "custom"]);
+for (const [kind, connection] of Object.entries(integrationConnectionPresets)) {
+  assert.equal(connection.service, kind);
+  assert.ok(connection.api && connection.auth_key_name && connection.operation, `${kind} connection preset must be executable`);
+}
 
 console.log(JSON.stringify({
   ok: true,
@@ -75,5 +82,6 @@ console.log(JSON.stringify({
     "automationPresets",
     "defaultKnowledge",
     "defaultIntegration",
+    "integrationConnectionPresets",
   ],
 }, null, 2));

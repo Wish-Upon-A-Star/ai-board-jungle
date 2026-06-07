@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Bot, CalendarClock, Database, FileText, GitBranch, KeyRound, Link2, LogOut, Play, Plus, Search, Share2, Trash2, Upload, UserPlus } from "lucide-react";
 import { api } from "./api";
-import { customPreset, defaultAutomation, defaultIntegration, defaultKnowledge, figmaCalendarPreset } from "./presets";
+import { customPreset, defaultAutomation, defaultIntegration, defaultKnowledge, figmaCalendarPreset, integrationConnectionPresets } from "./presets";
 import { buildSystemReadinessCards, getRunStatus, mergePostsById, parseRunResult, summarizeRunResult } from "./viewModel";
 import "./style.css";
 
@@ -263,7 +263,7 @@ function App() {
         collect_limit: Number(integrationForm.collect_limit) || 20,
         collect_pages: Number(integrationForm.collect_pages) || 2,
         rag_targets: integrationForm.rag_targets.split(",").map((item) => item.trim()).filter(Boolean),
-        custom_connections: [],
+        custom_connections: integrationForm.custom_connections || [],
       };
       const data = await api("/api/integration-profiles", { method: "POST", body: JSON.stringify(body) });
       setApiResult({ called: "integration-profile.save", response: data });
@@ -272,6 +272,30 @@ function App() {
     } catch (err) {
       showActionError(err);
     }
+  }
+
+  function addIntegrationConnection(kind = "custom") {
+    const preset = integrationConnectionPresets[kind] || integrationConnectionPresets.custom;
+    setIntegrationForm((current) => ({
+      ...current,
+      custom_connections: [...(current.custom_connections || []), { ...preset }],
+    }));
+  }
+
+  function updateIntegrationConnection(index, field, value) {
+    setIntegrationForm((current) => ({
+      ...current,
+      custom_connections: (current.custom_connections || []).map((connection, currentIndex) =>
+        currentIndex === index ? { ...connection, [field]: value } : connection
+      ),
+    }));
+  }
+
+  function removeIntegrationConnection(index) {
+    setIntegrationForm((current) => ({
+      ...current,
+      custom_connections: (current.custom_connections || []).filter((_, currentIndex) => currentIndex !== index),
+    }));
   }
 
   async function collectIntegrationProfile(profile) {
@@ -552,6 +576,39 @@ function App() {
                 </div>
                 <Field label="RAG 대상"><input value={integrationForm.rag_targets} onChange={(e) => setIntegrationForm({ ...integrationForm, rag_targets: e.target.value })} /></Field>
                 <Field label="프로필 템플릿"><textarea value={integrationForm.custom_template} onChange={(e) => setIntegrationForm({ ...integrationForm, custom_template: e.target.value })} /></Field>
+                <section className="connection-builder">
+                  <div className="section-head flat">
+                    <div>
+                      <strong>프로필 커스텀 연결</strong>
+                      <span>이 프로필을 자동화에서 선택하면 아래 연결 목록과 템플릿을 함께 사용합니다.</span>
+                    </div>
+                    <div className="profile-actions">
+                      {Object.keys(integrationConnectionPresets).map((kind) => (
+                        <button key={kind} type="button" onClick={() => addIntegrationConnection(kind)}><Plus size={13} /> {kind}</button>
+                      ))}
+                    </div>
+                  </div>
+                  {(integrationForm.custom_connections || []).map((connection, index) => (
+                    <div key={`${connection.service}:${index}`} className="connection-card">
+                      <div className="connection-title">
+                        <strong>{index + 1}. {connection.label || "새 연결"}</strong>
+                        <button type="button" className="danger" onClick={() => removeIntegrationConnection(index)}>삭제</button>
+                      </div>
+                      <div className="grid3 wide">
+                        <Field label="라벨"><input value={connection.label} onChange={(e) => updateIntegrationConnection(index, "label", e.target.value)} /></Field>
+                        <Field label="서비스"><input value={connection.service} onChange={(e) => updateIntegrationConnection(index, "service", e.target.value)} /></Field>
+                        <Field label="API"><input value={connection.api} onChange={(e) => updateIntegrationConnection(index, "api", e.target.value)} /></Field>
+                      </div>
+                      <div className="grid3 wide">
+                        <Field label="URL"><input value={connection.url} onChange={(e) => updateIntegrationConnection(index, "url", e.target.value)} /></Field>
+                        <Field label="토큰 변수"><input value={connection.auth_key_name} onChange={(e) => updateIntegrationConnection(index, "auth_key_name", e.target.value)} /></Field>
+                        <Field label="Operation"><input value={connection.operation} onChange={(e) => updateIntegrationConnection(index, "operation", e.target.value)} /></Field>
+                      </div>
+                      <Field label="연결 템플릿"><textarea value={connection.template} onChange={(e) => updateIntegrationConnection(index, "template", e.target.value)} /></Field>
+                    </div>
+                  ))}
+                  {(integrationForm.custom_connections || []).length === 0 ? <p className="empty-state">연결이 없으면 source kind와 base URL만 사용합니다.</p> : null}
+                </section>
                 <button><KeyRound size={14} /> 연동 프로필 저장</button>
               </form>
               <div className="knowledge-list">
@@ -586,6 +643,7 @@ function App() {
                     <strong>{profile.name}</strong>
                     <span>{profile.sourceKind} / {profile.apiProvider} / {profile.aiModel} / token {profile.hasToken ? "저장됨" : "없음"} / {profile.tokenStorage || "empty"}</span>
                     <p>{profile.baseUrl} / RAG: {profile.ragTargets.join(", ") || "미설정"}</p>
+                    <p>Connections: {profile.customConnections?.map((connection) => `${connection.service}:${connection.operation}`).join(" / ") || "기본 연결"}</p>
                     {profile.lastCollect?.warnings?.length ? <p className="warning-line">{profile.lastCollect.warnings.join(" / ")}</p> : null}
                     <button type="button" onClick={() => collectIntegrationProfile(profile)}><Search size={14} /> RAG 수집 실행</button>
                     {["figma", "google_calendar"].includes(profile.sourceKind) ? (
