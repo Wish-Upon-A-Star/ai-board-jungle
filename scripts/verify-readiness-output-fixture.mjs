@@ -304,5 +304,21 @@ assert.throws(
   /valid index-shape positive guard/,
   "readiness fixture summary without validFixtureSummaryIndexes positive guard must fail"
 );
+const misplacedPositiveFixtureGuardsOutput = {
+  ok: output.ok,
+  checked: output.checked,
+  validScannedFileCount: output.validScannedFileCount,
+  failureFlags: output.failureFlags,
+  negativeFixtureGuards: output.negativeFixtureGuards,
+  positiveFixtureGuards: output.positiveFixtureGuards,
+  ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(misplacedPositiveFixtureGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /failureFlags, positiveFixtureGuards, negativeFixtureGuards/,
+  "readiness fixture summary with positiveFixtureGuards after negativeFixtureGuards must fail"
+);
 
 console.log(JSON.stringify(output, null, 2));
