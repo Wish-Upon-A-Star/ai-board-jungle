@@ -467,6 +467,17 @@ assert.throws(
   /valid index-shape positive guard/,
   "readiness fixture summary without validFixtureSummaryIndexes positive guard must fail"
 );
+const expandedPositiveFixtureGuardsOutput = {
+  ...output,
+  positiveFixtureGuards: [...expectedPositiveFixtureGuards, "unexpectedPositiveGuard"],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(expandedPositiveFixtureGuardsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with expanded positive fixture guards must fail"
+);
 const misplacedPositiveFixtureGuardsOutput = {
   ok: output.ok,
   checked: output.checked,
