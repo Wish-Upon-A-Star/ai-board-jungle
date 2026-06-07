@@ -86,6 +86,15 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       readinessFixtureResult.summary.includes('"missingBooleanFailureField"'),
       "readiness output fixture summary must include missing-field negative guard"
     );
+    const failureFlagsIndex = readinessFixtureResult.summary.indexOf('"failureFlags": [');
+    const negativeFixtureGuardsIndex = readinessFixtureResult.summary.indexOf('"negativeFixtureGuards": [');
+    const firstBooleanFailureFieldIndex = readinessFixtureResult.summary.indexOf('"missingScannedFileCountFails": true');
+    assert.ok(
+      failureFlagsIndex >= 0
+        && negativeFixtureGuardsIndex > failureFlagsIndex
+        && firstBooleanFailureFieldIndex > negativeFixtureGuardsIndex,
+      "readiness output fixture summary must list failureFlags, negativeFixtureGuards, then boolean *Fails fields"
+    );
   }
 
   const scannedFileCountMatch = textOutputResult.summary.match(/"scannedFileCount":\s*(\d+)/);
