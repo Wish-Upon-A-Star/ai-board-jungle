@@ -261,6 +261,7 @@ npm run verify:evaluation-reports
 npm run verify:readiness
 npm run verify:readiness:compact
 npm run verify:readiness-output
+npm run verify:readiness-output-fixture
 npm run verify:command-scope
 npm run verify:readme
 npm run verify:readme-output
@@ -284,6 +285,7 @@ npm run smoke:http
 - `verify:readiness`: prints the serverless readiness JSON summary
 - `verify:readiness:compact`: prints the same readiness checks as compact CI-friendly lines
 - `verify:readiness-output`: asserts the compact readiness output keeps the required summary, PASS lines, README counts, and text-output evidence
+- `verify:readiness-output-fixture`: checks that missing text-output evidence fails the readiness-output contract
 - `verify:command-scope`: checks README verification command lists against `package.json`
 - `verify:readme-output`: parses `verify:readme` JSON and checks command/checklist coverage counts
 - `smoke:http`: runs HTTP smoke checks against the managed FastAPI server
@@ -361,8 +363,9 @@ npm run test:live-integrations
 - `npm run verify:readiness` prints a JSON readiness summary without starting FastAPI, Vite, or Chrome CDP.
 - `npm run verify:readiness:compact` prints the same serverless readiness checks as one line per check for CI logs.
 - `npm run verify:readiness-output` asserts the compact output keeps the `READINESS OK` summary, required `PASS` lines, README counts, and text-output evidence.
+- `npm run verify:readiness-output-fixture` checks that a fake readiness result missing `scannedFileCount` fails the readiness-output contract.
 - `npm run verify:command-scope` asserts the README serverless/server-required command lists stay synchronized with `package.json`.
-- It runs hygiene, text, text-output, frontend helper, template preset, evaluation report, README, command scope, and backend syntax checks.
+- It runs hygiene, text, text-output, frontend helper, template preset, evaluation report, README, readiness-output fixture, command scope, and backend syntax checks.
 - Server-required checks are listed separately in the output so users know when to run `npm run verify:full:quick`.
 
 ## Verification Command Scope
@@ -378,6 +381,7 @@ Serverless checks do not start FastAPI, Vite, or Chrome CDP:
 - `npm run verify:readiness`
 - `npm run verify:readiness:compact`
 - `npm run verify:readiness-output`
+- `npm run verify:readiness-output-fixture`
 - `npm run verify:command-scope`
 - `npm run verify:readme`
 - `npm run verify:readme-output`

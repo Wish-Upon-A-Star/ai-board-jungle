@@ -26,6 +26,7 @@ Serverless checks can run without starting FastAPI, Vite, or Chrome CDP. Server-
    npm run verify:readiness
    npm run verify:readiness:compact
    npm run verify:readiness-output
+   npm run verify:readiness-output-fixture
    npm run verify:command-scope
    npm run verify:readme
    npm run verify:readme-output

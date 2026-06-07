@@ -8,6 +8,7 @@ export const serverlessCommands = [
   "verify:readiness",
   "verify:readiness:compact",
   "verify:readiness-output",
+  "verify:readiness-output-fixture",
   "verify:command-scope",
   "verify:readme",
   "verify:readme-output",

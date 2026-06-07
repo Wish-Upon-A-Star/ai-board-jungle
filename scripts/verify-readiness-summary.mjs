@@ -47,6 +47,7 @@ const checks = [
   ["evaluation reports", "node", ["scripts/verify-evaluation-reports.mjs"]],
   ["readme", "node", ["scripts/verify-readme.mjs"]],
   ["readme output", "node", ["scripts/verify-readme-output.mjs"]],
+  ["readiness output fixture", "node", ["scripts/verify-readiness-output-fixture.mjs"]],
   ["command scope", "node", ["scripts/verify-command-scope.mjs"]],
   ["backend syntax", "python", ["-m", "py_compile", "backend/app/main.py", "backend/app/services.py"]],
 ];

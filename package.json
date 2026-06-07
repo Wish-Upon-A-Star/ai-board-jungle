@@ -18,6 +18,7 @@
     "verify:readiness": "node scripts/verify-readiness-summary.mjs",
     "verify:readiness:compact": "node scripts/verify-readiness-summary.mjs --compact",
     "verify:readiness-output": "node scripts/verify-readiness-output.mjs",
+    "verify:readiness-output-fixture": "node scripts/verify-readiness-output-fixture.mjs",
     "verify:command-scope": "node scripts/verify-command-scope.mjs",
     "verify:text": "node scripts/verify-text-integrity.mjs",
     "verify:text-output": "node scripts/verify-text-output.mjs",

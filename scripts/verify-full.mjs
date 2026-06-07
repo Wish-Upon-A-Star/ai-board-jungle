@@ -11,6 +11,7 @@ run("node", ["scripts/verify-text-integrity.mjs"]);
 run("node", ["scripts/verify-frontend-helpers.mjs"]);
 run("node", ["scripts/verify-template-presets.mjs"]);
 run("node", ["scripts/verify-evaluation-reports.mjs"]);
+run("node", ["scripts/verify-readiness-output-fixture.mjs"]);
 run("node", ["scripts/verify-readiness-output.mjs"]);
 run("node", ["scripts/verify-command-scope.mjs"]);
 run("node", ["scripts/verify-readme.mjs"]);
