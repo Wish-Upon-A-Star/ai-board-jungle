@@ -41,6 +41,21 @@ const expectedPositiveFixtureGuards = [
   "validFixtureSummaryIndexes",
 ];
 
+const expectedLatestEvaluationRound = 138;
+
+function buildEvaluationReportsResult({ latestRound = expectedLatestEvaluationRound } = {}) {
+  return {
+    name: "evaluation reports",
+    summary: JSON.stringify({
+      ok: true,
+      checked: latestRound,
+      first: "2026-06-06-round-01.md",
+      latest: `2026-06-07-round-${latestRound}.md`,
+      latestRound,
+    }, null, 2),
+  };
+}
+
 function buildReadmeResult({
   includeChecklistCommands = true,
   includeChecklistItems = true,
@@ -101,14 +116,24 @@ function buildTextOutputResult({
   };
 }
 
-function buildReadiness(textOutputOptions, { includeReadmeResult = true, readmeOptions } = {}) {
+function buildReadiness(textOutputOptions, {
+  includeReadmeResult = true,
+  includeEvaluationReportsResult = true,
+  readmeOptions,
+  evaluationReportsOptions,
+} = {}) {
   const results = [buildTextOutputResult(textOutputOptions)];
 
   if (includeReadmeResult) {
     results.unshift(buildReadmeResult(readmeOptions));
   }
 
+  if (includeEvaluationReportsResult) {
+    results.push(buildEvaluationReportsResult(evaluationReportsOptions));
+  }
+
   return {
+    latestEvaluationRound: expectedLatestEvaluationRound,
     results,
   };
 }
@@ -129,6 +154,14 @@ const missingRequiredScannedFiles = buildReadiness({
 
 const missingReadmeResult = buildReadiness(undefined, {
   includeReadmeResult: false,
+});
+
+const missingEvaluationReportsResult = buildReadiness(undefined, {
+  includeEvaluationReportsResult: false,
+});
+
+const staleLatestEvaluationRound = buildReadiness(undefined, {
+  evaluationReportsOptions: { latestRound: expectedLatestEvaluationRound - 1 },
 });
 
 const missingChecklistCommands = buildReadiness(undefined, {
@@ -244,6 +277,18 @@ assert.throws(
 );
 
 assert.throws(
+  () => assertReadinessJsonEvidence(missingEvaluationReportsResult),
+  /evaluation reports result/,
+  "missing evaluation reports result fixture must fail"
+);
+
+assert.throws(
+  () => assertReadinessJsonEvidence(staleLatestEvaluationRound),
+  /latest report round/,
+  "stale latest evaluation round fixture must fail"
+);
+
+assert.throws(
   () => assertReadinessJsonEvidence(missingChecklistCommands),
   /checklistCommands/,
   "missing checklistCommands fixture must fail"
@@ -288,9 +333,11 @@ function extraTopLevelFailureOutput() {
 
 function buildReadinessWithFixtureSummary(fixtureOutput) {
   return {
+    latestEvaluationRound: expectedLatestEvaluationRound,
     results: [
       buildReadmeResult(),
       buildTextOutputResult(),
+      buildEvaluationReportsResult(),
       {
         name: "readiness output fixture",
         summary: JSON.stringify(fixtureOutput, null, 2),

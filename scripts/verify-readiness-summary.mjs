@@ -55,19 +55,29 @@ const checks = [
 const results = checks.map(([name, cmd, args, opts]) => runCheck(name, cmd, args, opts));
 const failed = results.filter((item) => !item.ok);
 const serverRequired = serverRequiredCommands;
+const evaluationReportsResult = results.find((item) => item.name === "evaluation reports");
+let latestEvaluationRound = null;
+if (evaluationReportsResult?.ok) {
+  try {
+    latestEvaluationRound = JSON.parse(evaluationReportsResult.summary).latestRound ?? null;
+  } catch {
+    latestEvaluationRound = null;
+  }
+}
 
 const summary = {
   ok: failed.length === 0,
   checked: results.length,
   passed: results.length - failed.length,
   failed: failed.map((item) => item.name),
+  latestEvaluationRound,
   serverRequired,
   note: "This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick for end-to-end smoke.",
   results,
 };
 
 if (compact) {
-  console.log(`READINESS ${summary.ok ? "OK" : "FAILED"} ${summary.passed}/${summary.checked} passed; server-required: ${serverRequired.join(", ")}`);
+  console.log(`READINESS ${summary.ok ? "OK" : "FAILED"} ${summary.passed}/${summary.checked} passed; latest-evaluation-round: ${latestEvaluationRound}; server-required: ${serverRequired.join(", ")}`);
   for (const result of results) {
     console.log(`${result.ok ? "PASS" : "FAIL"} ${result.name} ${result.durationMs}ms`);
     if (!result.ok && result.summary) {

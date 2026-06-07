@@ -5,6 +5,7 @@ import { serverRequiredCommands } from "./verification-command-lists.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
 const expectedServerRequiredLine = `server-required: ${serverRequiredCommands.join(", ")}`;
+const expectedLatestEvaluationRound = 138;
 const requiredLines = [
   "PASS hygiene",
   "PASS text",
@@ -65,6 +66,10 @@ export const expectedFixtureSummaryKeys = Object.freeze([
 
 export function assertCompactReadinessOutput(output) {
   assert.ok(output.includes("READINESS OK 11/11 passed"), "compact output must include the readiness total");
+  assert.ok(
+    output.includes(`latest-evaluation-round: ${expectedLatestEvaluationRound}`),
+    "compact output must include the latest evaluation report round"
+  );
   assert.ok(output.includes(expectedServerRequiredLine), "compact output must list server-required checks");
 
   for (const line of requiredLines) {
@@ -132,6 +137,17 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
   assert.ok(readmeResult, "json readiness must include readme result");
   const textOutputResult = readinessSummary.results.find((item) => item.name === "text output");
   assert.ok(textOutputResult, "json readiness must include text output result");
+  const evaluationReportsResult = readinessSummary.results.find((item) => item.name === "evaluation reports");
+  assert.ok(evaluationReportsResult, "json readiness must include evaluation reports result");
+  assert.equal(
+    readinessSummary.latestEvaluationRound,
+    expectedLatestEvaluationRound,
+    "json readiness must expose the latest evaluation report round"
+  );
+  assert.ok(
+    evaluationReportsResult.summary.includes(`"latestRound": ${expectedLatestEvaluationRound}`),
+    "evaluation reports summary must include the latest report round"
+  );
   const readinessFixtureResult = readinessSummary.results.find((item) => item.name === "readiness output fixture");
   if (requireFixtureSummary) {
     assert.ok(readinessFixtureResult, "json readiness must include readiness output fixture result");
@@ -309,6 +325,7 @@ function runReadinessOutputCheck() {
     ok: true,
     checked: "verify-readiness-summary --compact",
     requiredLines,
+    latestEvaluationRound: expectedLatestEvaluationRound,
     checklistCommands: expectedChecklistCommands,
     checklistItems: expectedChecklistItems,
     textOutputScannedFileCount: scannedFileCount,
