@@ -91,6 +91,9 @@ a:hover { color: #0086d1; }
 .preset-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .preset-actions button { padding: 4px 8px; }
 .connection-builder { display: grid; gap: 8px; border: 1px solid #e2e2e2; padding: 10px; background: #fcfcfc; }
+.connection-preview { display: grid; gap: 4px; border: 1px solid #d7e7f7; background: #f8fbff; padding: 9px; color: #555; }
+.connection-preview strong { color: #333; }
+.connection-preview span { color: #2780c2; overflow-wrap: anywhere; }
 .profile-settings-box { border: 1px solid #d7e7f7; padding: 10px; background: #f8fbff; }
 .integration-profile-box { border: 1px solid #d9eadf; padding: 10px; background: #fbfffc; }
 .subtle { color: #888; font-weight: 400; }

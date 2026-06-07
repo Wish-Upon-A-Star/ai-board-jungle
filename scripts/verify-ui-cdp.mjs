@@ -199,6 +199,8 @@ async function main() {
     "프로필 커스텀 연결",
     "사용자 기본 커스텀 연결",
     "기본 설정 저장",
+    "사용자 기본값 적용",
+    "자동화 연결 미리보기",
   ];
   const missing = requiredUi.filter((item) => !text.includes(item));
   const hasLiveWritePlaceholder = await evalJs(
@@ -291,6 +293,22 @@ async function main() {
       }]
     }),
   }).then((data) => Array.isArray(data.profileSettings?.customConnections) && data.profileSettings.customConnections[0]?.auth_key_name === "USER_NOTION_TOKEN");
+  await evalJs(`location.reload()`);
+  await wait(2500);
+  const profileDefaultsApplyVisible = await evalJs(`(() => {
+    const button = Array.from(document.querySelectorAll("button")).find((item) => item.innerText.includes("사용자 기본값 적용"));
+    if (!button) return false;
+    button.click();
+    return document.body.innerText.includes("자동화 연결 미리보기");
+  })()`);
+  await wait(500);
+  const profileDefaultsApplied = await evalJs(`(() => {
+    const text = document.body.innerText;
+    const fieldValues = Array.from(document.querySelectorAll("input, textarea")).map((field) => field.value || "");
+    return text.includes("notion:upsert_task_page") &&
+      fieldValues.some((value) => value.includes("CDP user default connection verification.")) &&
+      fieldValues.some((value) => value.includes("gpt-4o-mini"));
+  })()`);
   const activityApi = await apiJson("/api/integration-activities").then((data) => Array.isArray(data.activities));
   const activityFilterApi = await apiJson("/api/integration-activities?event_type=integration_profile.write&dry_run=true").then((data) =>
     Array.isArray(data.activities)
@@ -414,6 +432,8 @@ async function main() {
     profileConnectionCreateApi,
     profileSettingsEditorVisible,
     profileSettingsSaveApi,
+    profileDefaultsApplyVisible,
+    profileDefaultsApplied,
     activityApi,
     activityFilterApi,
     activityPageApi,
@@ -445,6 +465,8 @@ async function main() {
     !profileConnectionCreateApi ||
     !profileSettingsEditorVisible ||
     !profileSettingsSaveApi ||
+    !profileDefaultsApplyVisible ||
+    !profileDefaultsApplied ||
     !activityApi ||
     !activityFilterApi ||
     !activityPageApi ||

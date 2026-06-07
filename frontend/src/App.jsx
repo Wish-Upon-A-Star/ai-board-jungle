@@ -380,6 +380,23 @@ function App() {
     });
   }
 
+  function applyProfileDefaultsToAutomation() {
+    const connections = profileSettings?.customConnections || [];
+    const firstConnection = connections[0];
+    setForm((current) => ({
+      ...current,
+      integration_profile_id: "",
+      ai_provider: profileSettings?.aiProvider || current.ai_provider,
+      ai_model: profileSettings?.aiModel || current.ai_model,
+      ai_api_base: profileSettings?.aiApiBase || current.ai_api_base,
+      api_key_strategy: profileSettings?.apiKeyStrategy || current.api_key_strategy,
+      template_preset: profileSettings?.templatePreset || current.template_preset,
+      custom_template: profileSettings?.customTemplate || current.custom_template,
+      api_provider: firstConnection?.api || current.api_provider,
+      custom_connections: connections.map((connection) => ({ ...connection })),
+    }));
+  }
+
   function updateActivityFilters(nextFilters) {
     setActivityFilters(nextFilters);
     loadActivities(nextFilters, 0, false);
@@ -554,6 +571,7 @@ function App() {
                   <button type="button" onClick={() => setForm(defaultAutomation)}>GitHub + Notion</button>
                   <button type="button" onClick={() => setForm(figmaCalendarPreset)}>Figma + Google Calendar</button>
                   <button type="button" onClick={() => setForm(customPreset)}>Custom API</button>
+                  <button type="button" onClick={applyProfileDefaultsToAutomation}>사용자 기본값 적용</button>
                 </div>
                 <section className="integration-profile-box">
                   <div className="grid2">
@@ -592,6 +610,10 @@ function App() {
                 <Field label="실행 지침"><textarea value={form.instruction} onChange={(e) => setForm({ ...form, instruction: e.target.value })} /></Field>
                 <Field label="결과 템플릿"><textarea value={form.template} onChange={(e) => setForm({ ...form, template: e.target.value })} /></Field>
                 <Field label="API Key 전략"><textarea value={form.api_key_strategy} onChange={(e) => setForm({ ...form, api_key_strategy: e.target.value })} /></Field>
+                <div className="connection-preview">
+                  <strong>자동화 연결 미리보기</strong>
+                  <span>{(form.custom_connections || []).length ? `${form.custom_connections.length}개 연결: ${form.custom_connections.map((connection) => `${connection.service}:${connection.operation}`).join(" / ")}` : "자동화 텍스트와 선택 프로필에서 연결을 추론합니다."}</span>
+                </div>
                 <button><CalendarClock size={14} /> 자동화 저장</button>
               </form>
             </article>
