@@ -29,6 +29,7 @@ export function assertCompactReadinessOutput(output) {
 }
 
 export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSummary = false } = {}) {
+  let fixtureSummaryIndexes = null;
   const readmeResult = readinessSummary.results.find((item) => item.name === "readme");
   assert.ok(readmeResult, "json readiness must include readme result");
   const textOutputResult = readinessSummary.results.find((item) => item.name === "text output");
@@ -95,6 +96,11 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
         && firstBooleanFailureFieldIndex > negativeFixtureGuardsIndex,
       "readiness output fixture summary must list failureFlags, negativeFixtureGuards, then boolean *Fails fields"
     );
+    fixtureSummaryIndexes = {
+      failureFlagsIndex,
+      negativeFixtureGuardsIndex,
+      firstBooleanFailureFieldIndex,
+    };
   }
 
   const scannedFileCountMatch = textOutputResult.summary.match(/"scannedFileCount":\s*(\d+)/);
@@ -102,7 +108,7 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
   const scannedFileCount = Number(scannedFileCountMatch[1]);
   assert.ok(scannedFileCount > 0, "text output scannedFileCount must be positive");
 
-  return { scannedFileCount };
+  return { scannedFileCount, fixtureSummaryIndexes };
 }
 
 function runReadinessOutputCheck() {
@@ -125,7 +131,9 @@ function runReadinessOutputCheck() {
   assert.equal(jsonResult.status, 0, `json readiness exited with ${jsonResult.status}\n${jsonOutput}`);
 
   const readinessSummary = JSON.parse(jsonOutput);
-  const { scannedFileCount } = assertReadinessJsonEvidence(readinessSummary, { requireFixtureSummary: true });
+  const { scannedFileCount, fixtureSummaryIndexes } = assertReadinessJsonEvidence(readinessSummary, {
+    requireFixtureSummary: true,
+  });
 
   console.log(JSON.stringify({
     ok: true,
@@ -134,6 +142,7 @@ function runReadinessOutputCheck() {
     checklistCommands: expectedChecklistCommands,
     checklistItems: expectedChecklistItems,
     textOutputScannedFileCount: scannedFileCount,
+    fixtureSummaryIndexes,
   }, null, 2));
 }
 
