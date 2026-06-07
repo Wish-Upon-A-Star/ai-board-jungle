@@ -694,6 +694,59 @@ assert.throws(
   /expected order/,
   "readiness fixture summary with reordered evaluation report negative guards must fail"
 );
+const missingReadinessOutputCliIndexNegativeScenariosOutput = { ...output };
+delete missingReadinessOutputCliIndexNegativeScenariosOutput.readinessOutputCliIndexNegativeScenarios;
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(missingReadinessOutputCliIndexNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /readinessOutputCliIndexNegativeScenarios/,
+  "readiness fixture summary without readinessOutputCliIndexNegativeScenarios must fail"
+);
+const staleReadinessOutputCliIndexNegativeScenariosOutput = {
+  ...output,
+  readinessOutputCliIndexNegativeScenarios: [],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(staleReadinessOutputCliIndexNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /stale CLI index negative scenario/,
+  "readiness fixture summary without CLI index negative scenario names must fail"
+);
+const partialReadinessOutputCliIndexNegativeScenariosOutput = {
+  ...output,
+  readinessOutputCliIndexNegativeScenarios: ["staleEvaluationReportNegativeGuardsIndex"],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(partialReadinessOutputCliIndexNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /misplaced CLI index negative scenario/,
+  "readiness fixture summary without misplaced CLI index negative scenario must fail"
+);
+const reversedPartialReadinessOutputCliIndexNegativeScenariosOutput = {
+  ...output,
+  readinessOutputCliIndexNegativeScenarios: ["misplacedEvaluationReportNegativeGuardsIndex"],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(reversedPartialReadinessOutputCliIndexNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /stale CLI index negative scenario/,
+  "readiness fixture summary without stale CLI index negative scenario must fail"
+);
+const reorderedReadinessOutputCliIndexNegativeScenariosOutput = {
+  ...output,
+  readinessOutputCliIndexNegativeScenarios: [...expectedReadinessOutputCliIndexNegativeScenarios].reverse(),
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(reorderedReadinessOutputCliIndexNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with reordered CLI index negative scenarios must fail"
+);
 const missingDirectHelperNegativeGuardsOutput = { ...output };
 delete missingDirectHelperNegativeGuardsOutput.directHelperNegativeGuards;
 assert.throws(
