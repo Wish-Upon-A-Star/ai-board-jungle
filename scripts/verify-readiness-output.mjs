@@ -108,6 +108,15 @@ const expectedDirectCompactFormatterGuards = [
   "directCompactFormatterTrailingNewline",
 ];
 
+const expectedReadinessImportExports = [
+  "readinessNote",
+  "checks",
+  "getReadinessChecks",
+  "buildReadinessSummary",
+  "formatCompactReadinessSummary",
+  "runReadinessSummaryCli",
+];
+
 export const expectedFixtureSummaryKeys = Object.freeze([
   "ok",
   "checked",
@@ -320,8 +329,11 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
   let fixtureSummaryIndexes = null;
   let fixtureSummaryKeyCount = null;
   let readinessFixtureOutput = null;
+  let importFixtureEvidence = null;
   const readmeResult = readinessSummary.results.find((item) => item.name === "readme");
   assert.ok(readmeResult, "json readiness must include readme result");
+  const readinessImportResult = readinessSummary.results.find((item) => item.name === "readiness import fixture");
+  assert.ok(readinessImportResult, "json readiness must include readiness import fixture result");
   const readmeOutputResult = readinessSummary.results.find((item) => item.name === "readme output");
   assert.ok(readmeOutputResult, "json readiness must include readme output result");
   const textOutputResult = readinessSummary.results.find((item) => item.name === "text output");
@@ -346,6 +358,34 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
   assert.ok(
     evaluationReportsResult.summary.includes(`"latestRound": ${expectedLatestEvaluationRound}`),
     "evaluation reports summary must include the latest report round"
+  );
+  assert.doesNotThrow(
+    () => { importFixtureEvidence = JSON.parse(readinessImportResult.summary); },
+    "readiness import fixture summary must be valid JSON"
+  );
+  assert.equal(
+    importFixtureEvidence.checked,
+    "verify-readiness-summary import fixture",
+    "readiness import fixture summary must identify the import safety check"
+  );
+  assert.deepEqual(
+    importFixtureEvidence.exportsChecked,
+    expectedReadinessImportExports,
+    "readiness import fixture summary must list the expected imported exports"
+  );
+  assert.equal(
+    importFixtureEvidence.stdoutBytes,
+    0,
+    "readiness import fixture summary must prove import stdout stayed empty"
+  );
+  assert.equal(
+    importFixtureEvidence.stderrBytes,
+    0,
+    "readiness import fixture summary must prove import stderr stayed empty"
+  );
+  assert.ok(
+    Number.isInteger(importFixtureEvidence.durationMs) && importFixtureEvidence.durationMs >= 0 && importFixtureEvidence.durationMs < 2000,
+    "readiness import fixture summary must prove import duration stayed below the child-process guard"
   );
   const readinessFixtureResult = readinessSummary.results.find((item) => item.name === "readiness output fixture");
   if (requireFixtureSummary) {
@@ -716,7 +756,7 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
   const scannedFileCount = Number(scannedFileCountMatch[1]);
   assert.ok(scannedFileCount > 0, "text output scannedFileCount must be positive");
 
-  return { scannedFileCount, fixtureSummaryIndexes, fixtureSummaryKeyCount };
+  return { scannedFileCount, fixtureSummaryIndexes, fixtureSummaryKeyCount, importFixtureEvidence };
 }
 
 function runReadinessOutputCheck() {
@@ -739,7 +779,7 @@ function runReadinessOutputCheck() {
   assert.equal(jsonResult.status, 0, `json readiness exited with ${jsonResult.status}\n${jsonOutput}`);
 
   const readinessSummary = JSON.parse(jsonOutput);
-  const { scannedFileCount, fixtureSummaryIndexes, fixtureSummaryKeyCount } = assertReadinessJsonEvidence(readinessSummary, {
+  const { scannedFileCount, fixtureSummaryIndexes, fixtureSummaryKeyCount, importFixtureEvidence } = assertReadinessJsonEvidence(readinessSummary, {
     requireFixtureSummary: true,
   });
   assertReadinessOutputCliIndexes(fixtureSummaryIndexes);
@@ -752,6 +792,10 @@ function runReadinessOutputCheck() {
     checklistCommands: expectedChecklistCommands,
     checklistItems: expectedChecklistItems,
     textOutputScannedFileCount: scannedFileCount,
+    importFixtureDurationMs: importFixtureEvidence.durationMs,
+    importFixtureStdoutBytes: importFixtureEvidence.stdoutBytes,
+    importFixtureStderrBytes: importFixtureEvidence.stderrBytes,
+    importFixtureExportCount: importFixtureEvidence.exportsChecked.length,
     fixtureSummaryKeyCount,
     fixtureSummaryIndexes,
   }, null, 2));

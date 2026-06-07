@@ -266,13 +266,40 @@ function buildTextOutputResult({
   };
 }
 
+function buildReadinessImportResult({
+  durationMs = 101,
+  stdoutBytes = 0,
+  stderrBytes = 0,
+} = {}) {
+  return {
+    name: "readiness import fixture",
+    summary: JSON.stringify({
+      ok: true,
+      checked: "verify-readiness-summary import fixture",
+      exportsChecked: [
+        "readinessNote",
+        "checks",
+        "getReadinessChecks",
+        "buildReadinessSummary",
+        "formatCompactReadinessSummary",
+        "runReadinessSummaryCli",
+      ],
+      durationMs,
+      stdoutBytes,
+      stderrBytes,
+    }, null, 2),
+  };
+}
+
 function buildReadiness(textOutputOptions, {
   includeReadmeResult = true,
   includeReadmeOutputResult = true,
+  includeReadinessImportResult = true,
   includeEvaluationReportsResult = true,
   includeServerRequired = true,
   includeNote = true,
   readmeOptions,
+  readinessImportOptions,
   evaluationReportsOptions,
 } = {}) {
   const results = [buildTextOutputResult(textOutputOptions)];
@@ -283,6 +310,10 @@ function buildReadiness(textOutputOptions, {
 
   if (includeReadmeOutputResult) {
     results.push(buildReadmeOutputResult());
+  }
+
+  if (includeReadinessImportResult) {
+    results.push(buildReadinessImportResult(readinessImportOptions));
   }
 
   if (includeEvaluationReportsResult) {
@@ -619,6 +650,7 @@ function buildReadinessWithFixtureSummary(fixtureOutput) {
       buildReadmeOutputResult(),
       buildTextOutputResult(),
       buildEvaluationReportsResult(),
+      buildReadinessImportResult(),
       {
         name: "readiness output fixture",
         summary: JSON.stringify(fixtureOutput, null, 2),
