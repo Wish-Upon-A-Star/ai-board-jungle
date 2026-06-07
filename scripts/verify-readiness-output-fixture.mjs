@@ -119,6 +119,20 @@ const staleChecklistItems = buildReadiness(undefined, {
   readmeOptions: { checklistItems: expectedChecklistItems - 1 },
 });
 
+function assertFailureFlagFieldsMatch(output) {
+  const booleanFailureFields = Object.keys(output).filter((key) => key.endsWith("Fails"));
+  assert.deepEqual(
+    booleanFailureFields.sort(),
+    [...output.failureFlags].sort(),
+    "fixture output failureFlags must match boolean *Fails fields"
+  );
+  assert.equal(
+    output.failureFlags.length,
+    booleanFailureFields.length,
+    "fixture output failureFlags length must match boolean *Fails field count"
+  );
+}
+
 const validResult = assertReadinessJsonEvidence(validReadiness);
 assert.equal(validResult.scannedFileCount, 46, "valid fixture must parse scannedFileCount");
 
@@ -182,16 +196,11 @@ for (const flag of expectedFailureFlags) {
   assert.equal(output[flag], true, `fixture output must expose ${flag}`);
 }
 
-const booleanFailureFields = Object.keys(output).filter((key) => key.endsWith("Fails"));
-assert.deepEqual(
-  booleanFailureFields.sort(),
-  [...expectedFailureFlags].sort(),
-  "fixture output failureFlags must match boolean *Fails fields"
-);
-assert.equal(
-  output.failureFlags.length,
-  booleanFailureFields.length,
-  "fixture output failureFlags length must match boolean *Fails field count"
+assertFailureFlagFieldsMatch(output);
+assert.throws(
+  () => assertFailureFlagFieldsMatch({ ...output, unexpectedFails: true }),
+  /failureFlags/,
+  "extra boolean *Fails fixture must fail the failureFlags guard"
 );
 
 console.log(JSON.stringify(output, null, 2));
