@@ -330,6 +330,17 @@ assertFixtureEvidenceOrder({
 assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(output), {
   requireFixtureSummary: true,
 });
+const reorderedFailureFlagsOutput = {
+  ...output,
+  failureFlags: [...expectedFailureFlags].reverse(),
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(reorderedFailureFlagsOutput), {
+    requireFixtureSummary: true,
+  }),
+  /expected order/,
+  "readiness fixture summary with reordered failureFlags must fail"
+);
 const reorderedNegativeFixtureGuardsOutput = {
   ...output,
   negativeFixtureGuards: [...expectedNegativeFixtureGuards].reverse(),

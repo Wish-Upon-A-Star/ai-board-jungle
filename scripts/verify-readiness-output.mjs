@@ -19,6 +19,17 @@ const requiredLines = [
   "PASS backend syntax",
 ];
 
+const expectedFailureFlags = [
+  "missingScannedFileCountFails",
+  "nonEmptyMissingRequiredFilesFails",
+  "missingRequiredScannedFilesFails",
+  "missingReadmeResultFails",
+  "missingChecklistCommandsFails",
+  "staleChecklistCommandsFails",
+  "missingChecklistItemsFails",
+  "staleChecklistItemsFails",
+];
+
 const expectedDirectHelperNegativeScenarios = [
   "missingDirectHelperNegativeGuards",
   "staleDirectHelperNegativeGuards",
@@ -134,6 +145,11 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     assert.ok(
       readinessFixtureResult.summary.includes('"staleChecklistItemsFails"'),
       "readiness output fixture summary must include last failure flag"
+    );
+    assert.deepEqual(
+      readinessFixtureOutput.failureFlags,
+      expectedFailureFlags,
+      "readiness output fixture summary must list failureFlags in the expected order"
     );
     assert.ok(
       readinessFixtureResult.summary.includes('"negativeFixtureGuards": ['),
