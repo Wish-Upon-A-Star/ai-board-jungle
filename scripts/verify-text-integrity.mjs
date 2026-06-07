@@ -58,6 +58,12 @@ function listFiles(target) {
 
 const hits = [];
 const scannedFiles = [];
+const missingRequiredFiles = requiredScannedFiles.filter((file) => !existsSync(file));
+
+if (missingRequiredFiles.length) {
+  console.error(JSON.stringify({ ok: false, checked: 0, missingRequiredFiles, hits: [] }, null, 2));
+  process.exit(1);
+}
 
 for (const target of scanTargets) {
   for (const file of listFiles(target)) {
@@ -83,8 +89,8 @@ for (const target of scanTargets) {
 const missingRequiredScans = requiredScannedFiles.filter((file) => !scannedFiles.includes(file));
 
 if (hits.length || missingRequiredScans.length) {
-  console.error(JSON.stringify({ ok: false, checked: scannedFiles.length, hits, missingRequiredScans }, null, 2));
+  console.error(JSON.stringify({ ok: false, checked: scannedFiles.length, hits, missingRequiredFiles, missingRequiredScans }, null, 2));
   process.exit(1);
 }
 
-console.log(JSON.stringify({ ok: true, checked: scannedFiles.length, requiredScannedFiles, hits: [] }, null, 2));
+console.log(JSON.stringify({ ok: true, checked: scannedFiles.length, requiredScannedFiles, missingRequiredFiles, hits: [] }, null, 2));
