@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
+import { serverRequiredCommands } from "./verification-command-lists.mjs";
 
 const compact = process.argv.includes("--compact");
 
@@ -50,15 +51,7 @@ const checks = [
 
 const results = checks.map(([name, cmd, args]) => runCheck(name, cmd, args));
 const failed = results.filter((item) => !item.ok);
-const serverRequired = [
-  "verify:contract",
-  "smoke:http",
-  "smoke:ui",
-  "verify:fastapi",
-  "verify:full:quick",
-  "verify:full",
-  "test:live-integrations",
-];
+const serverRequired = serverRequiredCommands;
 
 const summary = {
   ok: failed.length === 0,

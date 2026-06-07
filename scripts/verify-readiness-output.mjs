@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { serverRequiredCommands } from "./verification-command-lists.mjs";
+
+const expectedServerRequiredLine = `server-required: ${serverRequiredCommands.join(", ")}`;
 
 const result = spawnSync(process.execPath, ["scripts/verify-readiness-summary.mjs", "--compact"], {
   shell: false,
@@ -10,10 +13,7 @@ const result = spawnSync(process.execPath, ["scripts/verify-readiness-summary.mj
 const output = `${result.stdout || ""}${result.stderr || ""}`;
 assert.equal(result.status, 0, `compact readiness exited with ${result.status}\n${output}`);
 assert.ok(output.includes("READINESS OK 8/8 passed"), "compact output must include the readiness total");
-assert.ok(
-  output.includes("server-required: verify:contract, smoke:http, smoke:ui, verify:fastapi, verify:full:quick, verify:full, test:live-integrations"),
-  "compact output must list server-required checks"
-);
+assert.ok(output.includes(expectedServerRequiredLine), "compact output must list server-required checks");
 
 const requiredLines = [
   "PASS hygiene",
