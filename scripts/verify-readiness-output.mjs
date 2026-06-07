@@ -106,6 +106,14 @@ export function assertFixtureEvidenceOrder({
   );
 }
 
+export function assertFixtureSummaryKeySchema(fixtureOutput) {
+  assert.deepEqual(
+    Object.keys(fixtureOutput),
+    expectedFixtureSummaryKeys,
+    "readiness output fixture summary must list top-level keys in the expected schema order"
+  );
+}
+
 export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSummary = false } = {}) {
   let fixtureSummaryIndexes = null;
   let readinessFixtureOutput = null;
@@ -250,11 +258,7 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       firstBooleanFailureFieldIndex,
     };
     assertFixtureEvidenceOrder(fixtureSummaryIndexes);
-    assert.deepEqual(
-      Object.keys(readinessFixtureOutput),
-      expectedFixtureSummaryKeys,
-      "readiness output fixture summary must list top-level keys in the expected schema order"
-    );
+    assertFixtureSummaryKeySchema(readinessFixtureOutput);
   }
 
   const scannedFileCountMatch = textOutputResult.summary.match(/"scannedFileCount":\s*(\d+)/);

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { assertFixtureEvidenceOrder, assertFixtureSummaryIndexes, assertReadinessJsonEvidence } from "./verify-readiness-output.mjs";
+import { assertFixtureEvidenceOrder, assertFixtureSummaryIndexes, assertFixtureSummaryKeySchema, assertReadinessJsonEvidence } from "./verify-readiness-output.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
 const expectedFailureFlags = [
@@ -267,6 +267,13 @@ const output = {
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 
+function extraTopLevelFailureOutput() {
+  return {
+    ...output,
+    unexpectedEvidence: "unexpected",
+  };
+}
+
 function buildReadinessWithFixtureSummary(fixtureOutput) {
   return {
     results: [
@@ -318,6 +325,12 @@ assert.deepEqual(
   "fixture output must expose direct helper negative scenario coverage"
 );
 const outputKeys = Object.keys(output);
+assertFixtureSummaryKeySchema(output);
+assert.throws(
+  () => assertFixtureSummaryKeySchema(extraTopLevelFailureOutput()),
+  /top-level keys/,
+  "direct fixture summary key schema helper must reject an extra top-level key"
+);
 assertFixtureEvidenceOrder({
   failureFlagsIndex: outputKeys.indexOf("failureFlags"),
   positiveFixtureGuardsIndex: outputKeys.indexOf("positiveFixtureGuards"),
@@ -349,8 +362,7 @@ assert.throws(
   "readiness fixture summary with validScannedFileCount after failureFlags must fail"
 );
 const extraTopLevelEvidenceOutput = {
-  ...output,
-  unexpectedEvidence: "unexpected",
+  ...extraTopLevelFailureOutput(),
 };
 assert.throws(
   () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(extraTopLevelEvidenceOutput), {
