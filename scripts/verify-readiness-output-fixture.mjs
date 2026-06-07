@@ -117,6 +117,8 @@ const expectedReadinessOutputCliIndexPositiveGuardNegativeScenarios = [
   "staleReadinessOutputCliIndexPositiveGuardsIndex",
   "staleReadinessOutputCliIndexNegativeScenariosIndex",
   "misplacedReadinessOutputCliIndexNegativeScenariosIndex",
+  "staleNegativeFixtureGuardSourceRetentionChecksIndex",
+  "staleDirectHelperNegativeGuardsIndexAfterSourceRetentionChecks",
 ];
 
 const expectedReadinessOutputCliIndexNegativeScenarios = [
@@ -1737,6 +1739,37 @@ assert.throws(
   }),
   /misplaced CLI negative scenarios index negative scenario/,
   "readiness fixture summary with wrong positive guard helper scenario name must fail"
+);
+const missingSourceRetentionReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput = {
+  ...output,
+  readinessOutputCliIndexPositiveGuardNegativeScenarios: [
+    "staleReadinessOutputCliIndexPositiveGuardsIndex",
+    "staleReadinessOutputCliIndexNegativeScenariosIndex",
+    "misplacedReadinessOutputCliIndexNegativeScenariosIndex",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(missingSourceRetentionReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /source-retention CLI index helper scenario/,
+  "readiness fixture summary without source-retention CLI helper scenario must fail"
+);
+const missingDirectHelperAfterSourceRetentionReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput = {
+  ...output,
+  readinessOutputCliIndexPositiveGuardNegativeScenarios: [
+    "staleReadinessOutputCliIndexPositiveGuardsIndex",
+    "staleReadinessOutputCliIndexNegativeScenariosIndex",
+    "misplacedReadinessOutputCliIndexNegativeScenariosIndex",
+    "staleNegativeFixtureGuardSourceRetentionChecksIndex",
+  ],
+};
+assert.throws(
+  () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(missingDirectHelperAfterSourceRetentionReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput), {
+    requireFixtureSummary: true,
+  }),
+  /direct helper CLI index after source-retention scenario/,
+  "readiness fixture summary without direct helper after source-retention CLI helper scenario must fail"
 );
 const expandedReadinessOutputCliIndexPositiveGuardNegativeScenariosOutput = {
   ...output,

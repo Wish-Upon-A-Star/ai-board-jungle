@@ -80,6 +80,8 @@ const expectedReadinessOutputCliIndexPositiveGuardNegativeScenarios = [
   "staleReadinessOutputCliIndexPositiveGuardsIndex",
   "staleReadinessOutputCliIndexNegativeScenariosIndex",
   "misplacedReadinessOutputCliIndexNegativeScenariosIndex",
+  "staleNegativeFixtureGuardSourceRetentionChecksIndex",
+  "staleDirectHelperNegativeGuardsIndexAfterSourceRetentionChecks",
 ];
 
 const expectedReadinessOutputCliIndexNegativeScenarios = [
@@ -662,6 +664,14 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     assert.ok(
       readinessFixtureResult.summary.includes('"misplacedReadinessOutputCliIndexNegativeScenariosIndex"'),
       "readiness output fixture summary must include misplaced CLI negative scenarios index negative scenario"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"staleNegativeFixtureGuardSourceRetentionChecksIndex"'),
+      "readiness output fixture summary must include stale source-retention CLI index helper scenario"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"staleDirectHelperNegativeGuardsIndexAfterSourceRetentionChecks"'),
+      "readiness output fixture summary must include stale direct helper CLI index after source-retention scenario"
     );
     assert.deepEqual(
       readinessFixtureOutput.readinessOutputCliIndexPositiveGuardNegativeScenarios,
