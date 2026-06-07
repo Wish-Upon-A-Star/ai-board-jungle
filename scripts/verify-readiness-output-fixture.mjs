@@ -8,7 +8,11 @@ import {
   assertReadinessJsonEvidence,
   expectedFixtureSummaryKeys,
 } from "./verify-readiness-output.mjs";
-import { getLatestEvaluationRound, readEvaluationReportRounds } from "./verify-evaluation-reports.mjs";
+import {
+  buildEvaluationReportSummary,
+  getLatestEvaluationRound,
+  readEvaluationReportRounds,
+} from "./verify-evaluation-reports.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
 const expectedFailureFlags = [
@@ -44,9 +48,7 @@ const expectedPositiveFixtureGuards = [
 ];
 
 const evaluationReportRounds = readEvaluationReportRounds();
-const expectedEvaluationReportCount = evaluationReportRounds.length;
-const expectedFirstEvaluationReport = evaluationReportRounds[0].file;
-const expectedLatestEvaluationReport = evaluationReportRounds.at(-1).file;
+const expectedEvaluationReportSummary = buildEvaluationReportSummary(evaluationReportRounds);
 const expectedLatestEvaluationRound = getLatestEvaluationRound();
 
 function readEvaluationReportsCliSummary() {
@@ -62,6 +64,11 @@ function readEvaluationReportsCliSummary() {
 
 const evaluationReportsCliSummary = readEvaluationReportsCliSummary();
 
+assert.deepEqual(
+  evaluationReportsCliSummary,
+  expectedEvaluationReportSummary,
+  "verify:evaluation-reports CLI summary must match the shared evaluation report summary builder"
+);
 assert.equal(
   evaluationReportsCliSummary.ok,
   true,
@@ -74,17 +81,17 @@ assert.equal(
 );
 assert.equal(
   evaluationReportsCliSummary.checked,
-  expectedEvaluationReportCount,
+  expectedEvaluationReportSummary.checked,
   "readEvaluationReportRounds helper count must match verify:evaluation-reports CLI checked count"
 );
 assert.equal(
   evaluationReportsCliSummary.first,
-  expectedFirstEvaluationReport,
+  expectedEvaluationReportSummary.first,
   "readEvaluationReportRounds first file must match verify:evaluation-reports CLI first file"
 );
 assert.equal(
   evaluationReportsCliSummary.latest,
-  expectedLatestEvaluationReport,
+  expectedEvaluationReportSummary.latest,
   "readEvaluationReportRounds latest file must match verify:evaluation-reports CLI latest file"
 );
 

@@ -37,14 +37,19 @@ export function getLatestEvaluationRound() {
   return rounds.at(-1).round;
 }
 
-const rounds = assertEvaluationReportRounds(readEvaluationReportRounds());
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  console.log(JSON.stringify({
+export function buildEvaluationReportSummary(rounds) {
+  return {
     ok: true,
     checked: rounds.length,
     first: rounds[0].file,
     latest: rounds.at(-1).file,
     latestRound: rounds.at(-1).round,
-  }, null, 2));
+  };
+}
+
+const rounds = assertEvaluationReportRounds(readEvaluationReportRounds());
+const summary = buildEvaluationReportSummary(rounds);
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  console.log(JSON.stringify(summary, null, 2));
 }
