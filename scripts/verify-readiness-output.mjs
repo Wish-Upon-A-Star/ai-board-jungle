@@ -101,6 +101,10 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       negativeFixtureGuardsIndex,
       firstBooleanFailureFieldIndex,
     };
+    assert.ok(
+      Object.values(fixtureSummaryIndexes).every((index) => Number.isInteger(index) && index >= 0),
+      "readiness output fixture summary indexes must be non-negative integers"
+    );
   }
 
   const scannedFileCountMatch = textOutputResult.summary.match(/"scannedFileCount":\s*(\d+)/);
