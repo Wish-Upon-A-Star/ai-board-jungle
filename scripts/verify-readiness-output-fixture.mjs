@@ -63,6 +63,21 @@ const nonEmptyMissingRequiredFiles = {
   ],
 };
 
+const missingRequiredScannedFiles = {
+  results: [
+    validReadiness.results[0],
+    {
+      name: "text output",
+      summary: [
+        '  "checked": "verify-text output",',
+        '  "missingRequiredFiles": [],',
+        '  "hits": [],',
+        '  "scannedFileCount": 46',
+      ].join("\n"),
+    },
+  ],
+};
+
 const validResult = assertReadinessJsonEvidence(validReadiness);
 assert.equal(validResult.scannedFileCount, 46, "valid fixture must parse scannedFileCount");
 
@@ -78,10 +93,17 @@ assert.throws(
   "non-empty missingRequiredFiles fixture must fail"
 );
 
+assert.throws(
+  () => assertReadinessJsonEvidence(missingRequiredScannedFiles),
+  /requiredScannedFiles/,
+  "missing requiredScannedFiles fixture must fail"
+);
+
 console.log(JSON.stringify({
   ok: true,
   checked: "verify-readiness-output negative fixture",
   validScannedFileCount: validResult.scannedFileCount,
   missingScannedFileCountFails: true,
   nonEmptyMissingRequiredFilesFails: true,
+  missingRequiredScannedFilesFails: true,
 }, null, 2));

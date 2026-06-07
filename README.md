@@ -363,7 +363,7 @@ npm run test:live-integrations
 - `npm run verify:readiness` prints a JSON readiness summary without starting FastAPI, Vite, or Chrome CDP.
 - `npm run verify:readiness:compact` prints the same serverless readiness checks as one line per check for CI logs.
 - `npm run verify:readiness-output` asserts the compact output keeps the `READINESS OK` summary, required `PASS` lines, README counts, and text-output evidence.
-- `npm run verify:readiness-output-fixture` checks that fake readiness results missing `scannedFileCount` or reporting non-empty `missingRequiredFiles` fail the readiness-output contract.
+- `npm run verify:readiness-output-fixture` checks that fake readiness results missing `scannedFileCount`, missing `requiredScannedFiles`, or reporting non-empty `missingRequiredFiles` fail the readiness-output contract.
 - `npm run verify:command-scope` asserts the README serverless/server-required command lists stay synchronized with `package.json`.
 - It runs hygiene, text, text-output, frontend helper, template preset, evaluation report, README, readiness-output fixture, command scope, and backend syntax checks.
 - Server-required checks are listed separately in the output so users know when to run `npm run verify:full:quick`.
