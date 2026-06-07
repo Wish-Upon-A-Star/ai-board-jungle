@@ -2,13 +2,25 @@ import assert from "node:assert/strict";
 import { assertReadinessJsonEvidence } from "./verify-readiness-output.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
-function buildReadmeResult() {
+function buildReadmeResult({
+  includeChecklistCommands = true,
+  includeChecklistItems = true,
+  checklistCommands = expectedChecklistCommands,
+  checklistItems = expectedChecklistItems,
+} = {}) {
+  const summary = [];
+
+  if (includeChecklistCommands) {
+    summary.push(`  "checklistCommands": ${checklistCommands},`);
+  }
+
+  if (includeChecklistItems) {
+    summary.push(`  "checklistItems": ${checklistItems}`);
+  }
+
   return {
     name: "readme",
-    summary: [
-      `  "checklistCommands": ${expectedChecklistCommands},`,
-      `  "checklistItems": ${expectedChecklistItems}`,
-    ].join("\n"),
+    summary: summary.join("\n"),
   };
 }
 
@@ -50,11 +62,11 @@ function buildTextOutputResult({
   };
 }
 
-function buildReadiness(textOutputOptions, { includeReadmeResult = true } = {}) {
+function buildReadiness(textOutputOptions, { includeReadmeResult = true, readmeOptions } = {}) {
   const results = [buildTextOutputResult(textOutputOptions)];
 
   if (includeReadmeResult) {
-    results.unshift(buildReadmeResult());
+    results.unshift(buildReadmeResult(readmeOptions));
   }
 
   return {
@@ -78,6 +90,22 @@ const missingRequiredScannedFiles = buildReadiness({
 
 const missingReadmeResult = buildReadiness(undefined, {
   includeReadmeResult: false,
+});
+
+const missingChecklistCommands = buildReadiness(undefined, {
+  readmeOptions: { includeChecklistCommands: false },
+});
+
+const staleChecklistCommands = buildReadiness(undefined, {
+  readmeOptions: { checklistCommands: expectedChecklistCommands - 1 },
+});
+
+const missingChecklistItems = buildReadiness(undefined, {
+  readmeOptions: { includeChecklistItems: false },
+});
+
+const staleChecklistItems = buildReadiness(undefined, {
+  readmeOptions: { checklistItems: expectedChecklistItems - 1 },
 });
 
 const validResult = assertReadinessJsonEvidence(validReadiness);
@@ -107,6 +135,30 @@ assert.throws(
   "missing readme result fixture must fail"
 );
 
+assert.throws(
+  () => assertReadinessJsonEvidence(missingChecklistCommands),
+  /checklistCommands/,
+  "missing checklistCommands fixture must fail"
+);
+
+assert.throws(
+  () => assertReadinessJsonEvidence(staleChecklistCommands),
+  /checklistCommands/,
+  "stale checklistCommands fixture must fail"
+);
+
+assert.throws(
+  () => assertReadinessJsonEvidence(missingChecklistItems),
+  /checklistItems/,
+  "missing checklistItems fixture must fail"
+);
+
+assert.throws(
+  () => assertReadinessJsonEvidence(staleChecklistItems),
+  /checklistItems/,
+  "stale checklistItems fixture must fail"
+);
+
 console.log(JSON.stringify({
   ok: true,
   checked: "verify-readiness-output negative fixture",
@@ -115,4 +167,8 @@ console.log(JSON.stringify({
   nonEmptyMissingRequiredFilesFails: true,
   missingRequiredScannedFilesFails: true,
   missingReadmeResultFails: true,
+  missingChecklistCommandsFails: true,
+  staleChecklistCommandsFails: true,
+  missingChecklistItemsFails: true,
+  staleChecklistItemsFails: true,
 }, null, 2));
