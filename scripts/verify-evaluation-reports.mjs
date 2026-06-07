@@ -18,10 +18,10 @@ export function readEvaluationReportRounds() {
 export function assertEvaluationReportRounds(rounds) {
   const seen = new Set();
   for (let index = 0; index < rounds.length; index += 1) {
-    const expected = index + 1;
     const { file, round } = rounds[index];
-    assert.equal(round, expected, `expected round ${String(expected).padStart(2, "0")} but found ${file}`);
     assert.equal(seen.has(round), false, `duplicate evaluation report round ${round}`);
+    const expected = index + 1;
+    assert.equal(round, expected, `expected round ${String(expected).padStart(2, "0")} but found ${file}`);
     seen.add(round);
 
     const content = readFileSync(join(reportsDir, file), "utf8");

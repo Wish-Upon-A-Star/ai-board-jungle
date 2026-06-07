@@ -56,6 +56,15 @@ assert.throws(
   /expected round 01/,
   "buildEvaluationReportSummary must reject a truncated rounds array before CLI execution"
 );
+const duplicateEvaluationReportRounds = [
+  ...evaluationReportRounds,
+  evaluationReportRounds.at(-1),
+];
+assert.throws(
+  () => buildEvaluationReportSummary(duplicateEvaluationReportRounds),
+  /duplicate evaluation report round \d+/,
+  "buildEvaluationReportSummary must reject duplicate rounds before CLI execution"
+);
 
 function readEvaluationReportsCliSummary() {
   const result = spawnSync(process.execPath, ["scripts/verify-evaluation-reports.mjs"], {
