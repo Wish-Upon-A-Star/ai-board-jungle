@@ -53,6 +53,11 @@ const expectedEvaluationReportNegativeGuards = [
   "duplicateEvaluationReportRounds",
 ];
 
+const expectedReadinessOutputCliIndexNegativeScenarios = [
+  "staleEvaluationReportNegativeGuardsIndex",
+  "misplacedEvaluationReportNegativeGuardsIndex",
+];
+
 const evaluationReportRounds = readEvaluationReportRounds();
 const expectedEvaluationReportSummary = buildEvaluationReportSummary(evaluationReportRounds);
 const expectedLatestEvaluationRound = getLatestEvaluationRound();
@@ -413,6 +418,7 @@ const output = {
   directHelperNegativeGuards: expectedDirectHelperNegativeGuards,
   directHelperNegativeScenarios: expectedDirectHelperNegativeScenarios,
   evaluationReportNegativeGuards: expectedEvaluationReportNegativeGuards,
+  readinessOutputCliIndexNegativeScenarios: expectedReadinessOutputCliIndexNegativeScenarios,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 
@@ -480,6 +486,11 @@ assert.deepEqual(
   expectedEvaluationReportNegativeGuards,
   "fixture output must expose evaluation report builder negative guard coverage"
 );
+assert.deepEqual(
+  output.readinessOutputCliIndexNegativeScenarios,
+  expectedReadinessOutputCliIndexNegativeScenarios,
+  "fixture output must expose readiness CLI index negative scenario coverage"
+);
 const outputKeys = Object.keys(output);
 assert.deepEqual(
   expectedFixtureSummaryKeys,
@@ -535,6 +546,7 @@ const misplacedValidScannedFileCountOutput = {
   directHelperNegativeGuards: output.directHelperNegativeGuards,
   directHelperNegativeScenarios: output.directHelperNegativeScenarios,
   evaluationReportNegativeGuards: output.evaluationReportNegativeGuards,
+  readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 assert.throws(
@@ -776,6 +788,7 @@ const misplacedPositiveFixtureGuardsOutput = {
   directHelperNegativeScenarios: output.directHelperNegativeScenarios,
   positiveFixtureGuards: output.positiveFixtureGuards,
   evaluationReportNegativeGuards: output.evaluationReportNegativeGuards,
+  readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 assert.throws(
@@ -796,6 +809,7 @@ const earlyBooleanFailureFieldsOutput = {
   directHelperNegativeGuards: output.directHelperNegativeGuards,
   directHelperNegativeScenarios: output.directHelperNegativeScenarios,
   evaluationReportNegativeGuards: output.evaluationReportNegativeGuards,
+  readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
 };
 assert.throws(
   () => assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(earlyBooleanFailureFieldsOutput), {
@@ -814,6 +828,7 @@ const misplacedFailureFlagsOutput = {
   directHelperNegativeGuards: output.directHelperNegativeGuards,
   directHelperNegativeScenarios: output.directHelperNegativeScenarios,
   evaluationReportNegativeGuards: output.evaluationReportNegativeGuards,
+  readinessOutputCliIndexNegativeScenarios: output.readinessOutputCliIndexNegativeScenarios,
   ...Object.fromEntries(expectedFailureFlags.map((flag) => [flag, true])),
 };
 assert.throws(

@@ -58,6 +58,11 @@ const expectedEvaluationReportNegativeGuards = [
   "duplicateEvaluationReportRounds",
 ];
 
+const expectedReadinessOutputCliIndexNegativeScenarios = [
+  "staleEvaluationReportNegativeGuardsIndex",
+  "misplacedEvaluationReportNegativeGuardsIndex",
+];
+
 export const expectedFixtureSummaryKeys = Object.freeze([
   "ok",
   "checked",
@@ -68,6 +73,7 @@ export const expectedFixtureSummaryKeys = Object.freeze([
   "directHelperNegativeGuards",
   "directHelperNegativeScenarios",
   "evaluationReportNegativeGuards",
+  "readinessOutputCliIndexNegativeScenarios",
   ...expectedFailureFlags,
 ]);
 
@@ -309,6 +315,23 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       readinessFixtureOutput.evaluationReportNegativeGuards,
       expectedEvaluationReportNegativeGuards,
       "readiness output fixture summary must list evaluationReportNegativeGuards in the expected order"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"readinessOutputCliIndexNegativeScenarios": ['),
+      "readiness output fixture summary must include readinessOutputCliIndexNegativeScenarios list"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"staleEvaluationReportNegativeGuardsIndex"'),
+      "readiness output fixture summary must include stale CLI index negative scenario"
+    );
+    assert.ok(
+      readinessFixtureResult.summary.includes('"misplacedEvaluationReportNegativeGuardsIndex"'),
+      "readiness output fixture summary must include misplaced CLI index negative scenario"
+    );
+    assert.deepEqual(
+      readinessFixtureOutput.readinessOutputCliIndexNegativeScenarios,
+      expectedReadinessOutputCliIndexNegativeScenarios,
+      "readiness output fixture summary must list readinessOutputCliIndexNegativeScenarios in the expected order"
     );
     const failureFlagsIndex = readinessFixtureResult.summary.indexOf('"failureFlags": [');
     const positiveFixtureGuardsIndex = readinessFixtureResult.summary.indexOf('"positiveFixtureGuards": [');
