@@ -165,6 +165,13 @@ assert.throws(
   /failureFlags, positiveFixtureGuards, negativeFixtureGuards/,
   "equal adjacent evidence indexes must fail the strict order guard"
 );
+const missingEvidenceIndex = { ...validFixtureSummaryIndexes };
+delete missingEvidenceIndex.firstBooleanFailureFieldIndex;
+assert.throws(
+  () => assertFixtureEvidenceOrder(missingEvidenceIndex),
+  /non-negative integers/,
+  "missing evidence index must fail the shared order guard shape check"
+);
 assert.throws(
   () => assertFixtureSummaryIndexes({ ...validFixtureSummaryIndexes, failureFlagsIndex: -1 }),
   /non-negative integers/,
