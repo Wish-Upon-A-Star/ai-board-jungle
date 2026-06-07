@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { assertFixtureSummaryIndexes, assertReadinessJsonEvidence } from "./verify-readiness-output.mjs";
+import { assertFixtureEvidenceOrder, assertFixtureSummaryIndexes, assertReadinessJsonEvidence } from "./verify-readiness-output.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
 const expectedFailureFlags = [
@@ -271,15 +271,12 @@ assert.deepEqual(
   "fixture output must expose covered failureFlags guard directions"
 );
 const outputKeys = Object.keys(output);
-const positiveFixtureGuardsIndex = outputKeys.indexOf("positiveFixtureGuards");
-const negativeFixtureGuardsIndex = outputKeys.indexOf("negativeFixtureGuards");
-const firstBooleanFailureFieldIndex = outputKeys.findIndex((key) => key.endsWith("Fails"));
-assert.ok(
-  positiveFixtureGuardsIndex >= 0
-    && negativeFixtureGuardsIndex > positiveFixtureGuardsIndex
-    && negativeFixtureGuardsIndex < firstBooleanFailureFieldIndex,
-  "fixture output must list positiveFixtureGuards, negativeFixtureGuards, then boolean *Fails fields"
-);
+assertFixtureEvidenceOrder({
+  failureFlagsIndex: outputKeys.indexOf("failureFlags"),
+  positiveFixtureGuardsIndex: outputKeys.indexOf("positiveFixtureGuards"),
+  negativeFixtureGuardsIndex: outputKeys.indexOf("negativeFixtureGuards"),
+  firstBooleanFailureFieldIndex: outputKeys.findIndex((key) => key.endsWith("Fails")),
+});
 
 assertReadinessJsonEvidence(buildReadinessWithFixtureSummary(output), {
   requireFixtureSummary: true,

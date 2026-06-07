@@ -35,6 +35,27 @@ export function assertFixtureSummaryIndexes(fixtureSummaryIndexes) {
   );
 }
 
+export function assertFixtureEvidenceOrder({
+  failureFlagsIndex,
+  positiveFixtureGuardsIndex,
+  negativeFixtureGuardsIndex,
+  firstBooleanFailureFieldIndex,
+}) {
+  assertFixtureSummaryIndexes({
+    failureFlagsIndex,
+    positiveFixtureGuardsIndex,
+    negativeFixtureGuardsIndex,
+    firstBooleanFailureFieldIndex,
+  });
+  assert.ok(
+    failureFlagsIndex >= 0
+      && positiveFixtureGuardsIndex > failureFlagsIndex
+      && negativeFixtureGuardsIndex > positiveFixtureGuardsIndex
+      && firstBooleanFailureFieldIndex > negativeFixtureGuardsIndex,
+    "readiness output fixture summary must list failureFlags, positiveFixtureGuards, negativeFixtureGuards, then boolean *Fails fields"
+  );
+}
+
 export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSummary = false } = {}) {
   let fixtureSummaryIndexes = null;
   const readmeResult = readinessSummary.results.find((item) => item.name === "readme");
@@ -106,20 +127,13 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     const positiveFixtureGuardsIndex = readinessFixtureResult.summary.indexOf('"positiveFixtureGuards": [');
     const negativeFixtureGuardsIndex = readinessFixtureResult.summary.indexOf('"negativeFixtureGuards": [');
     const firstBooleanFailureFieldIndex = readinessFixtureResult.summary.indexOf('"missingScannedFileCountFails": true');
-    assert.ok(
-      failureFlagsIndex >= 0
-        && positiveFixtureGuardsIndex > failureFlagsIndex
-        && negativeFixtureGuardsIndex > positiveFixtureGuardsIndex
-        && firstBooleanFailureFieldIndex > negativeFixtureGuardsIndex,
-      "readiness output fixture summary must list failureFlags, positiveFixtureGuards, negativeFixtureGuards, then boolean *Fails fields"
-    );
     fixtureSummaryIndexes = {
       failureFlagsIndex,
       positiveFixtureGuardsIndex,
       negativeFixtureGuardsIndex,
       firstBooleanFailureFieldIndex,
     };
-    assertFixtureSummaryIndexes(fixtureSummaryIndexes);
+    assertFixtureEvidenceOrder(fixtureSummaryIndexes);
   }
 
   const scannedFileCountMatch = textOutputResult.summary.match(/"scannedFileCount":\s*(\d+)/);
