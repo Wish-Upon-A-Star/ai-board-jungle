@@ -202,5 +202,12 @@ assert.throws(
   /failureFlags/,
   "extra boolean *Fails fixture must fail the failureFlags guard"
 );
+const missingBooleanFailureOutput = { ...output };
+delete missingBooleanFailureOutput.missingScannedFileCountFails;
+assert.throws(
+  () => assertFailureFlagFieldsMatch(missingBooleanFailureOutput),
+  /failureFlags/,
+  "missing boolean *Fails fixture must fail the failureFlags guard"
+);
 
 console.log(JSON.stringify(output, null, 2));
