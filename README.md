@@ -275,6 +275,17 @@ npm run smoke:http
 - `verify:readme`: 제출 README 구조, 체크리스트, PNG 스크린샷 무결성 확인
 - `verify:contract`: React UI가 의존하는 FastAPI 응답 계약 확인
 - `verify:full:quick`: hygiene, text, frontend helper, README, backend tests, frontend build, API contract, HTTP smoke, UI CDP smoke, MCP smoke
+- `verify:template-presets`: checks reusable automation templates for GitHub + Notion, Figma + Google Calendar, and custom API setups
+- `verify:evaluation-reports`: checks contiguous round reports with scores and next-risk evidence
+- `verify:readiness`: prints the serverless readiness JSON summary
+- `verify:readiness:compact`: prints the same readiness checks as compact CI-friendly lines
+- `verify:readiness-output`: asserts the compact readiness output keeps the required summary and PASS lines
+- `verify:command-scope`: checks README verification command lists against `package.json`
+- `smoke:http`: runs HTTP smoke checks against the managed FastAPI server
+- `smoke:ui`: runs Chrome CDP UI smoke checks against the managed React app
+- `verify:fastapi`: runs backend tests and React/FastAPI integration verification
+- `verify:full`: runs the full local verification gate, including live-ready checks that still respect dry-run safeguards
+- `test:live-integrations`: checks real GitHub, Notion, Figma, and Google Calendar integrations when user-owned tokens are configured
 
 데모 스크린샷:
 

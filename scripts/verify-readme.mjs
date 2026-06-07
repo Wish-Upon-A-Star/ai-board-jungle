@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { serverlessCommands, serverRequiredCommands } from "./verification-command-lists.mjs";
 
 const readme = readFileSync("README.md", "utf8");
 const checklistPath = "docs/submission-checklist.md";
@@ -58,6 +59,13 @@ const suspiciousPatterns = [
 ];
 
 const missing = requiredSnippets.filter((snippet) => !readme.includes(snippet));
+const allVerificationCommands = [...serverlessCommands, ...serverRequiredCommands];
+const missingCommandMentions = allVerificationCommands
+  .map((command) => `npm run ${command}`)
+  .filter((snippet) => !readme.includes(snippet));
+const missingCommandExplanations = allVerificationCommands
+  .map((command) => `\`${command}\``)
+  .filter((snippet) => !readme.includes(snippet));
 const suspicious = suspiciousPatterns.filter((pattern) => pattern.test(readme)).map(String);
 const checklistRequired = [
   "npm run demo:screenshot",
@@ -79,9 +87,17 @@ const screenshotPath = "docs/demo-screenshot.png";
 const screenshotOk =
   existsSync(screenshotPath) && readFileSync(screenshotPath).subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
 
-if (missing.length || suspicious.length || checklistMissing.length || !screenshotOk) {
-  console.error(JSON.stringify({ ok: false, missing, suspicious, checklistMissing, screenshotOk }, null, 2));
+if (missing.length || missingCommandMentions.length || missingCommandExplanations.length || suspicious.length || checklistMissing.length || !screenshotOk) {
+  console.error(JSON.stringify({ ok: false, missing, missingCommandMentions, missingCommandExplanations, suspicious, checklistMissing, screenshotOk }, null, 2));
   process.exit(1);
 }
 
-console.log(JSON.stringify({ ok: true, checked: "README.md", checklistPath, required: requiredSnippets.length, screenshotOk }, null, 2));
+console.log(JSON.stringify({
+  ok: true,
+  checked: "README.md",
+  checklistPath,
+  required: requiredSnippets.length,
+  commandMentions: allVerificationCommands.length,
+  commandExplanations: allVerificationCommands.length,
+  screenshotOk,
+}, null, 2));
