@@ -41,6 +41,7 @@ function runCheck(name, cmd, args, opts = {}) {
 const checks = [
   ["hygiene", "node", ["scripts/verify-hygiene.mjs"]],
   ["text", "node", ["scripts/verify-text-integrity.mjs"]],
+  ["text output", "node", ["scripts/verify-text-output.mjs"]],
   ["frontend helpers", "node", ["scripts/verify-frontend-helpers.mjs"]],
   ["template presets", "node", ["scripts/verify-template-presets.mjs"]],
   ["evaluation reports", "node", ["scripts/verify-evaluation-reports.mjs"]],

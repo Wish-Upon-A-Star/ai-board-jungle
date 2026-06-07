@@ -20,6 +20,7 @@
     "verify:readiness-output": "node scripts/verify-readiness-output.mjs",
     "verify:command-scope": "node scripts/verify-command-scope.mjs",
     "verify:text": "node scripts/verify-text-integrity.mjs",
+    "verify:text-output": "node scripts/verify-text-output.mjs",
     "verify:contract": "node scripts/verify-api-contract.mjs",
     "verify:readme": "node scripts/verify-readme.mjs",
     "verify:readme-output": "node scripts/verify-readme-output.mjs",

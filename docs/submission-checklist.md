@@ -19,6 +19,7 @@ Serverless checks can run without starting FastAPI, Vite, or Chrome CDP. Server-
    ```powershell
    npm run verify:hygiene
    npm run verify:text
+   npm run verify:text-output
    npm run verify:frontend-helpers
    npm run verify:template-presets
    npm run verify:evaluation-reports

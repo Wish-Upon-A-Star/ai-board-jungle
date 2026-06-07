@@ -254,6 +254,8 @@ npm run verify:full
 
 ```powershell
 npm run verify:hygiene
+npm run verify:text
+npm run verify:text-output
 npm run verify:frontend-helpers
 npm run verify:evaluation-reports
 npm run verify:readiness
@@ -272,6 +274,7 @@ npm run smoke:http
 
 - `verify:hygiene`: `frontend/dist/`, DB, 로그, `.env` 추적 방지와 실토큰 패턴 스캔
 - `verify:text`: README, backend, frontend source, scripts, submission checklist의 깨진 한글/문자열 회귀 검사
+- `verify:text-output`: parses `verify:text` JSON and checks required scanned file evidence
 - `verify:frontend-helpers`: React 화면에서 쓰는 실행 결과 파싱, 게시글 병합, readiness 카드 계산 순수 함수 검사
 - `verify:readme`: 제출 README 구조, 체크리스트, PNG 스크린샷 무결성 확인
 - `verify:contract`: React UI가 의존하는 FastAPI 응답 계약 확인
@@ -359,7 +362,7 @@ npm run test:live-integrations
 - `npm run verify:readiness:compact` prints the same serverless readiness checks as one line per check for CI logs.
 - `npm run verify:readiness-output` asserts the compact output keeps the `READINESS OK` summary and required `PASS` lines.
 - `npm run verify:command-scope` asserts the README serverless/server-required command lists stay synchronized with `package.json`.
-- It runs hygiene, text, frontend helper, template preset, evaluation report, README, command scope, and backend syntax checks.
+- It runs hygiene, text, text-output, frontend helper, template preset, evaluation report, README, command scope, and backend syntax checks.
 - Server-required checks are listed separately in the output so users know when to run `npm run verify:full:quick`.
 
 ## Verification Command Scope
@@ -368,6 +371,7 @@ Serverless checks do not start FastAPI, Vite, or Chrome CDP:
 
 - `npm run verify:hygiene`
 - `npm run verify:text`
+- `npm run verify:text-output`
 - `npm run verify:frontend-helpers`
 - `npm run verify:template-presets`
 - `npm run verify:evaluation-reports`
