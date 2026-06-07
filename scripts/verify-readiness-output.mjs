@@ -44,6 +44,8 @@ assert.equal(jsonResult.status, 0, `json readiness exited with ${jsonResult.stat
 const readinessSummary = JSON.parse(jsonOutput);
 const readmeResult = readinessSummary.results.find((item) => item.name === "readme");
 assert.ok(readmeResult, "json readiness must include readme result");
+const textOutputResult = readinessSummary.results.find((item) => item.name === "text output");
+assert.ok(textOutputResult, "json readiness must include text output result");
 assert.ok(
   readmeResult.summary.includes(`"checklistCommands": ${expectedChecklistCommands}`),
   "readme summary must include checklistCommands count"
@@ -52,6 +54,27 @@ assert.ok(
   readmeResult.summary.includes(`"checklistItems": ${expectedChecklistItems}`),
   "readme summary must include checklistItems count"
 );
+assert.ok(
+  textOutputResult.summary.includes('"scannedFileCount":'),
+  "text output summary must include scannedFileCount"
+);
+assert.ok(
+  textOutputResult.summary.includes('"requiredScannedFiles":'),
+  "text output summary must include requiredScannedFiles"
+);
+assert.ok(
+  textOutputResult.summary.includes('"scripts/verify-readme-contract.mjs"'),
+  "text output summary must include the README contract helper"
+);
+assert.ok(
+  textOutputResult.summary.includes('"missingRequiredFiles": []'),
+  "text output summary must include missingRequiredFiles empty evidence"
+);
+
+const scannedFileCountMatch = textOutputResult.summary.match(/"scannedFileCount":\s*(\d+)/);
+assert.ok(scannedFileCountMatch, "text output scannedFileCount must be parseable");
+const scannedFileCount = Number(scannedFileCountMatch[1]);
+assert.ok(scannedFileCount > 0, "text output scannedFileCount must be positive");
 
 console.log(JSON.stringify({
   ok: true,
@@ -59,4 +82,5 @@ console.log(JSON.stringify({
   requiredLines,
   checklistCommands: expectedChecklistCommands,
   checklistItems: expectedChecklistItems,
+  textOutputScannedFileCount: scannedFileCount,
 }, null, 2));

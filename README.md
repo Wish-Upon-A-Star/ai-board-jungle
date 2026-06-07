@@ -283,7 +283,7 @@ npm run smoke:http
 - `verify:evaluation-reports`: checks contiguous round reports with scores and next-risk evidence
 - `verify:readiness`: prints the serverless readiness JSON summary
 - `verify:readiness:compact`: prints the same readiness checks as compact CI-friendly lines
-- `verify:readiness-output`: asserts the compact readiness output keeps the required summary and PASS lines
+- `verify:readiness-output`: asserts the compact readiness output keeps the required summary, PASS lines, README counts, and text-output evidence
 - `verify:command-scope`: checks README verification command lists against `package.json`
 - `verify:readme-output`: parses `verify:readme` JSON and checks command/checklist coverage counts
 - `smoke:http`: runs HTTP smoke checks against the managed FastAPI server
@@ -360,7 +360,7 @@ npm run test:live-integrations
 
 - `npm run verify:readiness` prints a JSON readiness summary without starting FastAPI, Vite, or Chrome CDP.
 - `npm run verify:readiness:compact` prints the same serverless readiness checks as one line per check for CI logs.
-- `npm run verify:readiness-output` asserts the compact output keeps the `READINESS OK` summary and required `PASS` lines.
+- `npm run verify:readiness-output` asserts the compact output keeps the `READINESS OK` summary, required `PASS` lines, README counts, and text-output evidence.
 - `npm run verify:command-scope` asserts the README serverless/server-required command lists stay synchronized with `package.json`.
 - It runs hygiene, text, text-output, frontend helper, template preset, evaluation report, README, command scope, and backend syntax checks.
 - Server-required checks are listed separately in the output so users know when to run `npm run verify:full:quick`.
