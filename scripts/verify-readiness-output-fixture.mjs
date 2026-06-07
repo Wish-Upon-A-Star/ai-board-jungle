@@ -156,6 +156,15 @@ const validFixtureSummaryIndexes = {
   firstBooleanFailureFieldIndex: 30,
 };
 assertFixtureSummaryIndexes(validFixtureSummaryIndexes);
+assertFixtureEvidenceOrder(validFixtureSummaryIndexes);
+assert.throws(
+  () => assertFixtureEvidenceOrder({
+    ...validFixtureSummaryIndexes,
+    negativeFixtureGuardsIndex: validFixtureSummaryIndexes.positiveFixtureGuardsIndex,
+  }),
+  /failureFlags, positiveFixtureGuards, negativeFixtureGuards/,
+  "equal adjacent evidence indexes must fail the strict order guard"
+);
 assert.throws(
   () => assertFixtureSummaryIndexes({ ...validFixtureSummaryIndexes, failureFlagsIndex: -1 }),
   /non-negative integers/,
