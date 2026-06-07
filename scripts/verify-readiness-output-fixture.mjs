@@ -173,6 +173,11 @@ assert.throws(
   "missing evidence index must fail the shared order guard shape check"
 );
 assert.throws(
+  () => assertFixtureEvidenceOrder({ ...validFixtureSummaryIndexes, failureFlagsIndex: "0" }),
+  /non-negative integers/,
+  "string evidence index must fail the shared order guard shape check"
+);
+assert.throws(
   () => assertFixtureSummaryIndexes({ ...validFixtureSummaryIndexes, failureFlagsIndex: -1 }),
   /non-negative integers/,
   "mutated fixtureSummaryIndexes with -1 must fail the index-shape guard"
