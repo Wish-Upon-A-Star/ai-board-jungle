@@ -8,7 +8,7 @@ import {
   assertReadinessJsonEvidence,
   expectedFixtureSummaryKeys,
 } from "./verify-readiness-output.mjs";
-import { getLatestEvaluationRound } from "./verify-evaluation-reports.mjs";
+import { getLatestEvaluationRound, readEvaluationReportRounds } from "./verify-evaluation-reports.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
 const expectedFailureFlags = [
@@ -43,9 +43,10 @@ const expectedPositiveFixtureGuards = [
   "validFixtureSummaryIndexes",
 ];
 
+const expectedEvaluationReportCount = readEvaluationReportRounds().length;
 const expectedLatestEvaluationRound = getLatestEvaluationRound();
 
-function readEvaluationReportsCliLatestRound() {
+function readEvaluationReportsCliSummary() {
   const result = spawnSync(process.execPath, ["scripts/verify-evaluation-reports.mjs"], {
     shell: false,
     encoding: "utf8",
@@ -53,13 +54,20 @@ function readEvaluationReportsCliLatestRound() {
   });
   const output = `${result.stdout || ""}${result.stderr || ""}`;
   assert.equal(result.status, 0, `verify-evaluation-reports CLI fixture exited with ${result.status}\n${output}`);
-  return JSON.parse(output).latestRound;
+  return JSON.parse(output);
 }
 
+const evaluationReportsCliSummary = readEvaluationReportsCliSummary();
+
 assert.equal(
-  readEvaluationReportsCliLatestRound(),
+  evaluationReportsCliSummary.latestRound,
   expectedLatestEvaluationRound,
   "getLatestEvaluationRound helper must match verify:evaluation-reports CLI latestRound"
+);
+assert.equal(
+  evaluationReportsCliSummary.checked,
+  expectedEvaluationReportCount,
+  "readEvaluationReportRounds helper count must match verify:evaluation-reports CLI checked count"
 );
 
 function buildEvaluationReportsResult({ latestRound = expectedLatestEvaluationRound } = {}) {
