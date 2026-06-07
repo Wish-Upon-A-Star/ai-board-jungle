@@ -9,6 +9,7 @@ export const serverlessCommands = [
   "verify:readiness-output",
   "verify:command-scope",
   "verify:readme",
+  "verify:readme-output",
 ];
 
 export const serverRequiredCommands = [

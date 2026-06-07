@@ -27,6 +27,7 @@ Serverless checks can run without starting FastAPI, Vite, or Chrome CDP. Server-
    npm run verify:readiness-output
    npm run verify:command-scope
    npm run verify:readme
+   npm run verify:readme-output
    ```
 
 3. Run the full local smoke path without reinstalling dependencies.

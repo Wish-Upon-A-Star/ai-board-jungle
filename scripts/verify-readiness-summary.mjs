@@ -45,6 +45,7 @@ const checks = [
   ["template presets", "node", ["scripts/verify-template-presets.mjs"]],
   ["evaluation reports", "node", ["scripts/verify-evaluation-reports.mjs"]],
   ["readme", "node", ["scripts/verify-readme.mjs"]],
+  ["readme output", "node", ["scripts/verify-readme-output.mjs"]],
   ["command scope", "node", ["scripts/verify-command-scope.mjs"]],
   ["backend syntax", "python", ["-m", "py_compile", "backend/app/main.py", "backend/app/services.py"]],
 ];

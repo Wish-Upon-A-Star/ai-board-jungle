@@ -22,6 +22,7 @@
     "verify:text": "node scripts/verify-text-integrity.mjs",
     "verify:contract": "node scripts/verify-api-contract.mjs",
     "verify:readme": "node scripts/verify-readme.mjs",
+    "verify:readme-output": "node scripts/verify-readme-output.mjs",
     "verify:auto": "node scripts/verify-fastapi.mjs",
     "verify:fastapi": "node scripts/verify-fastapi.mjs",
     "verify:full": "node scripts/verify-full.mjs",

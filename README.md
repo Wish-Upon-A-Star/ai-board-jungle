@@ -261,6 +261,7 @@ npm run verify:readiness:compact
 npm run verify:readiness-output
 npm run verify:command-scope
 npm run verify:readme
+npm run verify:readme-output
 npm run verify:contract
 npm run verify:fastapi
 npm run smoke:ui
@@ -281,6 +282,7 @@ npm run smoke:http
 - `verify:readiness:compact`: prints the same readiness checks as compact CI-friendly lines
 - `verify:readiness-output`: asserts the compact readiness output keeps the required summary and PASS lines
 - `verify:command-scope`: checks README verification command lists against `package.json`
+- `verify:readme-output`: parses `verify:readme` JSON and checks command/checklist coverage counts
 - `smoke:http`: runs HTTP smoke checks against the managed FastAPI server
 - `smoke:ui`: runs Chrome CDP UI smoke checks against the managed React app
 - `verify:fastapi`: runs backend tests and React/FastAPI integration verification
@@ -374,6 +376,7 @@ Serverless checks do not start FastAPI, Vite, or Chrome CDP:
 - `npm run verify:readiness-output`
 - `npm run verify:command-scope`
 - `npm run verify:readme`
+- `npm run verify:readme-output`
 
 Server-required checks start or expect FastAPI, Vite, Chrome CDP, or live API credentials:
 

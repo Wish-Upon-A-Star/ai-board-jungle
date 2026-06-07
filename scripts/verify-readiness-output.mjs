@@ -15,7 +15,7 @@ const result = spawnSync(process.execPath, ["scripts/verify-readiness-summary.mj
 
 const output = `${result.stdout || ""}${result.stderr || ""}`;
 assert.equal(result.status, 0, `compact readiness exited with ${result.status}\n${output}`);
-assert.ok(output.includes("READINESS OK 8/8 passed"), "compact output must include the readiness total");
+assert.ok(output.includes("READINESS OK 9/9 passed"), "compact output must include the readiness total");
 assert.ok(output.includes(expectedServerRequiredLine), "compact output must list server-required checks");
 
 const requiredLines = [
@@ -25,6 +25,7 @@ const requiredLines = [
   "PASS template presets",
   "PASS evaluation reports",
   "PASS readme",
+  "PASS readme output",
   "PASS command scope",
   "PASS backend syntax",
 ];
