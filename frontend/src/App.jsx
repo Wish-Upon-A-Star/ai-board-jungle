@@ -298,6 +298,53 @@ function App() {
     }));
   }
 
+  function addProfileConnection(kind = "custom") {
+    const preset = integrationConnectionPresets[kind] || integrationConnectionPresets.custom;
+    setProfileSettings((current) => ({
+      ...current,
+      customConnections: [...(current?.customConnections || []), { ...preset }],
+    }));
+  }
+
+  function updateProfileConnection(index, field, value) {
+    setProfileSettings((current) => ({
+      ...current,
+      customConnections: (current?.customConnections || []).map((connection, currentIndex) =>
+        currentIndex === index ? { ...connection, [field]: value } : connection
+      ),
+    }));
+  }
+
+  function removeProfileConnection(index) {
+    setProfileSettings((current) => ({
+      ...current,
+      customConnections: (current?.customConnections || []).filter((_, currentIndex) => currentIndex !== index),
+    }));
+  }
+
+  async function saveProfileSettings(event) {
+    event.preventDefault();
+    clearErrorState();
+    try {
+      const body = {
+        ai_provider: profileSettings?.aiProvider || "OpenAI",
+        ai_model: profileSettings?.aiModel || "gpt-4o-mini",
+        ai_api_base: profileSettings?.aiApiBase || "https://api.openai.com/v1",
+        api_key_strategy: profileSettings?.apiKeyStrategy || "사용자별 환경변수 또는 서버 비밀 저장소에 보관",
+        template_preset: profileSettings?.templatePreset || "github_notion",
+        custom_template: profileSettings?.customTemplate || "",
+        custom_connections: profileSettings?.customConnections || [],
+      };
+      const data = await api("/api/profile/settings", { method: "PUT", body: JSON.stringify(body) });
+      setProfileSettings(data.profileSettings);
+      setApiResult({ called: "profile-settings.save", response: data });
+      setResult(data.profileSettings);
+      await loadAll();
+    } catch (err) {
+      showActionError(err);
+    }
+  }
+
   async function collectIntegrationProfile(profile) {
     const data = await api(`/api/integration-profiles/${profile.id}/collect`, { method: "POST" });
     setApiResult({ called: "integration-profile.collect", response: data });
@@ -372,6 +419,7 @@ function App() {
         <nav>
           <a href="#automations" className="active">자동화</a>
           <a href="#new-task">등록</a>
+          <a href="#profile-settings">기본값</a>
           <a href="#integration-profiles">연동</a>
           <a href="#knowledge">RAG</a>
           <a href="#api-console">API</a>
@@ -545,6 +593,56 @@ function App() {
                 <Field label="결과 템플릿"><textarea value={form.template} onChange={(e) => setForm({ ...form, template: e.target.value })} /></Field>
                 <Field label="API Key 전략"><textarea value={form.api_key_strategy} onChange={(e) => setForm({ ...form, api_key_strategy: e.target.value })} /></Field>
                 <button><CalendarClock size={14} /> 자동화 저장</button>
+              </form>
+            </article>
+
+            <article id="profile-settings" className="panel">
+              <div className="panel-title row-title"><span>사용자 기본 자동화 설정</span><span className="subtle">새 자동화나 커스텀 지침에 재사용할 AI 모델, 템플릿, 연결 기본값입니다.</span></div>
+              <form className="knowledge-form" onSubmit={saveProfileSettings}>
+                <div className="grid3 wide">
+                  <Field label="AI 제공자"><input value={profileSettings?.aiProvider || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiProvider: e.target.value })} /></Field>
+                  <Field label="AI 모델"><input value={profileSettings?.aiModel || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiModel: e.target.value })} /></Field>
+                  <Field label="AI API Base"><input value={profileSettings?.aiApiBase || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiApiBase: e.target.value })} /></Field>
+                </div>
+                <div className="grid2">
+                  <Field label="템플릿 프리셋"><input value={profileSettings?.templatePreset || ""} onChange={(e) => setProfileSettings({ ...profileSettings, templatePreset: e.target.value })} /></Field>
+                  <Field label="API Key 전략"><input value={profileSettings?.apiKeyStrategy || ""} onChange={(e) => setProfileSettings({ ...profileSettings, apiKeyStrategy: e.target.value })} /></Field>
+                </div>
+                <Field label="기본 커스텀 템플릿"><textarea value={profileSettings?.customTemplate || ""} onChange={(e) => setProfileSettings({ ...profileSettings, customTemplate: e.target.value })} /></Field>
+                <section className="connection-builder">
+                  <div className="section-head flat">
+                    <div>
+                      <strong>사용자 기본 커스텀 연결</strong>
+                      <span>자동화마다 직접 입력하지 않아도 되는 개인 기본 연결 목록입니다.</span>
+                    </div>
+                    <div className="profile-actions">
+                      {Object.keys(integrationConnectionPresets).map((kind) => (
+                        <button key={kind} type="button" onClick={() => addProfileConnection(kind)}><Plus size={13} /> {kind}</button>
+                      ))}
+                    </div>
+                  </div>
+                  {(profileSettings?.customConnections || []).map((connection, index) => (
+                    <div key={`${connection.service}:${index}`} className="connection-card">
+                      <div className="connection-title">
+                        <strong>{index + 1}. {connection.label || "기본 연결"}</strong>
+                        <button type="button" className="danger" onClick={() => removeProfileConnection(index)}>삭제</button>
+                      </div>
+                      <div className="grid3 wide">
+                        <Field label="라벨"><input value={connection.label} onChange={(e) => updateProfileConnection(index, "label", e.target.value)} /></Field>
+                        <Field label="서비스"><input value={connection.service} onChange={(e) => updateProfileConnection(index, "service", e.target.value)} /></Field>
+                        <Field label="API"><input value={connection.api} onChange={(e) => updateProfileConnection(index, "api", e.target.value)} /></Field>
+                      </div>
+                      <div className="grid3 wide">
+                        <Field label="URL"><input value={connection.url} onChange={(e) => updateProfileConnection(index, "url", e.target.value)} /></Field>
+                        <Field label="토큰 변수"><input value={connection.auth_key_name} onChange={(e) => updateProfileConnection(index, "auth_key_name", e.target.value)} /></Field>
+                        <Field label="Operation"><input value={connection.operation} onChange={(e) => updateProfileConnection(index, "operation", e.target.value)} /></Field>
+                      </div>
+                      <Field label="연결 템플릿"><textarea value={connection.template} onChange={(e) => updateProfileConnection(index, "template", e.target.value)} /></Field>
+                    </div>
+                  ))}
+                  {(profileSettings?.customConnections || []).length === 0 ? <p className="empty-state">기본 연결이 없으면 자동화 또는 연동 프로필에서 직접 선택합니다.</p> : null}
+                </section>
+                <button><KeyRound size={14} /> 기본 설정 저장</button>
               </form>
             </article>
 

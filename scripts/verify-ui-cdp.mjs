@@ -197,6 +197,8 @@ async function main() {
     "Figma",
     "Health",
     "프로필 커스텀 연결",
+    "사용자 기본 커스텀 연결",
+    "기본 설정 저장",
   ];
   const missing = requiredUi.filter((item) => !text.includes(item));
   const hasLiveWritePlaceholder = await evalJs(
@@ -265,6 +267,30 @@ async function main() {
       }]
     }),
   }).then((data) => Array.isArray(data.profile?.customConnections) && data.profile.customConnections[0]?.service === "google_calendar");
+  const profileSettingsEditorVisible = await evalJs(`(() => {
+    const text = document.body.innerText;
+    return text.includes("사용자 기본 자동화 설정") && text.includes("사용자 기본 커스텀 연결") && text.includes("기본 설정 저장");
+  })()`);
+  const profileSettingsSaveApi = await apiJson("/api/profile/settings", {
+    method: "PUT",
+    body: JSON.stringify({
+      ai_provider: "OpenAI",
+      ai_model: "gpt-4o-mini",
+      ai_api_base: "https://api.openai.com/v1",
+      api_key_strategy: "CDP user default connection verification.",
+      template_preset: "custom",
+      custom_template: "title: {title}",
+      custom_connections: [{
+        label: "User default Notion",
+        service: "notion",
+        url: "https://www.notion.so/workspace/user-default-db",
+        api: "Notion API",
+        auth_key_name: "USER_NOTION_TOKEN",
+        operation: "upsert_task_page",
+        template: "업무명: {title}"
+      }]
+    }),
+  }).then((data) => Array.isArray(data.profileSettings?.customConnections) && data.profileSettings.customConnections[0]?.auth_key_name === "USER_NOTION_TOKEN");
   const activityApi = await apiJson("/api/integration-activities").then((data) => Array.isArray(data.activities));
   const activityFilterApi = await apiJson("/api/integration-activities?event_type=integration_profile.write&dry_run=true").then((data) =>
     Array.isArray(data.activities)
@@ -386,6 +412,8 @@ async function main() {
     liveWriteApi,
     profileConnectionEditorVisible,
     profileConnectionCreateApi,
+    profileSettingsEditorVisible,
+    profileSettingsSaveApi,
     activityApi,
     activityFilterApi,
     activityPageApi,
@@ -415,6 +443,8 @@ async function main() {
     !liveWriteApi ||
     !profileConnectionEditorVisible ||
     !profileConnectionCreateApi ||
+    !profileSettingsEditorVisible ||
+    !profileSettingsSaveApi ||
     !activityApi ||
     !activityFilterApi ||
     !activityPageApi ||
