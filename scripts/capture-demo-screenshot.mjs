@@ -97,6 +97,33 @@ async function main() {
   });
   await wait(800);
 
+  const screenshotReadiness = await page.call("Runtime.evaluate", {
+    expression: `(() => {
+      const section = document.querySelector("#profile-settings");
+      const text = document.body.innerText;
+      const requiredText = [
+        "사용자 기본 자동화 설정",
+        "사용자 기본 커스텀 연결",
+        "AI 제공자",
+        "AI 모델",
+        "GitHub",
+        "Notion"
+      ];
+      return {
+        sectionVisible: Boolean(section),
+        sectionTop: section ? Math.round(section.getBoundingClientRect().top) : null,
+        requiredText,
+        missingText: requiredText.filter((item) => !text.includes(item)),
+        hasSecretLeak: /ghp_|github_pat_|secret_[a-z0-9]|ntn_[a-z0-9]/i.test(text)
+      };
+    })();`,
+    returnByValue: true,
+  });
+  const readiness = screenshotReadiness.result?.result?.value;
+  if (!readiness?.sectionVisible || readiness.missingText?.length || readiness.hasSecretLeak) {
+    throw new Error(`screenshot content check failed: ${JSON.stringify(readiness)}`);
+  }
+
   const screenshot = await page.call("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
   mkdirSync(dirname(outputPath), { recursive: true });
   writeFileSync(outputPath, Buffer.from(screenshot.result.data, "base64"));
