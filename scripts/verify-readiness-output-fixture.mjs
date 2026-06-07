@@ -166,6 +166,26 @@ function buildReadmeResult({
   };
 }
 
+function buildReadmeOutputResult() {
+  return {
+    name: "readme output",
+    summary: [
+      "{",
+      '  "ok": true,',
+      '  "checked": "verify-readme output",',
+      '  "readmeChecked": "README.md",',
+      '  "checklistPath": "docs/submission-checklist.md",',
+      '  "required": 44,',
+      `  "commandMentions": ${expectedChecklistCommands},`,
+      `  "commandExplanations": ${expectedChecklistCommands},`,
+      `  "checklistCommands": ${expectedChecklistCommands},`,
+      `  "checklistItems": ${expectedChecklistItems},`,
+      '  "screenshotOk": true',
+      "}",
+    ].join("\n"),
+  };
+}
+
 function buildTextOutputResult({
   includeRequiredScannedFiles = true,
   includeScannedFileCount = true,
@@ -206,6 +226,7 @@ function buildTextOutputResult({
 
 function buildReadiness(textOutputOptions, {
   includeReadmeResult = true,
+  includeReadmeOutputResult = true,
   includeEvaluationReportsResult = true,
   readmeOptions,
   evaluationReportsOptions,
@@ -214,6 +235,10 @@ function buildReadiness(textOutputOptions, {
 
   if (includeReadmeResult) {
     results.unshift(buildReadmeResult(readmeOptions));
+  }
+
+  if (includeReadmeOutputResult) {
+    results.push(buildReadmeOutputResult());
   }
 
   if (includeEvaluationReportsResult) {
@@ -473,6 +498,7 @@ function buildReadinessWithFixtureSummary(fixtureOutput) {
     latestEvaluationRound: expectedLatestEvaluationRound,
     results: [
       buildReadmeResult(),
+      buildReadmeOutputResult(),
       buildTextOutputResult(),
       buildEvaluationReportsResult(),
       {

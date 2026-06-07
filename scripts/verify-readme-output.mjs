@@ -16,6 +16,9 @@ assertReadmeSuccessSummary(summary);
 console.log(JSON.stringify({
   ok: true,
   checked: "verify-readme output",
+  readmeChecked: summary.checked,
+  checklistPath: summary.checklistPath,
+  required: summary.required,
   commandMentions: summary.commandMentions,
   commandExplanations: summary.commandExplanations,
   checklistCommands: summary.checklistCommands,

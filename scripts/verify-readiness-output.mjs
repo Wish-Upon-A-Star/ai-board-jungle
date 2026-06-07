@@ -200,6 +200,8 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
   let readinessFixtureOutput = null;
   const readmeResult = readinessSummary.results.find((item) => item.name === "readme");
   assert.ok(readmeResult, "json readiness must include readme result");
+  const readmeOutputResult = readinessSummary.results.find((item) => item.name === "readme output");
+  assert.ok(readmeOutputResult, "json readiness must include readme output result");
   const textOutputResult = readinessSummary.results.find((item) => item.name === "text output");
   assert.ok(textOutputResult, "json readiness must include text output result");
   const evaluationReportsResult = readinessSummary.results.find((item) => item.name === "evaluation reports");
@@ -224,6 +226,26 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
   assert.ok(
     readmeResult.summary.includes(`"checklistItems": ${expectedChecklistItems}`),
     "readme summary must include checklistItems count"
+  );
+  assert.ok(
+    readmeOutputResult.summary.includes('"readmeChecked": "README.md"'),
+    "readme output summary must include README identity evidence"
+  );
+  assert.ok(
+    readmeOutputResult.summary.includes('"checklistPath": "docs/submission-checklist.md"'),
+    "readme output summary must include checklist path evidence"
+  );
+  assert.ok(
+    readmeOutputResult.summary.includes('"required":'),
+    "readme output summary must include required snippet count evidence"
+  );
+  assert.ok(
+    readmeOutputResult.summary.includes(`"checklistCommands": ${expectedChecklistCommands}`),
+    "readme output summary must include checklistCommands count"
+  );
+  assert.ok(
+    readmeOutputResult.summary.includes(`"checklistItems": ${expectedChecklistItems}`),
+    "readme output summary must include checklistItems count"
   );
   assert.ok(
     textOutputResult.summary.includes('"scannedFileCount":'),
