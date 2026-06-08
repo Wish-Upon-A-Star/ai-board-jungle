@@ -20,7 +20,7 @@ from app.db import SessionLocal, engine, init_db
 import app.main as main_module
 from app.main import app
 from app.models import AutomationTask, IntegrationProfile
-from app.live_writers import write_github_issue
+from app.live_writers import write_github_issue, write_notion_task
 from app.security import reveal_secret
 
 
@@ -64,6 +64,21 @@ def test_github_issue_writer_uses_shared_repo_parser_for_ssh_urls():
     assert write["status"] == "ready"
     assert write["url"] == "https://api.github.com/repos/acme/private-repo/issues"
     assert "plain-token-for-dry-run" not in str(write)
+
+
+def test_notion_task_writer_uses_shared_id_parser_for_dashed_ids():
+    profile = IntegrationProfile(
+        owner_id=1,
+        name="Dashed Notion writer",
+        source_kind="notion",
+        base_url="12345678-90ab-cdef-1234-567890abcdef",
+        token_value="plain-notion-token-for-dry-run",
+    )
+    write = write_notion_task(profile, "Check Notion parser", "Dry-run only.", dry_run=True)
+    assert write["status"] == "ready"
+    assert write["databaseUrl"] == "https://api.notion.com/v1/databases/1234567890abcdef1234567890abcdef"
+    assert write["payload"]["parent"]["database_id"] == "1234567890abcdef1234567890abcdef"
+    assert "plain-notion-token-for-dry-run" not in str(write)
 
 
 def test_full_fastapi_flow(monkeypatch):

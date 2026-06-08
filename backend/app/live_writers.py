@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 import httpx
 
-from .collectors import parse_github_repo
+from .collectors import extract_notion_id, parse_github_repo
 from .models import IntegrationProfile
 from .security import reveal_secret
 
@@ -50,15 +50,9 @@ def write_github_issue(profile: IntegrationProfile, title: str, body: str, dry_r
     return {"service": "github", "status": "written", "id": data.get("number", ""), "url": data.get("html_url", ""), "dryRun": False}
 
 
-def notion_database_id(url_or_id: str) -> str:
-    compact = url_or_id.replace("-", "")
-    match = re.search(r"([0-9a-fA-F]{32})", compact)
-    return match.group(1) if match else url_or_id.strip()
-
-
 def write_notion_task(profile: IntegrationProfile, title: str, body: str, dry_run: bool = True, target_url: str | None = None) -> dict:
     token = reveal_secret(profile.token_value)
-    database_id = notion_database_id(target_url or profile.base_url)
+    database_id = extract_notion_id(target_url or profile.base_url)
     if not token or not database_id:
         return {"service": "notion", "status": "blocked", "reason": "missing token or Notion database URL", "dryRun": dry_run}
     headers = {"Authorization": f"Bearer {token}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"}
