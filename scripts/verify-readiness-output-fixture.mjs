@@ -34,6 +34,8 @@ const expectedFailureFlags = [
   "staleChecklistCommandsFails",
   "missingChecklistItemsFails",
   "staleChecklistItemsFails",
+  "missingSourceGuardsFails",
+  "nonEmptyMissingSourceGuardsFails",
 ];
 
 const fixtureSource = readFileSync(new URL(import.meta.url), "utf8");
@@ -445,6 +447,14 @@ const missingRequiredScannedFiles = buildReadiness({
   includeRequiredScannedFiles: false,
 });
 
+const missingSourceGuards = buildReadiness({
+  includeSourceGuards: false,
+});
+
+const nonEmptyMissingSourceGuards = buildReadiness({
+  missingSourceGuards: ["redisCacheFallbackRagRegressionTest"],
+});
+
 const missingReadmeResult = buildReadiness(undefined, {
   includeReadmeResult: false,
 });
@@ -715,6 +725,18 @@ assert.throws(
   () => assertReadinessJsonEvidence(missingRequiredScannedFiles),
   /requiredScannedFiles/,
   "missing requiredScannedFiles fixture must fail"
+);
+
+assert.throws(
+  () => assertReadinessJsonEvidence(missingSourceGuards),
+  /sourceGuards/,
+  "missing sourceGuards fixture must fail"
+);
+
+assert.throws(
+  () => assertReadinessJsonEvidence(nonEmptyMissingSourceGuards),
+  /missingSourceGuards/,
+  "non-empty missingSourceGuards fixture must fail"
 );
 
 assert.throws(
@@ -1344,6 +1366,8 @@ const wrongNameFailureFlagsOutput = {
     "staleChecklistCommandsFails",
     "missingChecklistItemsFails",
     "staleChecklistItemFails",
+    "missingSourceGuardsFails",
+    "nonEmptyMissingSourceGuardsFails",
   ],
 };
 assert.throws(

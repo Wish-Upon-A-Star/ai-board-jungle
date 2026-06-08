@@ -32,6 +32,8 @@ const expectedFailureFlags = [
   "staleChecklistCommandsFails",
   "missingChecklistItemsFails",
   "staleChecklistItemsFails",
+  "missingSourceGuardsFails",
+  "nonEmptyMissingSourceGuardsFails",
 ];
 
 const expectedDirectHelperNegativeScenarios = [
@@ -513,7 +515,7 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
       "readiness output fixture summary must include first failure flag"
     );
     assert.ok(
-      readinessFixtureResult.summary.includes('"staleChecklistItemsFails"'),
+      readinessFixtureResult.summary.includes('"nonEmptyMissingSourceGuardsFails"'),
       "readiness output fixture summary must include last failure flag"
     );
     assert.deepEqual(
