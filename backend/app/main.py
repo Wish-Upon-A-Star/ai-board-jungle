@@ -4,6 +4,7 @@ import json
 import os
 import hashlib
 import hmac
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from .collectors import collect_profile_items, save_collected_items
+from .collectors import collect_profile_items, extract_notion_id, save_collected_items
 from .db import check_db, database_reachable, get_db, init_db
 from .live_writers import execute_profile_write
 from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, User
@@ -337,6 +338,20 @@ def verify_hmac_signature(secret: str, body: bytes, signature: str, prefix: str 
     expected = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
     supplied = signature.removeprefix(prefix)
     return hmac.compare_digest(expected, supplied)
+
+
+def notion_webhook_target_matches(target: str, candidate: str) -> bool:
+    target = target.strip()
+    candidate = candidate.strip()
+    if not target or not candidate:
+        return False
+    target_id = extract_notion_id(target)
+    candidate_id = extract_notion_id(candidate)
+    target_is_id = bool(re.fullmatch(r"[0-9a-fA-F]{32}", target_id))
+    candidate_is_id = bool(re.fullmatch(r"[0-9a-fA-F]{32}", candidate_id))
+    if target_is_id and candidate_is_id:
+        return target_id.lower() == candidate_id.lower()
+    return target in candidate or candidate in target
 
 
 async def extract_upload_text(upload: UploadFile | None) -> tuple[str, str, str]:
@@ -1157,10 +1172,7 @@ async def notion_webhook(
     for task in db.scalars(stmt).all():
         task_target = task.notion_database_url.strip()
         profile_target = task.integration_profile.base_url.strip() if task.integration_profile else ""
-        if target and (
-            (task_target and (target in task_target or task_target in target))
-            or (profile_target and (target in profile_target or profile_target in target))
-        ):
+        if notion_webhook_target_matches(target, task_target) or notion_webhook_target_matches(target, profile_target):
             tasks.append(task)
     results = [execute_automation_task(db, task, task.owner, scheduled=True) for task in tasks[:20]]
     return {
