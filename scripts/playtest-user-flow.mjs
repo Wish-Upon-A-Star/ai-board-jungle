@@ -38,12 +38,15 @@ async function main() {
     await page.locator(".automation-form").waitFor({ state: "visible", timeout: 15000 });
 
     await clickVisible(page.locator(".automation-form .preset-actions button").nth(0));
+    await clickVisible(page.getByRole("button", { name: "Defaults" }).first());
     await clickVisible(page.locator("#profile-settings form button").last());
     await page.waitForTimeout(500);
 
+    await clickVisible(page.getByRole("button", { name: "MCP / Profiles" }).first());
     await clickVisible(page.locator("#integration-profiles form button").last());
     await page.locator("#integration-profiles .knowledge-item").first().waitFor({ state: "visible", timeout: 15000 });
 
+    await clickVisible(page.getByRole("button", { name: "Automation" }).first());
     await clickVisible(page.locator(".automation-form button").last());
     await page.locator(".task-card").first().waitFor({ state: "visible", timeout: 15000 });
     await page.screenshot({ path: `${artifactDir}/playtest-after-create-${stamp()}.png`, fullPage: true });
@@ -54,16 +57,19 @@ async function main() {
     await clickVisible(page.locator(".task-card .task-actions button").filter({ hasText: "Share" }).first());
     await clickVisible(page.locator(".scheduler-bar button").first());
 
+    await clickVisible(page.getByRole("button", { name: "MCP / Profiles" }).first());
     await clickVisible(page.locator("#integration-profiles .knowledge-item button").first());
     const dryRun = page.getByRole("button", { name: /Dry-run write/ }).first();
     if (await dryRun.isVisible().catch(() => false)) await dryRun.click();
     await clickVisible(page.getByRole("button", { name: /Real-write audit/ }).first());
     await clickVisible(page.getByRole("button", { name: /Reset filters/ }).first());
-    await clickVisible(page.getByRole("button", { name: /Health/ }).first());
-    await clickVisible(page.getByRole("button", { name: /^RAG$/ }).first());
-    await clickVisible(page.getByRole("button", { name: /MCP/ }).first());
-    await clickVisible(page.getByRole("button", { name: /Agent Hub/ }).first());
+    await clickVisible(page.getByRole("button", { name: "API" }).first());
+    await clickVisible(page.locator(".api-buttons").getByRole("button", { name: /Health/ }).first());
+    await clickVisible(page.locator(".api-buttons").getByRole("button", { name: /^RAG$/ }).first());
+    await clickVisible(page.locator(".api-buttons").getByRole("button", { name: /MCP/ }).first());
+    await clickVisible(page.locator(".api-buttons").getByRole("button", { name: /Agent Hub/ }).first());
 
+    await clickVisible(page.getByRole("button", { name: "Automation" }).first());
     await clickVisible(page.locator(".task-card .task-actions button.danger").first());
     await clickVisible(page.locator(".task-card .task-actions button.confirm-delete").first());
     await page.screenshot({ path: `${artifactDir}/playtest-final-${stamp()}.png`, fullPage: true });

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Bot, CalendarClock, Database, FileText, GitBranch, KeyRound, Link2, LogOut, Play, Plus, Search, Share2, Trash2, Upload, UserPlus } from "lucide-react";
 import { api, apiStatus } from "./api";
-import { customPreset, defaultAutomation, defaultIntegration, defaultKnowledge, figmaCalendarPreset, integrationConnectionPresets } from "./presets";
+import { customPreset, defaultAutomation, defaultIntegration, defaultKnowledge, figmaCalendarPreset, integrationConnectionPresets, mcpGithubToNotionPreset, mcpNotionToGithubPreset } from "./presets";
 import { buildSystemReadinessCards, getHealthFailureMessage, getRunStatus, mergePostsById, parseRunResult, summarizeRunResult } from "./viewModel";
 import "./style.css";
 
@@ -40,6 +40,7 @@ function App() {
   const [apiResult, setApiResult] = useState(null);
   const [apiPrompt, setApiPrompt] = useState("GitHub 이슈를 읽어서 Notion 업무 DB 형식으로 넣고, 디자인 확인이 필요하면 Figma에도 코멘트를 남겨줘");
   const [sideTab, setSideTab] = useState("selected");
+  const [activeMainTab, setActiveMainTab] = useState("automations");
   const [form, setForm] = useState(defaultAutomation);
   const [knowledgeForm, setKnowledgeForm] = useState(defaultKnowledge);
   const [integrationForm, setIntegrationForm] = useState(defaultIntegration);
@@ -418,6 +419,41 @@ function App() {
     });
   }
 
+  function mcpProfilesFor(kind) {
+    return integrationProfiles.filter((profile) => profile.sourceKind === kind && String(profile.authType || "").toLowerCase().includes("mcp"));
+  }
+
+  function openMcpProfileSetup(kind = "github") {
+    const isNotion = kind === "notion";
+    setActiveMainTab("integrations");
+    setIntegrationForm({
+      ...defaultIntegration,
+      name: isNotion ? "Notion MCP profile" : "GitHub MCP profile",
+      source_kind: kind,
+      base_url: isNotion ? "https://www.notion.so/<workspace>/<page-or-database-id>" : "https://github.com/<owner>/<repo>",
+      api_provider: isNotion ? "Notion MCP" : "GitHub MCP",
+      token_name: isNotion ? "NOTION_MCP_TOKEN" : "GITHUB_MCP_TOKEN",
+      token_value: "",
+      auth_type: "mcp_oauth",
+      mcp_server_url: isNotion ? "mcp://notion" : "mcp://github",
+      mcp_auth_subject: user?.email || "",
+      mcp_scopes: isNotion ? "page.read, page.write, database.read, database.write" : "repo.read, commits.read, issues.write",
+      rag_targets: isNotion ? "notion_pages,notion_database" : "commits,issues,pull_requests",
+    });
+    setAutomationSaveState({ status: "error", message: `Create a ${isNotion ? "Notion" : "GitHub"} MCP profile first, then return to the Automation tab.` });
+  }
+
+  function applyMcpAutomationPreset(preset, primaryKind) {
+    const githubProfiles = mcpProfilesFor("github");
+    const notionProfiles = mcpProfilesFor("notion");
+    if (!githubProfiles.length) return openMcpProfileSetup("github");
+    if (!notionProfiles.length) return openMcpProfileSetup("notion");
+    const primaryProfile = primaryKind === "notion" ? notionProfiles[0] : githubProfiles[0];
+    setActiveMainTab("automations");
+    setForm({ ...preset, integration_profile_id: primaryProfile.id });
+    setAutomationSaveState({ status: "idle", message: `MCP template loaded with ${primaryProfile.name}.` });
+  }
+
   function applyProfileDefaultsToAutomation() {
     const connections = profileSettings?.customConnections || [];
     const firstConnection = connections[0];
@@ -478,6 +514,12 @@ function App() {
       <header className="site-header">
         <div className="wordmark">AI<span>/</span>BOARD<span>&gt;</span></div>
         <nav>
+          <button className={activeMainTab === "automations" ? "active" : ""} onClick={() => setActiveMainTab("automations")}>Automation</button>
+          <button className={activeMainTab === "integrations" ? "active" : ""} onClick={() => setActiveMainTab("integrations")}>MCP / Profiles</button>
+          <button className={activeMainTab === "settings" ? "active" : ""} onClick={() => setActiveMainTab("settings")}>Defaults</button>
+          <button className={activeMainTab === "knowledge" ? "active" : ""} onClick={() => setActiveMainTab("knowledge")}>RAG</button>
+          <button className={activeMainTab === "board" ? "active" : ""} onClick={() => setActiveMainTab("board")}>Board</button>
+          <button className={activeMainTab === "api" ? "active" : ""} onClick={() => setActiveMainTab("api")}>API</button>
           <a href="#automations" className="active">자동화</a>
           <a href="#new-task">등록</a>
           <a href="#profile-settings">기본값</a>
@@ -542,7 +584,7 @@ function App() {
               </div>
             </article>
 
-            <article id="automations" className="panel">
+            <article id="automations" className={`panel ${activeMainTab === "automations" ? "" : "tab-hidden"}`}>
               <div className="panel-title">사용자별 자동화 작업</div>
               <div className="task-list">
                 <div className="scheduler-bar">
@@ -610,10 +652,12 @@ function App() {
               </div>
             </article>
 
-            <article id="new-task" className="panel">
+            <article id="new-task" className={`panel ${activeMainTab === "automations" ? "" : "tab-hidden"}`}>
               <div className="panel-title row-title"><span>자동화 등록</span><span className="subtle">프로필 또는 커스텀 설정을 자동화마다 선택합니다.</span></div>
               <form className="automation-form" onSubmit={createAutomation}>
                 <div className="preset-actions">
+                  <button type="button" onClick={() => applyMcpAutomationPreset(mcpGithubToNotionPreset, "github")}>MCP GitHub → Notion</button>
+                  <button type="button" onClick={() => applyMcpAutomationPreset(mcpNotionToGithubPreset, "notion")}>MCP Notion → GitHub</button>
                   <button type="button" onClick={() => setForm(defaultAutomation)}>GitHub + Notion</button>
                   <button type="button" onClick={() => setForm(figmaCalendarPreset)}>Figma + Google Calendar</button>
                   <button type="button" onClick={() => setForm(customPreset)}>Custom API</button>
@@ -667,7 +711,7 @@ function App() {
               </form>
             </article>
 
-            <article id="profile-settings" className="panel">
+            <article id="profile-settings" className={`panel ${activeMainTab === "settings" ? "" : "tab-hidden"}`}>
               <div className="panel-title row-title"><span>사용자 기본 자동화 설정</span><span className="subtle">새 자동화나 커스텀 지침에 재사용할 AI 모델, 템플릿, 연결 기본값입니다.</span></div>
               <form className="knowledge-form" onSubmit={saveProfileSettings}>
                 <div className="grid3 wide">
@@ -717,8 +761,12 @@ function App() {
               </form>
             </article>
 
-            <article id="integration-profiles" className="panel">
+            <article id="integration-profiles" className={`panel ${activeMainTab === "integrations" ? "" : "tab-hidden"}`}>
               <div className="panel-title row-title"><span>연동 프로필 목록</span><span className="subtle">사용자별 토큰, API, AI 모델, RAG 범위를 저장합니다.</span></div>
+              <div className="mcp-setup-actions">
+                <button type="button" onClick={() => openMcpProfileSetup("github")}>Create GitHub MCP profile</button>
+                <button type="button" onClick={() => openMcpProfileSetup("notion")}>Create Notion MCP profile</button>
+              </div>
               <form className="knowledge-form" onSubmit={saveIntegrationProfile}>
                 <div className="grid3 wide">
                   <Field label="프로필명"><input value={integrationForm.name} onChange={(e) => setIntegrationForm({ ...integrationForm, name: e.target.value })} /></Field>
@@ -840,7 +888,7 @@ function App() {
               </div>
             </article>
 
-            <article id="knowledge" className="panel">
+            <article id="knowledge" className={`panel ${activeMainTab === "knowledge" ? "" : "tab-hidden"}`}>
               <div className="panel-title row-title"><span>RAG 지식자료</span><span className="subtle">문서, 음성, 이미지, 기타 파일 설명을 사용자별로 저장합니다.</span></div>
               <form className="knowledge-form" onSubmit={saveKnowledge}>
                 <div className="grid3 wide">
@@ -861,7 +909,7 @@ function App() {
               </div>
             </article>
 
-            <article id="board" className="panel">
+            <article id="board" className={`panel ${activeMainTab === "board" ? "" : "tab-hidden"}`}>
               <div className="panel-title row-title">
                 <span>게시판</span>
                 <div className="search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="검색" /><button onClick={() => loadAll(q)}><Search size={13} /></button></div>
@@ -885,7 +933,7 @@ function App() {
               </form>
             </article>
 
-            <article id="api-console" className="panel">
+            <article id="api-console" className={`panel ${activeMainTab === "api" ? "" : "tab-hidden"}`}>
               <div className="panel-title">API / AI 도구</div>
               <div className="api-console">
                 <textarea value={apiPrompt} onChange={(e) => setApiPrompt(e.target.value)} />

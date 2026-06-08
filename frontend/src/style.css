@@ -12,8 +12,12 @@ a:hover { color: #0086d1; }
 .wordmark { letter-spacing: 6px; color: #777; font-size: 21px; font-weight: 300; white-space: nowrap; }
 .wordmark span { color: #1687c9; font-weight: 500; letter-spacing: 1px; }
 .site-header nav { display: flex; align-items: stretch; height: 100%; margin-left: auto; }
-.site-header nav a { display: flex; align-items: center; padding: 0 17px; color: #555; border-bottom: 2px solid transparent; }
-.site-header nav a.active { color: #167ac6; border-bottom-color: #167ac6; }
+.site-header nav a { display: none; }
+.site-header nav button { display: flex; align-items: center; padding: 0 14px; color: #555; border: 0; border-bottom: 2px solid transparent; background: transparent; height: 100%; font-size: 13px; cursor: pointer; }
+.site-header nav button.active { color: #167ac6; border-bottom-color: #167ac6; background: #f5fbff; }
+.tab-hidden { display: none; }
+.mcp-setup-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.mcp-setup-actions button { width: auto; min-width: 170px; border-color: #1687c9; color: #1687c9; }
 .user-menu { color: #777; margin-left: 18px; font-size: 11px; display: flex; align-items: center; gap: 6px; }
 .user-menu button { display: inline-flex; align-items: center; gap: 4px; padding: 4px 7px; }
 

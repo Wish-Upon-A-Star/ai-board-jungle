@@ -14,8 +14,10 @@ const backendMain = read("backend/app/main.py");
 const liveWriters = read("backend/app/live_writers.py");
 
 const requiredServices = ["github", "notion", "figma", "google_calendar", "custom"];
-const requiredPresetKeys = ["github_notion", "figma_calendar", "custom"];
+const requiredPresetKeys = ["github_notion", "mcp_github_to_notion", "mcp_notion_to_github", "figma_calendar", "custom"];
 const requiredAutomationButtons = [
+  "MCP GitHub",
+  "MCP Notion",
   "GitHub + Notion",
   "Figma + Google Calendar",
   "Custom API",

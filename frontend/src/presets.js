@@ -64,6 +64,44 @@ export const customPreset = {
   ],
 };
 
+export const mcpGithubToNotionPreset = {
+  ...defaultAutomation,
+  name: "MCP GitHub latest commits to Notion",
+  source: "GitHub latest 5 commits via MCP",
+  destination: "Notion Korean visual table via MCP",
+  interval_minutes: 10,
+  instruction: "Use the selected user-owned MCP GitHub profile to read the latest 5 commits since the last run. Write a Korean summary to the configured Notion page or database through the user's Notion MCP/API profile. Format the result as a clean table with commit time, author, message, Korean change summary, risk, and next action. Add a short visual status summary before the table.",
+  template: "| 시간 | 작성자 | 커밋 | 변경 요약 | 위험도 | 다음 조치 |\n|---|---|---|---|---|---|",
+  api_provider: "GitHub MCP + Notion MCP",
+  ai_agent: "McpCommitReporterAgent",
+  template_preset: "mcp_github_to_notion",
+  api_key_strategy: "Use user-owned MCP auth profiles. If no MCP GitHub or Notion profile exists, create one in Integration Profiles first.",
+  rag_targets: ["commits"],
+  custom_connections: [
+    { label: "GitHub MCP commits", service: "github", url: "https://github.com/<owner>/<repo>", api: "GitHub MCP", auth_key_name: "GITHUB_MCP_TOKEN", operation: "read_latest_commits", template: "Latest commits since {last_run}: {commit_list}" },
+    { label: "Notion MCP report", service: "notion", url: "https://www.notion.so/<workspace>/<page-or-database-id>", api: "Notion MCP", auth_key_name: "NOTION_MCP_TOKEN", operation: "append_korean_table_report", template: "Korean table: {summary_table}\nVisual status: {status_summary}" },
+  ],
+};
+
+export const mcpNotionToGithubPreset = {
+  ...defaultAutomation,
+  name: "MCP Notion changes to GitHub issue",
+  source: "Notion changes since last run via MCP",
+  destination: "GitHub issue via MCP",
+  interval_minutes: 10,
+  instruction: "Use the selected user-owned MCP Notion profile to read Notion changes since the last successful run. Summarize changed requirements, decisions, blockers, and follow-up tasks in Korean. If development action is needed, create or update a GitHub issue in the configured repository through the user's GitHub MCP/API profile. Avoid duplicate issues and append to an existing issue when the topic already exists.",
+  template: "## Notion 변경 히스토리\n- 변경 내용:\n- 결정 사항:\n- 미해결 문제:\n- GitHub 조치:",
+  api_provider: "Notion MCP + GitHub MCP",
+  ai_agent: "McpNotionHistoryIssueAgent",
+  template_preset: "mcp_notion_to_github",
+  api_key_strategy: "Use user-owned MCP auth profiles. If no MCP Notion or GitHub profile exists, create one in Integration Profiles first.",
+  rag_targets: ["notion_pages", "notion_database"],
+  custom_connections: [
+    { label: "Notion MCP history", service: "notion", url: "https://www.notion.so/<workspace>/<page-or-database-id>", api: "Notion MCP", auth_key_name: "NOTION_MCP_TOKEN", operation: "read_changes_since_last_run", template: "Notion changes since {last_run}: {notion_changes}" },
+    { label: "GitHub MCP issue", service: "github", url: "https://github.com/<owner>/<repo>", api: "GitHub MCP", auth_key_name: "GITHUB_MCP_TOKEN", operation: "create_or_update_issue", template: "Issue title: {title}\nIssue body: {korean_history}" },
+  ],
+};
+
 export const defaultKnowledge = {
   title: "운영 자동화 지침",
   source_type: "document",
@@ -104,4 +142,4 @@ export const integrationConnectionPresets = {
   custom: { label: "커스텀 연결", service: "custom", url: "", api: "Custom REST API", auth_key_name: "CUSTOM_API_KEY", operation: "custom_action", template: "필드명: {value}\n링크: {source_url}\n다음 액션: {next_action}" },
 };
 
-export const automationPresets = [defaultAutomation, figmaCalendarPreset, customPreset];
+export const automationPresets = [defaultAutomation, mcpGithubToNotionPreset, mcpNotionToGithubPreset, figmaCalendarPreset, customPreset];
