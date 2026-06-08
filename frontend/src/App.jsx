@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Bot, CalendarClock, Database, FileText, GitBranch, KeyRound, Link2, LogOut, Play, Plus, Search, Share2, Trash2, Upload, UserPlus } from "lucide-react";
 import { api, apiStatus } from "./api";
 import { customPreset, defaultAutomation, defaultIntegration, defaultKnowledge, figmaCalendarPreset, integrationConnectionPresets } from "./presets";
-import { buildSystemReadinessCards, getRunStatus, mergePostsById, parseRunResult, summarizeRunResult } from "./viewModel";
+import { buildSystemReadinessCards, getHealthFailureMessage, getRunStatus, mergePostsById, parseRunResult, summarizeRunResult } from "./viewModel";
 import "./style.css";
 
 function Badge({ role }) {
@@ -52,6 +52,7 @@ function App() {
   const myTasks = useMemo(() => tasks.filter((task) => task.owner?.id === user?.id), [tasks, user]);
   const sharedCount = posts.filter((post) => post.automationTaskId).length;
   const systemCards = buildSystemReadinessCards({ providerReadiness, knowledgeSources, tasks, healthStatus });
+  const healthFailureMessage = getHealthFailureMessage(healthStatus);
 
   useEffect(() => {
     loadHealth();
@@ -444,10 +445,10 @@ function App() {
         <section className="login-box">
           <div className="wordmark">AI<span>/</span>BOARD<span>&gt;</span></div>
           <p>GitHub, Notion, Figma, Google Calendar 자동화를 중심으로 한 AI 게시판입니다.</p>
-          {healthStatus && !healthStatus.ok ? (
+          {healthFailureMessage ? (
             <div className="health-alert">
               <strong>Server health check failed</strong>
-              <span>{healthStatus.data?.database?.error || healthStatus.statusText || `HTTP ${healthStatus.status}`}</span>
+              <span>{healthFailureMessage}</span>
             </div>
           ) : null}
           <div className="auth-tabs">

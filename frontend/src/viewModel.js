@@ -31,6 +31,13 @@ export function mergePostsById(currentPosts, nextPosts) {
   });
 }
 
+export function getHealthFailureMessage(healthStatus) {
+  if (!healthStatus || healthStatus.ok) return "";
+  return healthStatus.data?.database?.error
+    || healthStatus.statusText
+    || `HTTP ${healthStatus.status || "error"}`;
+}
+
 export function buildSystemReadinessCards({ providerReadiness = [], knowledgeSources = [], tasks = [], healthStatus = null } = {}) {
   const readyProviders = providerReadiness.filter((provider) => provider.ready).length;
   const databaseHealth = healthStatus?.data?.database || healthStatus?.response?.database || null;

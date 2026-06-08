@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   buildSystemReadinessCards,
+  getHealthFailureMessage,
   getRunStatus,
   mergePostsById,
   parseRunResult,
@@ -50,6 +51,10 @@ const databaseBlockedCards = buildSystemReadinessCards({
 });
 assert.deepEqual(databaseBlockedCards.find((card) => card.label === "FastAPI"), { label: "FastAPI", value: "HTTP 503", ok: false });
 assert.deepEqual(databaseBlockedCards.find((card) => card.label === "PostgreSQL"), { label: "PostgreSQL", value: "blocked 503", ok: false });
+assert.equal(getHealthFailureMessage({ status: 503, ok: false, data: { database: { error: "PostgreSQL is not reachable" } } }), "PostgreSQL is not reachable");
+assert.equal(getHealthFailureMessage({ status: "error", ok: false, statusText: "network failed" }), "network failed");
+assert.equal(getHealthFailureMessage({ status: 500, ok: false }), "HTTP 500");
+assert.equal(getHealthFailureMessage({ status: 200, ok: true }), "");
 
 for (const preset of automationPresets) {
   assert.equal(typeof preset.name, "string");
@@ -89,6 +94,7 @@ console.log(JSON.stringify({
     "getRunStatus",
     "mergePostsById",
     "buildSystemReadinessCards",
+    "getHealthFailureMessage",
     "automationPresets",
     "defaultKnowledge",
     "defaultIntegration",
