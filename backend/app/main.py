@@ -384,6 +384,21 @@ def github_webhook_repo_matches(repo_url: str, candidate: str) -> bool:
     return tuple(part.lower() for part in repo) == tuple(part.lower() for part in candidate_repo)
 
 
+def github_webhook_repos(payload: dict) -> list[str]:
+    repository = payload.get("repository") if isinstance(payload, dict) else None
+    if not isinstance(repository, dict):
+        return []
+    targets: list[str] = []
+    for key in ["html_url", "clone_url", "ssh_url", "git_url"]:
+        value = str(repository.get(key) or "").strip()
+        if value:
+            targets.append(value)
+    full_name = str(repository.get("full_name") or "").strip().strip("/")
+    if re.fullmatch(r"[^/\s]+/[^/\s]+", full_name):
+        targets.append(f"https://github.com/{full_name}")
+    return list(dict.fromkeys(targets))
+
+
 async def extract_upload_text(upload: UploadFile | None) -> tuple[str, str, str]:
     if upload is None:
         return "", "", ""
@@ -1163,19 +1178,23 @@ async def github_webhook(
     if not verify_hmac_signature(settings().github_webhook_secret, body, x_hub_signature_256):
         raise HTTPException(status_code=401, detail="Invalid GitHub webhook signature.")
     payload = json.loads(body.decode("utf-8") or "{}")
-    repo_url = ((payload.get("repository") or {}).get("html_url") or "").strip()
+    repo_urls = github_webhook_repos(payload)
     stmt = select(AutomationTask).where(AutomationTask.status == "ACTIVE")
     tasks = []
     for task in db.scalars(stmt).all():
         profile_target = task.integration_profile.base_url if task.integration_profile else ""
-        if github_webhook_repo_matches(repo_url, task.github_repo_url) or github_webhook_repo_matches(repo_url, profile_target):
+        if any(
+            github_webhook_repo_matches(repo_url, task.github_repo_url) or github_webhook_repo_matches(repo_url, profile_target)
+            for repo_url in repo_urls
+        ):
             tasks.append(task)
     results = [execute_automation_task(db, task, task.owner, scheduled=True) for task in tasks[:20]]
     return {
         "ok": True,
         "provider": "github",
         "event": x_github_event,
-        "repo": repo_url,
+        "repo": repo_urls[0] if repo_urls else "",
+        "repos": repo_urls,
         "matched": len(tasks),
         "triggered": [{"taskId": item["task"]["id"], "status": item["run"]["result"]["status"]} for item in results],
         "signatureRequired": bool(settings().github_webhook_secret),
