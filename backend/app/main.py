@@ -36,15 +36,22 @@ STARTUP_DB_ERROR = ""
 @app.on_event("startup")
 def startup() -> None:
     global STARTUP_DB_ERROR
+    ensure_database_ready()
+
+
+def ensure_database_ready() -> tuple[bool, str]:
+    global STARTUP_DB_ERROR
     reachable, reason = database_reachable()
     if not reachable:
         STARTUP_DB_ERROR = reason
-        return
+        return False, reason
     try:
         init_db()
         STARTUP_DB_ERROR = ""
+        return True, ""
     except SQLAlchemyError as exc:
         STARTUP_DB_ERROR = f"{exc.__class__.__name__}: {str(exc).splitlines()[0][:240]}"
+        return False, STARTUP_DB_ERROR
 
 
 def serialize_user(user: User) -> dict:
@@ -402,6 +409,9 @@ def serialize_task(task: AutomationTask) -> dict:
 @app.get("/api/health", response_model=None)
 def health() -> dict | JSONResponse:
     if STARTUP_DB_ERROR:
+        recovered, _ = ensure_database_ready()
+        if recovered:
+            return {"ok": True, "stack": "React + FastAPI + PostgreSQL + Redis", "docs": "/docs", "database": check_db()}
         return JSONResponse(
             status_code=503,
             content={

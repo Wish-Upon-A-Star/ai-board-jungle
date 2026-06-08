@@ -17,9 +17,30 @@ from sqlalchemy import inspect
 from app.collectors import CollectedItem
 from app.config import settings
 from app.db import SessionLocal, engine, init_db
+import app.main as main_module
 from app.main import app
 from app.models import AutomationTask, IntegrationProfile
 from app.security import reveal_secret
+
+
+def test_health_recovers_after_startup_database_error(monkeypatch):
+    calls = {"init": 0}
+
+    def fake_init_db():
+        calls["init"] += 1
+
+    monkeypatch.setattr(main_module, "database_reachable", lambda: (True, ""))
+    monkeypatch.setattr(main_module, "init_db", fake_init_db)
+    monkeypatch.setattr(main_module, "check_db", lambda: {"ok": True, "url": "postgresql+psycopg"})
+
+    with TestClient(app) as client:
+        main_module.STARTUP_DB_ERROR = "PostgreSQL is not reachable at localhost:5432"
+        health = client.get("/api/health")
+
+    assert health.status_code == 200
+    assert health.json()["database"]["ok"] is True
+    assert calls["init"] >= 1
+    assert main_module.STARTUP_DB_ERROR == ""
 
 
 def test_full_fastapi_flow(monkeypatch):
