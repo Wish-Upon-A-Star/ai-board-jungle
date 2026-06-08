@@ -293,6 +293,14 @@ npm run start:lan
 
 FastAPI serves the built React files from `frontend/dist`, keeps `/api/*` and `/mcp/rpc` as backend routes, and falls back to `index.html` for React deep links. If the build is missing, `/` returns a clear `Frontend build not found. Run npm run build first.` error instead of a blank page.
 
+Apply verified code to the live `3000/8000` server:
+
+```powershell
+npm run apply:live
+```
+
+`apply:live` first checks that `AI_BOARD_DATABASE_URL` is PostgreSQL and reachable. If PostgreSQL is not reachable, it exits before stopping the current live ports. When PostgreSQL is reachable, it builds the frontend, restarts FastAPI on `8000` and Vite on `3000`, then waits for `/api/health` and the web app before reporting success.
+
 Verify this mode with:
 
 ```powershell
