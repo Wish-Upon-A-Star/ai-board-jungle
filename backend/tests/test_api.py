@@ -423,10 +423,6 @@ def test_notion_sources_report_commit_summary_keeps_author_clean():
     assert "변경 범위와 자동화 영향도를 확인해야 합니다" not in summary
     assert "작성자: Wish-Upon-A-Star" in summary
     assert "커밋: 1b483cd3d1c8" in summary
-    return
-    assert summary.startswith("Wish-Upon-A-Star가")
-    assert "Wish-Upon-A-Star url:" not in summary
-    assert "커밋(25035385369c)" in summary
 
 
 def test_notion_sources_report_commit_summary_describes_oauth_login_change():
