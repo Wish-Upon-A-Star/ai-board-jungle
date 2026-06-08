@@ -99,6 +99,126 @@ def notion_page_children(title: str, body: str) -> list[dict]:
     ]
 
 
+def notion_table_cells(values: list[str], limit: int = 900) -> dict:
+    return {
+        "object": "block",
+        "type": "table_row",
+        "table_row": {"cells": [notion_text(value, limit) for value in values]},
+    }
+
+
+def source_attr(source: object, name: str, default: str = "") -> str:
+    if isinstance(source, dict):
+        value = source.get(name, default)
+    else:
+        value = getattr(source, name, default)
+    return str(value or "")
+
+
+def source_type_label(value: str) -> str:
+    normalized = value.lower()
+    if "commit" in normalized:
+        return "커밋"
+    if "pull" in normalized or normalized in {"pr", "github_pr"}:
+        return "풀 리퀘스트"
+    if "issue" in normalized:
+        return "이슈"
+    if "notion" in normalized:
+        return "노션"
+    return value or "항목"
+
+
+def notion_sources_table_children(title: str, sources: list[object]) -> list[dict]:
+    rows = [notion_table_cells(["번호", "구분", "제목", "요약", "링크"])]
+    for index, source in enumerate(sources, start=1):
+        title_value = source_attr(source, "title")
+        source_type = source_attr(source, "source_type") or source_attr(source, "sourceType")
+        url = source_attr(source, "file_name") or source_attr(source, "url")
+        summary = source_attr(source, "extracted_text") or source_attr(source, "summary") or source_attr(source, "text")
+        rows.append(
+            notion_table_cells(
+                [
+                    str(index),
+                    source_type_label(source_type),
+                    title_value[:240],
+                    summary[:900],
+                    url[:500],
+                ]
+            )
+        )
+    return [
+        {
+            "object": "block",
+            "type": "heading_2",
+            "heading_2": {"rich_text": notion_text(title, 200)},
+        },
+        {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {"rich_text": notion_text(f"총 {len(sources)}개 항목을 AI Board 자동화가 UTF-8 한국어 표로 정리했습니다.", 500)},
+        },
+        {
+            "object": "block",
+            "type": "table",
+            "table": {
+                "table_width": 5,
+                "has_column_header": True,
+                "has_row_header": False,
+                "children": rows,
+            },
+        },
+    ]
+
+
+def write_notion_sources_table(
+    profile: IntegrationProfile,
+    title: str,
+    sources: list[object],
+    dry_run: bool = True,
+    target_url: str | None = None,
+) -> dict:
+    token = reveal_secret(profile.token_value)
+    target_id = extract_notion_id(target_url or profile.base_url)
+    if not token or not target_id:
+        return {"service": "notion", "status": "blocked", "reason": "missing token or Notion page/database URL", "dryRun": dry_run}
+    children = notion_sources_table_children(title, sources)
+    block_children_url = f"https://api.notion.com/v1/blocks/{target_id}/children"
+    if dry_run:
+        return {
+            "service": "notion",
+            "status": "ready",
+            "method": "PATCH",
+            "url": block_children_url,
+            "payload": {"children": children},
+            "dryRun": True,
+            "target": "page",
+            "format": "korean-summary-table",
+            "count": len(sources),
+        }
+    try:
+        response = httpx.patch(
+            block_children_url,
+            headers={"Authorization": f"Bearer {token}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"},
+            json={"children": children},
+            timeout=30.0,
+        )
+    except httpx.HTTPError as exc:
+        return {"service": "notion", "status": "failed", "reason": str(exc), "dryRun": False, "target": "page"}
+    data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"raw": response.text}
+    if not response.is_success:
+        return {"service": "notion", "status": "failed", "code": response.status_code, "response": data, "dryRun": False, "target": "page"}
+    return {
+        "service": "notion",
+        "status": "written",
+        "id": target_id,
+        "url": f"https://www.notion.so/{target_id}",
+        "dryRun": False,
+        "target": "page",
+        "format": "korean-summary-table",
+        "count": len(sources),
+    }
+
+
 def write_notion_task(profile: IntegrationProfile, title: str, body: str, dry_run: bool = True, target_url: str | None = None) -> dict:
     token = reveal_secret(profile.token_value)
     target_id = extract_notion_id(target_url or profile.base_url)

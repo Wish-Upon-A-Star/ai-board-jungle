@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from .collectors import CollectedItem, collect_profile_items, extract_notion_id, parse_github_repo, save_collected_items
 from .db import check_db, database_reachable, get_db, init_db
-from .live_writers import execute_profile_write
+from .live_writers import execute_profile_write, write_notion_sources_table
 from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, User
 from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LiveWriteIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
 from .security import create_token, current_user, hash_password, protect_secret, reveal_secret, secret_preview, secret_storage_type, verify_password
@@ -1417,19 +1417,12 @@ def execute_automation_task(
             original_base_url = profile.base_url
             profile.base_url = str(connection.get("url") or profile.base_url)
             if service == "notion" and saved_sources:
-                child_writes = [
-                    execute_profile_write(profile, f"[AI Board] {source.title}", source_write_body(task, source), dry_run=False)
-                    for source in saved_sources
-                ]
-                failed = [item for item in child_writes if item.get("status") not in {"written", "ready"}]
-                write = {
-                    "service": service,
-                    "status": "partial" if failed else "written",
-                    "count": len(child_writes),
-                    "failed": len(failed),
-                    "items": child_writes,
-                    "dryRun": False,
-                }
+                write = write_notion_sources_table(
+                    profile,
+                    f"[AI Board] {task.name} - GitHub 변경사항 한국어 표",
+                    saved_sources,
+                    dry_run=False,
+                )
             else:
                 write = execute_profile_write(profile, f"[AI Board] {task.name}", write_body, dry_run=False)
             profile.base_url = original_base_url
@@ -1474,6 +1467,67 @@ def run_automation(task_id: int, user: User = Depends(current_user), db: Session
     if task.owner_id != user.id and user.role != "ADMIN":
         raise HTTPException(status_code=403, detail="You do not have permission to run this automation.")
     return execute_automation_task(db, task, user, scheduled=False)
+
+
+@app.post("/api/automations/{task_id}/runs/{run_id}/replay-notion")
+def replay_automation_run_to_notion(task_id: int, run_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    task = db.get(AutomationTask, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Automation task not found.")
+    if task.owner_id != user.id and user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="You do not have permission to replay this automation.")
+    run = (
+        db.query(AutomationRun)
+        .filter(AutomationRun.id == run_id, AutomationRun.task_id == task.id, AutomationRun.owner_id == task.owner_id)
+        .first()
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Automation run not found.")
+    try:
+        previous_result = json.loads(run.result or "{}")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Automation run result is not valid JSON.") from exc
+    collected_items = previous_result.get("collected") or []
+    if not collected_items:
+        raise HTTPException(status_code=400, detail="This run has no collected items to replay.")
+    profile = profile_for_service(db, task.owner, task, "notion")
+    if not profile:
+        raise HTTPException(status_code=400, detail="No user-owned Notion integration profile with a token is available.")
+    connection = next((item for item in parse_connections(task.custom_connections) if str(item.get("service", "")).lower() == "notion"), {})
+    original_base_url = profile.base_url
+    profile.base_url = str(connection.get("url") or task.notion_database_url or profile.base_url)
+    write = write_notion_sources_table(
+        profile,
+        f"[AI Board] {task.name} - run {run.id} 재전송 한국어 표",
+        collected_items,
+        dry_run=False,
+    )
+    profile.base_url = original_base_url
+    replay_result = {
+        "taskId": task.id,
+        "sourceRunId": run.id,
+        "status": write.get("status", "unknown"),
+        "collected": collected_items,
+        "liveWrites": [write],
+    }
+    task.last_result = result_to_text(replay_result)
+    task.last_run_at = datetime.now(timezone.utc)
+    replay_run = AutomationRun(task_id=task.id, owner_id=task.owner_id, result=task.last_result)
+    db.add(replay_run)
+    log_activity(
+        db,
+        user,
+        "automation.replay_notion",
+        "notion",
+        write.get("status", "unknown"),
+        f"Replayed automation run {run.id} to Notion with Korean UTF-8 table",
+        {"taskId": task.id, "sourceRunId": run.id, "write": write},
+        task_id=task.id,
+        profile_id=profile.id,
+    )
+    db.commit()
+    db.refresh(replay_run)
+    return {"task": serialize_task(task), "run": {"id": replay_run.id, "result": replay_result, "createdPostId": None}}
 
 
 @app.get("/api/automations/{task_id}/runs")
