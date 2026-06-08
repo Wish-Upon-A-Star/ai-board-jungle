@@ -275,6 +275,31 @@ Verify this mode with:
 npm run verify:production-serve
 ```
 
+## External Public Access
+
+Use this when 6-10 testers must open the app from outside the LAN without stopping the current `npm run dev:lan` server. This starts a separate single-process FastAPI server on port `8130`, serves the built React app from the same process, and opens a Cloudflare Quick Tunnel public URL:
+
+```powershell
+npm run serve:external
+```
+
+The command prints `AI Board public URL: https://...trycloudflare.com` when the tunnel is ready. Share that one URL with testers. It does not stop or reuse ports `3000` and `8000`.
+
+Useful overrides:
+
+- `AI_BOARD_EXTERNAL_PORT`: local backing port. Default `8130`.
+- `AI_BOARD_EXTERNAL_HOST`: local bind host. Default `127.0.0.1` for tunnel-backed exposure.
+- `AI_BOARD_EXTERNAL_WORKERS`: Uvicorn worker count. Keep `1` for local SQLite; use `2` or more only with PostgreSQL.
+- `AI_BOARD_DATABASE_URL`: database URL. For 6-10 real users, prefer PostgreSQL instead of the local SQLite file.
+
+Test the external server path without opening a public tunnel:
+
+```powershell
+npm run verify:external-serve
+```
+
+For longer-lived public access, replace the quick tunnel with a named Cloudflare Tunnel, reverse proxy, or hosted deployment. Quick Tunnel URLs are temporary and can change when restarted.
+
 기본 계정:
 
 - `admin@example.com` / `password123`
@@ -312,6 +337,7 @@ npm run verify:readme
 npm run verify:readme-output
 npm run verify:contract
 npm run verify:production-serve
+npm run verify:external-serve
 npm run verify:fastapi
 npm run smoke:ui
 npm run smoke:http
@@ -327,6 +353,7 @@ npm run smoke:http
 - `verify:readme`: 제출 README 구조, 체크리스트, PNG 스크린샷 무결성 확인
 - `verify:contract`: React UI가 의존하는 FastAPI 응답 계약 확인
 - `verify:production-serve`: builds React and checks FastAPI can serve the built UI, SPA fallback, API health, and API 404 isolation from one process
+- `verify:external-serve`: checks the external-access server script, separate 8131 test port, no current-server shutdown behavior, and single-process smoke path
 - `verify:full:quick`: hygiene, text, frontend helper, README, backend tests, frontend build, API contract, HTTP smoke, UI CDP smoke, MCP smoke
 - `verify:template-presets`: checks reusable automation templates for GitHub + Notion, Figma + Google Calendar, and custom API setups
 - `verify:evaluation-reports`: checks contiguous round reports with scores and next-risk evidence
@@ -437,7 +464,7 @@ Serverless checks do not start FastAPI, Vite, or Chrome CDP:
 
 Server-required checks start or expect FastAPI, Vite, Chrome CDP, or live API credentials:
 
-Run server-required checks sequentially; verify:full:quick and verify:fastapi both own and clean ports 3000/8000.
+Run server-required checks sequentially; verify:full:quick and verify:fastapi both own and clean ports 3000/8000. verify:external-serve uses port 8131 and must not stop the current server.
 
 Safe local verification order:
 
@@ -451,6 +478,7 @@ npm run verify:full:quick
 
 - `npm run verify:contract`
 - `npm run verify:production-serve`
+- `npm run verify:external-serve`
 - `npm run smoke:http`
 - `npm run smoke:ui`
 - `npm run verify:fastapi`

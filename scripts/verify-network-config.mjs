@@ -5,6 +5,7 @@ const devFastapi = readFileSync("scripts/dev-fastapi.mjs", "utf8");
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const envExample = readFileSync(".env.example", "utf8");
 const readme = readFileSync("README.md", "utf8");
+const serveExternal = readFileSync("scripts/serve-external.mjs", "utf8");
 
 assert.ok(devFastapi.includes('import os from "node:os"'), "dev server must inspect local network interfaces");
 assert.ok(devFastapi.includes('const host = process.env.AI_BOARD_HOST || "0.0.0.0"'), "dev server must bind to all interfaces by default");
@@ -20,6 +21,11 @@ assert.ok(readme.includes("## LAN / Other Device Access"), "README must document
 assert.ok(readme.includes("npm run dev:lan"), "README must include the LAN dev command");
 assert.ok(readme.includes("AI_BOARD_PUBLIC_HOST"), "README must explain public host override");
 assert.ok(readme.includes("Open the printed AI Board browser URL"), "README must tell users which URL to open");
+assert.equal(packageJson.scripts["serve:external"], "node scripts/serve-external.mjs", "package.json must expose serve:external");
+assert.equal(packageJson.scripts["verify:external-serve"], "node scripts/verify-external-serve.mjs", "package.json must expose verify:external-serve");
+assert.ok(serveExternal.includes("AI_BOARD_EXTERNAL_PORT"), "external serve must use a configurable non-dev port");
+assert.ok(serveExternal.includes("AI Board public URL:"), "external serve must print the public tunnel URL");
+assert.ok(!serveExternal.includes("stopLocalServers"), "external serve must not stop the running LAN/dev server");
 
 console.log(JSON.stringify({
   ok: true,
@@ -29,5 +35,6 @@ console.log(JSON.stringify({
     "dev:lan script",
     ".env.example LAN variables",
     "README LAN instructions",
+    "external tunnel serve script",
   ],
 }, null, 2));

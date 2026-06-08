@@ -28,6 +28,7 @@ if (!skipInstall) {
 }
 run("npm", ["--prefix", "frontend", "run", "build"]);
 run("node", ["scripts/verify-production-serve.mjs", "--skip-build"], { env, timeout: 120000 });
+run("node", ["scripts/verify-external-serve.mjs"], { env, timeout: 120000 });
 run("python", ["scripts/seed-fastapi.py"], { env });
 
 const api = start("python", ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"], env);

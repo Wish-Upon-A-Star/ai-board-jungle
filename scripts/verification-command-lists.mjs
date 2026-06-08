@@ -18,6 +18,7 @@ export const serverlessCommands = [
 export const serverRequiredCommands = [
   "verify:contract",
   "verify:production-serve",
+  "verify:external-serve",
   "smoke:http",
   "smoke:ui",
   "verify:fastapi",
@@ -29,7 +30,7 @@ export const serverRequiredCommands = [
 export const serverRequiredExclusivePorts = [3000, 8000];
 
 export const serverRequiredConcurrencyNote =
-  "Run server-required checks sequentially; verify:full:quick and verify:fastapi both own and clean ports 3000/8000.";
+  "Run server-required checks sequentially; verify:full:quick and verify:fastapi both own and clean ports 3000/8000. verify:external-serve uses port 8131 and must not stop the current server.";
 
 export const safeLocalVerificationOrder = [
   "verify:readiness",

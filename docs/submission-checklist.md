@@ -2,9 +2,11 @@
 
 Run these checks before final submission or when the UI changes:
 
-Serverless checks can run without starting FastAPI, Vite, or Chrome CDP. Server-required checks are covered by `npm run verify:full:quick`, `npm run verify:fastapi`, and live integration tests.
+Serverless checks can run without starting FastAPI, Vite, or Chrome CDP. Server-required checks are covered by `npm run verify:full:quick`, `npm run verify:fastapi`, `npm run verify:external-serve`, and live integration tests.
 
-Run server-required checks sequentially; verify:full:quick and verify:fastapi both own and clean ports 3000/8000.
+Run server-required checks sequentially; verify:full:quick and verify:fastapi both own and clean ports 3000/8000. verify:external-serve uses port 8131 and must not stop the current server.
+
+Do not stop a currently shared server for ad-hoc fixes; first verify changes on a separate test port.
 
 Safe local verification order:
 
@@ -49,12 +51,13 @@ npm run verify:full:quick
 
    ```powershell
    npm run verify:production-serve
+   npm run verify:external-serve
    npm run verify:full:quick
    npm run smoke:http
    npm run smoke:ui
    ```
 
-   This includes `npm run verify:frontend-helpers`, `npm run verify:network-config`, and `npm run verify:evaluation-reports` before the build, then `npm run verify:production-serve` for single-process FastAPI static serving and `npm run verify:contract` after the managed FastAPI and React servers are available.
+   This includes `npm run verify:frontend-helpers`, `npm run verify:network-config`, and `npm run verify:evaluation-reports` before the build, then `npm run verify:production-serve` for single-process FastAPI static serving, `npm run verify:external-serve` for the separate external test-port path, and `npm run verify:contract` after the managed FastAPI and React servers are available.
 
 4. For live external writes, set real GitHub/Notion/Google Calendar/Figma credentials in `.env` and run:
 
