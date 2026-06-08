@@ -15,6 +15,15 @@ function Field({ label, children }) {
   return <label className="field"><span>{label}</span>{children}</label>;
 }
 
+const mainTabs = [
+  { id: "automations", label: "Automation", description: "작업 실행, 예약, 생성" },
+  { id: "integrations", label: "MCP / Profiles", description: "GitHub, Notion 로그인과 프로필" },
+  { id: "settings", label: "Defaults", description: "사용자 기본 AI 설정" },
+  { id: "knowledge", label: "RAG", description: "검색 지식자료" },
+  { id: "board", label: "Board", description: "공유 기록과 게시글" },
+  { id: "api", label: "API", description: "상태 점검과 도구 호출" },
+];
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem("ai-board-token") || "");
   const [user, setUser] = useState(null);
@@ -535,27 +544,34 @@ function App() {
 
   return (
     <div className="page">
+      <a className="skip-link" href="#workspace">본문으로 바로가기</a>
       <header className="site-header">
-        <div className="wordmark">AI<span>/</span>BOARD<span>&gt;</span></div>
-        <nav>
-          <button className={activeMainTab === "automations" ? "active" : ""} onClick={() => setActiveMainTab("automations")}>Automation</button>
-          <button className={activeMainTab === "integrations" ? "active" : ""} onClick={() => setActiveMainTab("integrations")}>MCP / Profiles</button>
-          <button className={activeMainTab === "settings" ? "active" : ""} onClick={() => setActiveMainTab("settings")}>Defaults</button>
-          <button className={activeMainTab === "knowledge" ? "active" : ""} onClick={() => setActiveMainTab("knowledge")}>RAG</button>
-          <button className={activeMainTab === "board" ? "active" : ""} onClick={() => setActiveMainTab("board")}>Board</button>
-          <button className={activeMainTab === "api" ? "active" : ""} onClick={() => setActiveMainTab("api")}>API</button>
-          <a href="#automations" className="active">자동화</a>
-          <a href="#new-task">등록</a>
-          <a href="#profile-settings">기본값</a>
-          <a href="#integration-profiles">연동</a>
-          <a href="#knowledge">RAG</a>
-          <a href="#api-console">API</a>
-          <a href="#board">게시판</a>
+        <div className="brand-block">
+          <div className="wordmark">AI<span>/</span>BOARD<span>&gt;</span></div>
+          <span>Automation command center</span>
+        </div>
+        <nav aria-label="주요 작업 탭" role="tablist">
+          {mainTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeMainTab === tab.id}
+              aria-controls={`${tab.id}-panel`}
+              aria-label={`${tab.label}: ${tab.description}`}
+              className={activeMainTab === tab.id ? "active" : ""}
+              title={tab.description}
+              onClick={() => setActiveMainTab(tab.id)}
+            >
+              <span>{tab.label}</span>
+              <small aria-hidden="true">{tab.description}</small>
+            </button>
+          ))}
         </nav>
-        <div className="user-menu">{user.email} <Badge role={user.role} /> <button onClick={logout}><LogOut size={13} /> 로그아웃</button></div>
+        <div className="user-menu" aria-label="현재 사용자">{user.email} <Badge role={user.role} /> <button type="button" onClick={logout} aria-label="로그아웃"><LogOut size={13} /> 로그아웃</button></div>
       </header>
 
-      <main className="container">
+      <main id="workspace" className="container">
         <section className="profile-head">
           <div className={user.role === "ADMIN" ? "avatar admin" : "avatar user"}>{user.role === "ADMIN" ? "A" : "U"}</div>
           <div>
@@ -608,7 +624,7 @@ function App() {
               </div>
             </article>
 
-            <article id="automations" className={`panel ${activeMainTab === "automations" ? "" : "tab-hidden"}`}>
+            <article id="automations-panel" className={`panel ${activeMainTab === "automations" ? "" : "tab-hidden"}`}>
               <div className="panel-title">사용자별 자동화 작업</div>
               <div className="task-list">
                 <div className="scheduler-bar">
@@ -735,7 +751,7 @@ function App() {
               </form>
             </article>
 
-            <article id="profile-settings" className={`panel ${activeMainTab === "settings" ? "" : "tab-hidden"}`}>
+            <article id="settings-panel" className={`panel ${activeMainTab === "settings" ? "" : "tab-hidden"}`}>
               <div className="panel-title row-title"><span>사용자 기본 자동화 설정</span><span className="subtle">새 자동화나 커스텀 지침에 재사용할 AI 모델, 템플릿, 연결 기본값입니다.</span></div>
               <form className="knowledge-form" onSubmit={saveProfileSettings}>
                 <div className="grid3 wide">
@@ -785,7 +801,7 @@ function App() {
               </form>
             </article>
 
-            <article id="integration-profiles" className={`panel ${activeMainTab === "integrations" ? "" : "tab-hidden"}`}>
+            <article id="integrations-panel" className={`panel ${activeMainTab === "integrations" ? "" : "tab-hidden"}`}>
               <div className="panel-title row-title"><span>연동 프로필 목록</span><span className="subtle">사용자별 토큰, API, AI 모델, RAG 범위를 저장합니다.</span></div>
               <div className="mcp-setup-actions">
                 <button type="button" onClick={() => startMcpLogin("github")}><GitBranch size={14} /> GitHub MCP 로그인</button>
@@ -934,7 +950,7 @@ function App() {
               </div>
             </article>
 
-            <article id="knowledge" className={`panel ${activeMainTab === "knowledge" ? "" : "tab-hidden"}`}>
+            <article id="knowledge-panel" className={`panel ${activeMainTab === "knowledge" ? "" : "tab-hidden"}`}>
               <div className="panel-title row-title"><span>RAG 지식자료</span><span className="subtle">문서, 음성, 이미지, 기타 파일 설명을 사용자별로 저장합니다.</span></div>
               <form className="knowledge-form" onSubmit={saveKnowledge}>
                 <div className="grid3 wide">
@@ -955,7 +971,7 @@ function App() {
               </div>
             </article>
 
-            <article id="board" className={`panel ${activeMainTab === "board" ? "" : "tab-hidden"}`}>
+            <article id="board-panel" className={`panel ${activeMainTab === "board" ? "" : "tab-hidden"}`}>
               <div className="panel-title row-title">
                 <span>게시판</span>
                 <div className="search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="검색" /><button onClick={() => loadAll(q)}><Search size={13} /></button></div>
@@ -979,7 +995,7 @@ function App() {
               </form>
             </article>
 
-            <article id="api-console" className={`panel ${activeMainTab === "api" ? "" : "tab-hidden"}`}>
+            <article id="api-panel" className={`panel ${activeMainTab === "api" ? "" : "tab-hidden"}`}>
               <div className="panel-title">API / AI 도구</div>
               <div className="api-console">
                 <textarea value={apiPrompt} onChange={(e) => setApiPrompt(e.target.value)} />
@@ -993,10 +1009,10 @@ function App() {
             </article>
           </section>
 
-          <aside className="result-panel">
-            <div className="tabs">
-              <button className={sideTab === "selected" ? "active" : ""} onClick={() => setSideTab("selected")}>선택 글</button>
-              <button className={sideTab === "api" ? "active" : ""} onClick={() => setSideTab("api")}>AI 결과</button>
+          <aside className="result-panel" aria-label="선택 항목과 API 결과">
+            <div className="tabs" role="tablist" aria-label="결과 패널">
+              <button type="button" role="tab" aria-label="선택 글 보기" aria-selected={sideTab === "selected"} className={sideTab === "selected" ? "active" : ""} onClick={() => setSideTab("selected")}>선택 글</button>
+              <button type="button" role="tab" aria-label="AI 결과 보기" aria-selected={sideTab === "api"} className={sideTab === "api" ? "active" : ""} onClick={() => setSideTab("api")}>AI 결과</button>
             </div>
             {sideTab === "selected" ? (
               selected ? <><h2>{selected.title}</h2><p>{selected.content}</p><p>{selected.tags?.map((tag) => `#${tag.tag.name}`).join(" ")}</p></> : <p>선택된 게시글이 없습니다.</p>
