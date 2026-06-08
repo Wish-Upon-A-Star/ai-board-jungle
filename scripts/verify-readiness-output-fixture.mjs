@@ -965,7 +965,7 @@ assert.deepEqual(
 
 function buildCompactReadinessOutput({ omitTotal = false, omitLatestRound = false, omitServerRequired = false, omitPassLine = false, omitNote = false } = {}) {
   const headerParts = [
-    omitTotal ? null : "READINESS OK 12/12 passed",
+    omitTotal ? null : "READINESS OK 13/13 passed",
     omitLatestRound ? null : `latest-evaluation-round: ${expectedLatestEvaluationRound}`,
     omitServerRequired ? null : `server-required: ${serverRequiredCommands.join(", ")}`,
   ].filter(Boolean);
@@ -975,6 +975,7 @@ function buildCompactReadinessOutput({ omitTotal = false, omitLatestRound = fals
     "PASS text output 1ms",
     "PASS frontend helpers 1ms",
     "PASS template presets 1ms",
+    "PASS network config 1ms",
     "PASS evaluation reports 1ms",
     "PASS readme 1ms",
     "PASS readme output 1ms",
@@ -1001,6 +1002,7 @@ function buildFormatterSummaryFixture({ failed = false } = {}) {
     "text output",
     "frontend helpers",
     "template presets",
+    "network config",
     "evaluation reports",
     "readme",
     "readme output",

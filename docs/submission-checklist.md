@@ -34,6 +34,7 @@ npm run verify:full:quick
    npm run verify:text-output
    npm run verify:frontend-helpers
    npm run verify:template-presets
+   npm run verify:network-config
    npm run verify:evaluation-reports
    npm run verify:readiness
    npm run verify:readiness:compact
@@ -52,7 +53,7 @@ npm run verify:full:quick
    npm run smoke:ui
    ```
 
-   This includes `npm run verify:frontend-helpers` and `npm run verify:evaluation-reports` before the build, then `npm run verify:contract` after the managed FastAPI and React servers are available.
+   This includes `npm run verify:frontend-helpers`, `npm run verify:network-config`, and `npm run verify:evaluation-reports` before the build, then `npm run verify:contract` after the managed FastAPI and React servers are available.
 
 4. For live external writes, set real GitHub/Notion/Google Calendar/Figma credentials in `.env` and run:
 

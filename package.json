@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev-fastapi.mjs",
+    "dev:lan": "node scripts/dev-fastapi.mjs",
     "build": "npm --prefix frontend run build",
     "start": "python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000",
     "seed": "python scripts/seed-fastapi.py",
@@ -14,6 +15,7 @@
     "verify:hygiene": "node scripts/verify-hygiene.mjs",
     "verify:frontend-helpers": "node scripts/verify-frontend-helpers.mjs",
     "verify:template-presets": "node scripts/verify-template-presets.mjs",
+    "verify:network-config": "node scripts/verify-network-config.mjs",
     "verify:evaluation-reports": "node scripts/verify-evaluation-reports.mjs",
     "verify:readiness": "node scripts/verify-readiness-summary.mjs",
     "verify:readiness:compact": "node scripts/verify-readiness-summary.mjs --compact",

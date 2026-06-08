@@ -4,6 +4,7 @@ export const serverlessCommands = [
   "verify:text-output",
   "verify:frontend-helpers",
   "verify:template-presets",
+  "verify:network-config",
   "verify:evaluation-reports",
   "verify:readiness",
   "verify:readiness:compact",

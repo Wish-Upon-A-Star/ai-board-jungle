@@ -231,6 +231,33 @@ npm run dev
 - React: `http://127.0.0.1:3000`
 - FastAPI Docs: `http://127.0.0.1:8000/docs`
 
+## LAN / Other Device Access
+
+Use this when the app must be opened from another PC, phone, VM, or LAN-connected device:
+
+```powershell
+npm run dev:lan
+```
+
+The dev server binds FastAPI and Vite to `0.0.0.0`, detects a LAN IPv4 address, and injects that address into the React app as `VITE_API_BASE`. Open the printed AI Board browser URL, for example `http://192.168.0.25:3000`, from the other device.
+
+If the automatic LAN IP is wrong, set the public host explicitly:
+
+```powershell
+$env:AI_BOARD_PUBLIC_HOST="192.168.0.25"
+npm run dev:lan
+```
+
+Useful overrides:
+
+- `AI_BOARD_HOST`: bind host. Default `0.0.0.0`; use `127.0.0.1` for local-only.
+- `AI_BOARD_PUBLIC_HOST`: browser-reachable host or tunnel domain for other devices.
+- `AI_BOARD_API_PORT`: backend port. Default `8000`.
+- `AI_BOARD_WEB_PORT`: frontend port. Default `3000`.
+- `VITE_API_BASE`: full API URL override, for example `https://api.example.com`.
+
+Windows Firewall must allow inbound access to the selected frontend/backend ports, and remote devices must be on a network that can reach this machine or the configured tunnel.
+
 기본 계정:
 
 - `admin@example.com` / `password123`
@@ -257,6 +284,7 @@ npm run verify:hygiene
 npm run verify:text
 npm run verify:text-output
 npm run verify:frontend-helpers
+npm run verify:network-config
 npm run verify:evaluation-reports
 npm run verify:readiness
 npm run verify:readiness:compact
@@ -277,6 +305,7 @@ npm run smoke:http
 - `verify:text`: README, backend, frontend source, scripts, submission checklist의 깨진 한글/문자열 회귀 검사
 - `verify:text-output`: parses `verify:text` JSON and checks required scanned file evidence
 - `verify:frontend-helpers`: React 화면에서 쓰는 실행 결과 파싱, 게시글 병합, readiness 카드 계산 순수 함수 검사
+- `verify:network-config`: checks LAN dev-server host, public API base, `.env.example`, and README external access instructions
 - `verify:readme`: 제출 README 구조, 체크리스트, PNG 스크린샷 무결성 확인
 - `verify:contract`: React UI가 의존하는 FastAPI 응답 계약 확인
 - `verify:full:quick`: hygiene, text, frontend helper, README, backend tests, frontend build, API contract, HTTP smoke, UI CDP smoke, MCP smoke
@@ -377,6 +406,7 @@ Serverless checks do not start FastAPI, Vite, or Chrome CDP:
 - `npm run verify:text-output`
 - `npm run verify:frontend-helpers`
 - `npm run verify:template-presets`
+- `npm run verify:network-config`
 - `npm run verify:evaluation-reports`
 - `npm run verify:readiness`
 - `npm run verify:readiness:compact`

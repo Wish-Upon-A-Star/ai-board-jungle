@@ -49,6 +49,7 @@ export const checks = [
   ["text output", "node", ["scripts/verify-text-output.mjs"], { summaryLines: 32 }],
   ["frontend helpers", "node", ["scripts/verify-frontend-helpers.mjs"]],
   ["template presets", "node", ["scripts/verify-template-presets.mjs"]],
+  ["network config", "node", ["scripts/verify-network-config.mjs"]],
   ["evaluation reports", "node", ["scripts/verify-evaluation-reports.mjs"]],
   ["readme", "node", ["scripts/verify-readme.mjs"]],
   ["readme output", "node", ["scripts/verify-readme-output.mjs"], { summaryLines: 14 }],
