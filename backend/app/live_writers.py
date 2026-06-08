@@ -284,7 +284,7 @@ def korean_summary_for_source(context: dict[str, str]) -> str:
     metadata_only = bool(re.fullmatch(r"(author|sha|date|url|state|number|repository|branch):[\s\S]+", normalized, re.IGNORECASE))
     if normalized and not metadata_only and "author:" not in normalized.lower() and "sha:" not in normalized.lower():
         return normalized[:360]
-    author_match = re.search(r"author:\s*([^\n]+)", text, re.IGNORECASE)
+    author_match = re.search(r"author:\s*([^\n]+?)(?:\s+(?:url|sha|date|state|number):|$)", text, re.IGNORECASE)
     sha_match = re.search(r"sha:\s*([0-9a-f]{7,40})", text, re.IGNORECASE)
     if "commit" in source_type or "commit" in title.lower():
         message = title
