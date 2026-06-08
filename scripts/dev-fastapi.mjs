@@ -7,14 +7,20 @@ const apiPort = process.env.AI_BOARD_API_PORT || "8000";
 const webPort = process.env.AI_BOARD_WEB_PORT || "3000";
 
 function firstLanIpv4() {
+  const candidates = [];
   for (const interfaces of Object.values(os.networkInterfaces())) {
     for (const address of interfaces || []) {
       if (address.family === "IPv4" && !address.internal) {
-        return address.address;
+        candidates.push(address.address);
       }
     }
   }
-  return "127.0.0.1";
+  return (
+    candidates.find((address) => !address.startsWith("169.254.") && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(address)) ||
+    candidates.find((address) => !address.startsWith("169.254.")) ||
+    candidates[0] ||
+    "127.0.0.1"
+  );
 }
 
 const publicHost = process.env.AI_BOARD_PUBLIC_HOST || firstLanIpv4();

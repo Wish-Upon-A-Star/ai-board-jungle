@@ -9,6 +9,7 @@ const readme = readFileSync("README.md", "utf8");
 assert.ok(devFastapi.includes('import os from "node:os"'), "dev server must inspect local network interfaces");
 assert.ok(devFastapi.includes('const host = process.env.AI_BOARD_HOST || "0.0.0.0"'), "dev server must bind to all interfaces by default");
 assert.ok(devFastapi.includes("process.env.AI_BOARD_PUBLIC_HOST || firstLanIpv4()"), "dev server must support explicit public host override");
+assert.ok(devFastapi.includes('!address.startsWith("169.254.")'), "dev server must avoid link-local addresses when a usable LAN IP exists");
 assert.ok(devFastapi.includes("const apiHost = host === \"127.0.0.1\" || host === \"localhost\""), "local-only host override must keep local API base");
 assert.ok(devFastapi.includes("const apiBase = process.env.VITE_API_BASE || `http://${apiHost}:${apiPort}`"), "frontend API base must default to reachable host, not hard-coded localhost");
 assert.ok(devFastapi.includes("AI Board browser URL:"), "dev server must print the browser URL for other devices");
@@ -24,6 +25,7 @@ console.log(JSON.stringify({
   ok: true,
   checked: [
     "dev-fastapi public host detection",
+    "link-local LAN IP avoidance",
     "dev:lan script",
     ".env.example LAN variables",
     "README LAN instructions",
