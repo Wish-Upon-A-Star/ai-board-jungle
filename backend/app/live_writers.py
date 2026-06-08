@@ -324,6 +324,66 @@ def source_context(source: object, index: int) -> dict[str, str]:
     }
 
 
+def commit_message_from_title(title: str) -> str:
+    match = re.search(r"Commit\s+[0-9a-f]{7,40}:\s*(.+)$", title or "", re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return (title or "").strip()
+
+
+def korean_commit_change_summary(message: str) -> str:
+    normalized = " ".join((message or "").strip().split())
+    exact = {
+        "Fix Notion commit author summaries": "Notion 표의 커밋 요약에서 작성자명에 URL이 섞이던 문제를 수정했습니다.",
+        "Improve Korean commit summaries": "GitHub 커밋을 Notion 표에 쓸 때 상태문이 아니라 실제 변경 내용을 한국어로 요약하도록 개선했습니다.",
+        "Add Figma and Google Calendar OAuth login": "Figma와 Google Calendar를 OAuth 로그인으로 연결할 수 있도록 provider 설정, 로그인 버튼, 토큰 갱신 처리를 추가했습니다.",
+        "Improve board readability and Notion table automation": "게시판 본문을 문단, 목록, 코드 블록 단위로 읽기 쉽게 만들고 Notion 자동화 결과를 실제 표 블록으로 작성하게 개선했습니다.",
+        "Improve dashboard design and accessibility": "대시보드의 탭 구조, 정보 배치, 버튼 접근성, 시각 계층을 정리해 사용자가 기능을 찾기 쉽게 개선했습니다.",
+        "Render Notion automation output from request templates": "자동화 요청 템플릿을 기준으로 Notion 출력 형식을 렌더링하도록 변경했습니다.",
+        "Hydrate replayed Notion summaries": "Notion 재전송 시 저장된 수집 요약을 다시 채워 넣도록 보강했습니다.",
+    }
+    if normalized in exact:
+        return exact[normalized]
+
+    patterns = [
+        (r"^Fix\s+(.+)$", "{item} 문제를 수정했습니다."),
+        (r"^Add\s+(.+)$", "{item} 기능을 추가했습니다."),
+        (r"^Improve\s+(.+)$", "{item}을 개선했습니다."),
+        (r"^Update\s+(.+)$", "{item}을 최신 요구사항에 맞게 갱신했습니다."),
+        (r"^Refactor\s+(.+)$", "{item} 구조를 정리했습니다."),
+    ]
+    readable_terms = {
+        "notion": "Notion",
+        "github": "GitHub",
+        "commit": "커밋",
+        "commits": "커밋",
+        "summary": "요약",
+        "summaries": "요약",
+        "author": "작성자",
+        "authors": "작성자",
+        "oauth": "OAuth",
+        "login": "로그인",
+        "dashboard": "대시보드",
+        "design": "디자인",
+        "accessibility": "접근성",
+        "board": "게시판",
+        "readability": "가독성",
+        "automation": "자동화",
+        "table": "표",
+        "tables": "표",
+    }
+    for pattern, sentence in patterns:
+        match = re.match(pattern, normalized, re.IGNORECASE)
+        if not match:
+            continue
+        item = match.group(1)
+        words = [readable_terms.get(word.lower().strip(".,:/()[]"), word) for word in item.split()]
+        return sentence.format(item=" ".join(words))
+    if normalized:
+        return f"커밋 메시지 '{normalized}'에 해당하는 변경을 반영했습니다."
+    return "커밋 메시지가 비어 있어 변경 내용을 자동 요약하지 못했습니다."
+
+
 def korean_summary_for_source(context: dict[str, str]) -> str:
     text = context.get("summary") or ""
     title = context.get("title") or ""
@@ -335,14 +395,16 @@ def korean_summary_for_source(context: dict[str, str]) -> str:
     author_match = re.search(r"author:\s*([^\n]+?)(?:\s+(?:url|sha|date|state|number):|$)", text, re.IGNORECASE)
     sha_match = re.search(r"sha:\s*([0-9a-f]{7,40})", text, re.IGNORECASE)
     if "commit" in source_type or "commit" in title.lower():
-        message = title
-        commit_match = re.search(r"Commit\s+[0-9a-f]{7,40}:\s*(.+)$", title)
-        if commit_match:
-            message = commit_match.group(1)
+        message = commit_message_from_title(title)
         author = author_match.group(1).strip() if author_match else "알 수 없음"
         sha = sha_match.group(1)[:12] if sha_match else ""
-        suffix = f" 커밋({sha})" if sha else " 커밋"
-        return f"{author}가 '{message}' 변경을 포함한{suffix}을 푸시했습니다. 변경 범위와 자동화 영향도를 확인해야 합니다."
+        details = []
+        if author:
+            details.append(f"작성자: {author}")
+        if sha:
+            details.append(f"커밋: {sha}")
+        suffix = f" ({', '.join(details)})" if details else ""
+        return f"{korean_commit_change_summary(message)}{suffix}"
     if "issue" in source_type or "issue" in title.lower():
         if normalized and not metadata_only:
             return normalized[:360]

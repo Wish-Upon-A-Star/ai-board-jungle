@@ -408,19 +408,44 @@ def test_notion_sources_report_commit_summary_keeps_author_clean():
         "GitHub 변경사항 자동 요약",
         [
             {
-                "title": "[GitHub MCP OAuth profile] Commit 25035385369c: Improve board readability",
+                "title": "[GitHub MCP OAuth profile] Commit 1b483cd3d1c8: Fix Notion commit author summaries",
                 "sourceType": "github_commit",
-                "url": "https://github.com/acme/repo/commit/25035385369c",
-                "summary": "Improve board readability sha: 25035385369c author: Wish-Upon-A-Star url: https://github.com/acme/repo/commit/25035385369c",
+                "url": "https://github.com/acme/repo/commit/1b483cd3d1c8",
+                "summary": "Fix Notion commit author summaries sha: 1b483cd3d1c8 author: Wish-Upon-A-Star url: https://github.com/acme/repo/commit/1b483cd3d1c8",
             }
         ],
         "| 번호 | 유형 | 제목 | 한국어 요약 | 위험도 | 다음 조치 | 링크 |\n|---|---|---|---|---|---|---|",
     )
     table = next(block for block in blocks if block["type"] == "table")
     summary = table["table"]["children"][1]["table_row"]["cells"][3][0]["text"]["content"]
+    assert "Notion 표의 커밋 요약에서 작성자명에 URL이 섞이던 문제를 수정했습니다." in summary
+    assert "Wish-Upon-A-Star url:" not in summary
+    assert "변경 범위와 자동화 영향도를 확인해야 합니다" not in summary
+    assert "작성자: Wish-Upon-A-Star" in summary
+    assert "커밋: 1b483cd3d1c8" in summary
+    return
     assert summary.startswith("Wish-Upon-A-Star가")
     assert "Wish-Upon-A-Star url:" not in summary
     assert "커밋(25035385369c)" in summary
+
+
+def test_notion_sources_report_commit_summary_describes_oauth_login_change():
+    blocks = notion_sources_template_children(
+        "GitHub 변경사항 자동 요약",
+        [
+            {
+                "title": "[GitHub MCP OAuth profile] Commit fd54e5cda123: Add Figma and Google Calendar OAuth login",
+                "sourceType": "github_commit",
+                "url": "https://github.com/acme/repo/commit/fd54e5cda123",
+                "summary": "Add Figma and Google Calendar OAuth login sha: fd54e5cda123 author: Codex",
+            }
+        ],
+        "| 번호 | 유형 | 제목 | 한국어 요약 | 위험도 | 다음 조치 | 링크 |\n|---|---|---|---|---|---|---|",
+    )
+    table = next(block for block in blocks if block["type"] == "table")
+    summary = table["table"]["children"][1]["table_row"]["cells"][3][0]["text"]["content"]
+    assert "Figma와 Google Calendar를 OAuth 로그인으로 연결" in summary
+    assert "확인해야 합니다" not in summary
 
 
 def test_replay_notion_hydrates_legacy_collected_summary(monkeypatch):
