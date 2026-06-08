@@ -343,6 +343,7 @@ def korean_commit_change_summary(message: str) -> str:
         "Hydrate replayed Notion summaries": "Notion 재전송 시 저장된 수집 요약을 다시 채워 넣도록 보강했습니다.",
         "Clean obsolete summary assertions": "요약 테스트에 남아 있던 이전 assertion과 죽은 코드를 제거해 검증 로직을 정리했습니다.",
         "Describe cleanup commit summaries": "정리 커밋도 Notion에서 의미 있는 한국어 문장으로 표시되도록 커밋 요약 규칙을 보강했습니다.",
+        "Load desktop OAuth credentials on live restart": "라이브 서버 재시작 시 바탕화면의 GitHub, Notion, Figma, Google OAuth 설정을 자동으로 읽도록 보강했습니다.",
     }
     if normalized in exact:
         return exact[normalized]
@@ -451,6 +452,34 @@ def default_sources_table_rows(sources: list[object]) -> list[list[str]]:
     return rows
 
 
+def source_table_value_for_header(header: str, context: dict[str, str], summary: str, risk: str) -> str:
+    normalized = re.sub(r"\s+", "", header or "").lower()
+    if normalized in {"번호", "no", "number", "#"}:
+        return context.get("index", "")
+    if normalized in {"유형", "타입", "type", "source", "sourcetype"}:
+        return context.get("source_type") or "GitHub"
+    if normalized in {"제목", "title", "이름", "name"}:
+        return context.get("title") or "(제목 없음)"
+    if normalized in {"한국어요약", "요약", "summary", "koreansummary"}:
+        return summary
+    if normalized in {"위험도", "risk", "risklevel"}:
+        return risk
+    if normalized in {"영향영역", "영향범위", "impact", "impactarea", "area"}:
+        return "BOARD/PAGES/GANTT"
+    if normalized in {"다음조치", "nextaction", "action"}:
+        return context.get("next_action") or "요청 템플릿 기준으로 검토"
+    if normalized in {"링크", "url", "link", "sourceurl"}:
+        return context.get("source_url") or ""
+    if normalized in {"작성자", "author", "assignee", "담당자"}:
+        return context.get("assignee") or ""
+    return context.get(header, "") or ""
+
+
+def source_table_row_for_header(header: list[str], context: dict[str, str], risk: str) -> list[str]:
+    summary = korean_summary_for_source(context)
+    return [source_table_value_for_header(column, context, summary, risk) for column in header]
+
+
 def notion_sources_template_children(title: str, sources: list[object], template: str) -> list[dict]:
     children = [
         heading_2_block(title),
@@ -462,17 +491,9 @@ def notion_sources_template_children(title: str, sources: list[object], template
         rows = [header]
         for index, source in enumerate(sources, start=1):
             context = source_context(source, index)
-            rows.append(
-                [
-                    context.get("index", str(index)),
-                    context.get("source_type") or "GitHub",
-                    context.get("title") or "(제목 없음)",
-                    korean_summary_for_source(context),
-                    "보통",
-                    context.get("next_action") or "검토",
-                    context.get("source_url") or "",
-                ][: len(header)]
-            )
+            lowered = f"{context['title']} {context['summary']}".lower()
+            risk = "높음" if any(token in lowered for token in ["security", "auth", "token", "secret", "fail", "error", "보안", "실패"]) else "보통"
+            rows.append(source_table_row_for_header(header, context, risk))
         children.append(notion_table_block(rows, header=True))
         return children
     children.append(notion_table_block(default_sources_table_rows(sources), header=True))

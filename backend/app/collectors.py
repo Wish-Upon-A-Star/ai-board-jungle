@@ -140,9 +140,16 @@ def notion_headers(token: str) -> dict:
 
 
 def extract_notion_id(value: str) -> str:
-    compact = value.replace("-", "")
-    match = re.search(r"([0-9a-fA-F]{32})", compact)
-    return match.group(1) if match else value.strip()
+    raw = value.strip()
+    slug = raw.rstrip("/").split("/")[-1].split("?")[0]
+    slug_compact = slug.replace("-", "")
+    if len(slug_compact) >= 32:
+        tail = slug_compact[-32:]
+        if re.fullmatch(r"[0-9a-fA-F]{32}", tail):
+            return tail
+    compact = raw.replace("-", "")
+    matches = re.findall(r"([0-9a-fA-F]{32})", compact)
+    return matches[-1] if matches else raw
 
 
 def notion_title(properties: dict) -> str:

@@ -1472,6 +1472,7 @@ def execute_automation_task(
     collected: list[dict] = []
     collection_warnings: list[str] = []
     saved_sources: list[KnowledgeSource] = []
+    report_sources: list[object] = []
     if task.integration_profile:
         limit = max(1, min(task.integration_profile.collect_limit, 100))
         pages = max(1, min(task.integration_profile.collect_pages, 5))
@@ -1481,6 +1482,15 @@ def execute_automation_task(
         else:
             items, collection_warnings = collect_profile_items(task.integration_profile, limit=limit, pages=pages)
         saved_sources = save_collected_items(db, actor, task.integration_profile, items) if items else []
+        report_sources = saved_sources or [
+            {
+                "title": item.title,
+                "sourceType": item.source_type,
+                "url": item.url,
+                "summary": item.text,
+            }
+            for item in items
+        ]
         collected = [serialize_collected_source(source) for source in saved_sources]
         task.integration_profile.last_collect_status = "collected" if saved_sources else "unchanged" if items else "no-data"
         task.integration_profile.last_collect_count = len(items)
@@ -1554,14 +1564,16 @@ def execute_automation_task(
         else:
             original_base_url = profile.base_url
             profile.base_url = str(connection.get("url") or profile.base_url)
-            if service == "notion" and saved_sources:
+            if service == "notion" and report_sources:
                 write = write_notion_sources_report(
                     profile,
                     f"[AI Board] {task.name} - 요청 템플릿 렌더링",
-                    saved_sources,
+                    report_sources,
                     task_output_template(task),
                     dry_run=False,
                 )
+            elif service == "notion":
+                write = {"service": "notion", "status": "skipped", "reason": "No new GitHub or Notion source items were collected for the template report.", "dryRun": False}
             else:
                 write = execute_profile_write(profile, f"[AI Board] {task.name}", write_body, dry_run=False)
             profile.base_url = original_base_url

@@ -16,7 +16,7 @@ os.environ["AI_BOARD_ALLOW_SQLITE_TEST_DB"] = "1"
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect
 
-from app.collectors import CollectedItem, parse_github_repo
+from app.collectors import CollectedItem, extract_notion_id, parse_github_repo
 from app.config import settings
 from app.db import SessionLocal, engine, init_db
 import app.main as main_module
@@ -213,6 +213,13 @@ def test_notion_task_writer_uses_shared_id_parser_for_dashed_ids():
     assert write["databaseUrl"] == "https://api.notion.com/v1/databases/1234567890abcdef1234567890abcdef"
     assert write["payload"]["parent"]["database_or_page_id"] == "1234567890abcdef1234567890abcdef"
     assert "plain-notion-token-for-dry-run" not in str(write)
+
+
+def test_extract_notion_id_prefers_last_id_when_slug_contains_hex_prefix():
+    assert (
+        extract_notion_id("https://app.notion.com/p/302-1-1-3797051c2f998094b2a5e5062d353881")
+        == "3797051c2f998094b2a5e5062d353881"
+    )
 
 
 def test_calendar_writer_refreshes_google_oauth_token(monkeypatch):
@@ -462,6 +469,28 @@ def test_notion_sources_report_commit_summary_describes_cleanup_change():
     assert "요약 테스트에 남아 있던 이전 assertion과 죽은 코드를 제거" in summary
     assert "커밋 메시지 '" not in summary
     assert "확인해야 합니다" not in summary
+
+
+def test_notion_sources_report_maps_table_values_by_header_name():
+    blocks = notion_sources_template_children(
+        "302호 1팀 GitHub 변경사항",
+        [
+            {
+                "title": "[GitHub MCP OAuth profile] Commit a5cbba993caa: Load desktop OAuth credentials on live restart",
+                "sourceType": "github_commit",
+                "url": "https://github.com/acme/repo/commit/a5cbba993caa",
+                "summary": "Load desktop OAuth credentials on live restart sha: a5cbba993caa author: Wish-Upon-A-Star",
+            }
+        ],
+        "| 번호 | 유형 | 제목 | 한국어 요약 | 영향 영역 | 다음 조치 | 링크 |\n|---|---|---|---|---|---|---|",
+    )
+    table = next(block for block in blocks if block["type"] == "table")
+    row = table["table"]["children"][1]["table_row"]["cells"]
+    values = [cell[0]["text"]["content"] for cell in row]
+    assert values[3].startswith("라이브 서버 재시작 시 바탕화면의 GitHub, Notion, Figma, Google OAuth 설정")
+    assert values[4] == "BOARD/PAGES/GANTT"
+    assert values[5] == "요청 템플릿 기준으로 검토"
+    assert values[4] != "보통"
 
 
 def test_replay_notion_hydrates_legacy_collected_summary(monkeypatch):
@@ -1017,8 +1046,9 @@ def test_full_fastapi_flow(monkeypatch):
         assert {"issues", "commits", "pull_requests"} <= {item["target"] for item in first_run.json()["run"]["result"]["externalRagSources"]}
         assert first_run.json()["run"]["result"]["liveWrites"][0]["service"] == "notion"
         assert first_run.json()["run"]["result"]["liveWrites"][0]["status"] == "written"
-        assert written and written[0]["service"] == "notion"
-        assert written[0]["dryRun"] is False
+        assert notion_tables and notion_tables[0]["service"] == "notion"
+        assert notion_tables[0]["dryRun"] is False
+        assert notion_tables[0]["sources"][0]["title"] == "Mock issue from GitHub"
         second_run = client.post(f"/api/automations/{task_id}/run", headers=headers)
         assert second_run.status_code == 200
         assert second_run.json()["run"]["result"]["status"] == "skipped"
