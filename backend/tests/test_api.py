@@ -977,6 +977,99 @@ def test_github_webhook_signature_triggers_matching_automation(monkeypatch):
         settings.cache_clear()
 
 
+def test_notion_webhook_signature_triggers_matching_automation(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_NOTION_WEBHOOK_SECRET", "notion-hook-secret")
+    settings.cache_clear()
+    writes = []
+
+    def fake_collect(profile, limit=20, pages=2):
+        return [
+            CollectedItem(
+                title="Webhook task page",
+                source_type="notion_page",
+                url="https://www.notion.so/workspace/hooked-page",
+                text="Webhook-triggered Notion task content",
+                tags=["notion", "page"],
+            )
+        ], []
+
+    def fake_write(profile, title, body, dry_run=True, start_minutes_from_now=15, duration_minutes=30):
+        writes.append({"service": profile.source_kind, "title": title, "body": body, "dryRun": dry_run})
+        return {
+            "service": profile.source_kind,
+            "status": "written",
+            "url": f"https://example.test/{profile.source_kind}",
+            "dryRun": dry_run,
+        }
+
+    monkeypatch.setattr("app.main.collect_profile_items", fake_collect)
+    monkeypatch.setattr("app.main.execute_profile_write", fake_write)
+    try:
+        with TestClient(app) as client:
+            register = client.post(
+                "/api/auth/register",
+                json={"email": "notion-webhook@example.com", "name": "Notion Hook User", "password": "password123"},
+            )
+            headers = {"Authorization": f"Bearer {register.json()['token']}"}
+            notion = client.post(
+                "/api/integration-profiles",
+                headers=headers,
+                json={
+                    "name": "Hooked Notion",
+                    "source_kind": "notion",
+                    "base_url": "1234567890abcdef1234567890abcdef",
+                    "api_provider": "Notion API",
+                    "token_name": "NOTION_TOKEN",
+                    "token_value": "notion_webhook_token",
+                    "rag_targets": ["notion_pages"],
+                },
+            ).json()["profile"]
+            task = client.post(
+                "/api/automations",
+                headers=headers,
+                json={
+                    "name": "Notion webhook sync",
+                    "integration_profile_id": notion["id"],
+                    "source": "Notion Pages",
+                    "destination": "Notion Tasks",
+                    "interval_minutes": 5,
+                    "instruction": "When Notion changes arrive, summarize and write a task page.",
+                    "template": "page / link / next action",
+                    "api_provider": "Notion API",
+                    "ai_agent": "NotionWebhookAgent",
+                    "notion_database_url": "1234567890abcdef1234567890abcdef",
+                    "custom_connections": [
+                        {
+                            "label": "Notion task DB",
+                            "service": "notion",
+                            "url": "1234567890abcdef1234567890abcdef",
+                            "api": "Notion API",
+                            "auth_key_name": "NOTION_TOKEN",
+                            "operation": "upsert_task_page",
+                            "template": "title: {title}",
+                        }
+                    ],
+                },
+            ).json()["task"]
+            payload = json.dumps({"database_id": "1234567890abcdef1234567890abcdef"}).encode()
+            bad = client.post("/api/webhooks/notion", content=payload, headers={"X-AI-Board-Signature": "sha256=bad"})
+            assert bad.status_code == 401
+            signature = "sha256=" + hmac.new(b"notion-hook-secret", payload, hashlib.sha256).hexdigest()
+            triggered = client.post("/api/webhooks/notion", content=payload, headers={"X-AI-Board-Signature": signature})
+            assert triggered.status_code == 200
+            data = triggered.json()
+            assert data["matched"] == 1
+            assert data["triggered"][0]["taskId"] == task["id"]
+            assert data["triggered"][0]["status"] == "changed"
+            assert writes
+            assert writes[0]["service"] == "notion"
+            assert writes[0]["title"] == "[AI Board] [Hooked Notion] Webhook task page"
+            assert "Source URL: https://www.notion.so/workspace/hooked-page" in writes[0]["body"]
+    finally:
+        monkeypatch.delenv("AI_BOARD_NOTION_WEBHOOK_SECRET", raising=False)
+        settings.cache_clear()
+
+
 def test_high_volume_query_indexes_exist():
     init_db()
     indexes = {

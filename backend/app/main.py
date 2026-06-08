@@ -1153,16 +1153,15 @@ async def notion_webhook(
     payload = json.loads(body.decode("utf-8") or "{}")
     target = str(payload.get("database_url") or payload.get("database_id") or payload.get("page_url") or payload.get("page_id") or "")
     stmt = select(AutomationTask).where(AutomationTask.status == "ACTIVE")
-    tasks = [
-        task
-        for task in db.scalars(stmt).all()
-        if target
-        and (
-            target in task.notion_database_url
-            or task.notion_database_url in target
-            or (task.integration_profile and (target in task.integration_profile.base_url or task.integration_profile.base_url in target))
-        )
-    ]
+    tasks = []
+    for task in db.scalars(stmt).all():
+        task_target = task.notion_database_url.strip()
+        profile_target = task.integration_profile.base_url.strip() if task.integration_profile else ""
+        if target and (
+            (task_target and (target in task_target or task_target in target))
+            or (profile_target and (target in profile_target or profile_target in target))
+        ):
+            tasks.append(task)
     results = [execute_automation_task(db, task, task.owner, scheduled=True) for task in tasks[:20]]
     return {
         "ok": True,
