@@ -7,15 +7,9 @@ from urllib.parse import quote
 
 import httpx
 
+from .collectors import parse_github_repo
 from .models import IntegrationProfile
 from .security import reveal_secret
-
-
-def parse_github_repo(url: str) -> tuple[str, str] | None:
-    match = re.search(r"github\.com[/:]([^/\s]+)\/([^/\s#?]+?)(?:\.git)?(?:[/?#]|$)", url)
-    if not match:
-        return None
-    return match.group(1), match.group(2)
 
 
 def parse_figma_file_key(url_or_key: str) -> str:

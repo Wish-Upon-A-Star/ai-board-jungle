@@ -20,6 +20,7 @@ from app.db import SessionLocal, engine, init_db
 import app.main as main_module
 from app.main import app
 from app.models import AutomationTask, IntegrationProfile
+from app.live_writers import write_github_issue
 from app.security import reveal_secret
 
 
@@ -48,6 +49,20 @@ def test_parse_github_repo_accepts_https_and_ssh_urls():
     assert parse_github_repo("https://github.com/acme/private-repo.git/") == ("acme", "private-repo")
     assert parse_github_repo("git@github.com:acme/private-repo.git") == ("acme", "private-repo")
     assert parse_github_repo("https://gitlab.com/acme/private-repo") is None
+
+
+def test_github_issue_writer_uses_shared_repo_parser_for_ssh_urls():
+    profile = IntegrationProfile(
+        owner_id=1,
+        name="SSH GitHub writer",
+        source_kind="github",
+        base_url="git@github.com:acme/private-repo.git",
+        token_value="plain-token-for-dry-run",
+    )
+    write = write_github_issue(profile, "Check SSH parser", "Dry-run only.", dry_run=True)
+    assert write["status"] == "ready"
+    assert write["url"] == "https://api.github.com/repos/acme/private-repo/issues"
+    assert "plain-token-for-dry-run" not in str(write)
 
 
 def test_full_fastapi_flow(monkeypatch):
