@@ -345,6 +345,7 @@ def korean_commit_change_summary(message: str) -> str:
         "Describe cleanup commit summaries": "정리 커밋도 Notion에서 의미 있는 한국어 문장으로 표시되도록 커밋 요약 규칙을 보강했습니다.",
         "Load desktop OAuth credentials on live restart": "라이브 서버 재시작 시 바탕화면의 GitHub, Notion, Figma, Google OAuth 설정을 자동으로 읽도록 보강했습니다.",
         "Use Notion demo template page for reports": "302호 1팀 Notion 데모 페이지를 자동화 보고서 목적지로 사용하고, GitHub 변경사항을 해당 템플릿 표 양식에 맞춰 쓰도록 변경했습니다.",
+        "Skip watched automations without source changes": "GitHub/Notion 감시 자동화가 새 커밋, 이슈, 페이지 변경을 수집하지 못한 경우 AI 모델 호출과 외부 쓰기를 건너뛰도록 변경했습니다.",
     }
     if normalized in exact:
         return exact[normalized]
@@ -375,8 +376,13 @@ def korean_commit_change_summary(message: str) -> str:
         "board": "게시판",
         "readability": "가독성",
         "automation": "자동화",
+        "automations": "자동화",
         "table": "표",
         "tables": "표",
+        "watched": "변경 감시",
+        "without": "없을 때",
+        "source": "원본 변경",
+        "changes": "변경사항",
         "obsolete": "이전",
         "assertion": "assertion",
         "assertions": "assertion",

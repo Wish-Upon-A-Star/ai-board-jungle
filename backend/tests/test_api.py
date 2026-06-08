@@ -22,7 +22,7 @@ from app.db import SessionLocal, engine, init_db
 import app.main as main_module
 from app.main import app
 from app.models import AutomationRun, AutomationTask, IntegrationProfile, KnowledgeSource
-from app.live_writers import notion_sources_template_children, write_calendar_event, write_github_issue, write_notion_sources_report, write_notion_task
+from app.live_writers import korean_summary_for_source, notion_sources_template_children, write_calendar_event, write_github_issue, write_notion_sources_report, write_notion_task
 from app.security import reveal_secret
 
 
@@ -1401,6 +1401,18 @@ def test_automation_no_data_skips_ai_policy_and_live_writes(monkeypatch):
         assert result["status"] == "no-data"
         assert result["liveWrites"] == []
         assert "no collected source items" in result["aiCallPolicy"]
+
+
+def test_watched_automation_commit_summary_is_specific_korean():
+    summary = korean_summary_for_source(
+        {
+            "source_type": "github_commit",
+            "title": "[GitHub MCP OAuth profile] Commit 691ffe4e01e7: Skip watched automations without source changes",
+            "summary": "author: Wish-Upon-A-Star sha: 691ffe4e01e76fbb13d7d1d89cfa52628d395ad9",
+        }
+    )
+    assert "새 커밋, 이슈, 페이지 변경" in summary
+    assert "AI 모델 호출과 외부 쓰기를 건너뛰도록" in summary
 
 
 def test_custom_connection_validation_rejects_incomplete_entries():
