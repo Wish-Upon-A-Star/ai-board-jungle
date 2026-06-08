@@ -32,14 +32,24 @@ const cards = buildSystemReadinessCards({
   providerReadiness: [{ ready: true }, { ready: false }],
   knowledgeSources: [{ id: 1 }, { id: 2 }, { id: 3 }],
   tasks: [{ id: 10 }],
+  healthStatus: { status: 200, ok: true, data: { database: { ok: true } } },
 });
 assert.equal(cards.length, 8);
+assert.deepEqual(cards.find((card) => card.label === "FastAPI"), { label: "FastAPI", value: "HTTP 200", ok: true });
+assert.deepEqual(cards.find((card) => card.label === "PostgreSQL"), { label: "PostgreSQL", value: "connected", ok: true });
 assert.deepEqual(cards.find((card) => card.label === "RAG"), { label: "RAG", value: "3 sources", ok: true });
 assert.deepEqual(cards.find((card) => card.label === "Agent"), { label: "Agent", value: "1 automations", ok: true });
 assert.deepEqual(cards.find((card) => card.label === "Live APIs"), { label: "Live APIs", value: "1/2 ready", ok: true });
 
 const emptyCards = buildSystemReadinessCards();
+assert.deepEqual(emptyCards.find((card) => card.label === "PostgreSQL"), { label: "PostgreSQL", value: "not checked", ok: false });
 assert.deepEqual(emptyCards.find((card) => card.label === "Live APIs"), { label: "Live APIs", value: "0/0 ready", ok: false });
+
+const databaseBlockedCards = buildSystemReadinessCards({
+  healthStatus: { status: 503, ok: false, data: { database: { ok: false, error: "PostgreSQL is not reachable" } } },
+});
+assert.deepEqual(databaseBlockedCards.find((card) => card.label === "FastAPI"), { label: "FastAPI", value: "HTTP 503", ok: false });
+assert.deepEqual(databaseBlockedCards.find((card) => card.label === "PostgreSQL"), { label: "PostgreSQL", value: "blocked 503", ok: false });
 
 for (const preset of automationPresets) {
   assert.equal(typeof preset.name, "string");

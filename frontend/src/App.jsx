@@ -29,6 +29,7 @@ function App() {
   const [deleteConfirmTaskId, setDeleteConfirmTaskId] = useState(null);
   const [integrationProfiles, setIntegrationProfiles] = useState([]);
   const [providerReadiness, setProviderReadiness] = useState([]);
+  const [healthStatus, setHealthStatus] = useState(null);
   const [integrationActivities, setIntegrationActivities] = useState([]);
   const [activityPage, setActivityPage] = useState({ total: 0, limit: 12, offset: 0, nextOffset: 0, hasMore: false });
   const [activityFilters, setActivityFilters] = useState({ provider: "", status: "", event_type: "", automation_task_id: "", integration_profile_id: "", dry_run: "" });
@@ -50,9 +51,10 @@ function App() {
 
   const myTasks = useMemo(() => tasks.filter((task) => task.owner?.id === user?.id), [tasks, user]);
   const sharedCount = posts.filter((post) => post.automationTaskId).length;
-  const systemCards = buildSystemReadinessCards({ providerReadiness, knowledgeSources, tasks });
+  const systemCards = buildSystemReadinessCards({ providerReadiness, knowledgeSources, tasks, healthStatus });
 
   useEffect(() => {
+    loadHealth();
     if (token) loadAll();
   }, [token]);
 
@@ -64,6 +66,19 @@ function App() {
   function showActionError(err) {
     setError(err.message || "요청을 처리하지 못했습니다.");
     setValidationIssues(Array.isArray(err.validationIssues) ? err.validationIssues : []);
+  }
+
+  async function loadHealth() {
+    try {
+      const health = await apiStatus("/api/health");
+      const nextHealth = { status: health.status, ok: health.ok, data: health.data, statusText: health.statusText };
+      setHealthStatus(nextHealth);
+      return nextHealth;
+    } catch (err) {
+      const nextHealth = { status: err.status || "error", ok: false, data: err.response || null, statusText: err.message };
+      setHealthStatus(nextHealth);
+      return nextHealth;
+    }
   }
 
   async function loadActivities(filters = activityFilters, offset = 0, append = false) {
@@ -80,6 +95,7 @@ function App() {
 
   async function loadAll(search = q, filters = activityFilters) {
     clearErrorState();
+    loadHealth();
     try {
       const activityParams = new URLSearchParams({ limit: "12", offset: "0" });
       Object.entries(filters).forEach(([key, value]) => {
@@ -210,6 +226,7 @@ function App() {
       if (kind === "health") {
         const health = await apiStatus("/api/health");
         const payload = { status: health.status, ok: health.ok, response: health.data };
+        setHealthStatus({ status: health.status, ok: health.ok, data: health.data, statusText: health.statusText });
         setApiResult({ called: kind, response: payload });
         setResult(payload);
         if (!health.ok) setError(health.data?.database?.error || health.statusText || "Health check failed.");
