@@ -346,6 +346,8 @@ def korean_commit_change_summary(message: str) -> str:
         "Load desktop OAuth credentials on live restart": "라이브 서버 재시작 시 바탕화면의 GitHub, Notion, Figma, Google OAuth 설정을 자동으로 읽도록 보강했습니다.",
         "Use Notion demo template page for reports": "302호 1팀 Notion 데모 페이지를 자동화 보고서 목적지로 사용하고, GitHub 변경사항을 해당 템플릿 표 양식에 맞춰 쓰도록 변경했습니다.",
         "Skip watched automations without source changes": "GitHub/Notion 감시 자동화가 새 커밋, 이슈, 페이지 변경을 수집하지 못한 경우 AI 모델 호출과 외부 쓰기를 건너뛰도록 변경했습니다.",
+        "Clarify watched automation commit summaries": "변경 감시 자동화 관련 커밋이 Notion 표에서 포괄 문장으로 보이지 않도록 한국어 요약 규칙과 테스트를 보강했습니다.",
+        "Clarify commit summary wording": "Notion 자동화 표의 커밋 요약 문장을 더 구체적으로 만들기 위해 요약 매핑과 표현 규칙을 정리했습니다.",
     }
     if normalized in exact:
         return exact[normalized]
@@ -358,6 +360,7 @@ def korean_commit_change_summary(message: str) -> str:
         (r"^Refactor\s+(.+)$", "{item} 구조를 정리했습니다."),
         (r"^Clean\s+(.+)$", "{item}을 정리했습니다."),
         (r"^Describe\s+(.+)$", "{item} 설명을 보강했습니다."),
+        (r"^Clarify\s+(.+)$", "{item} 문구를 더 명확하게 정리했습니다."),
     ]
     readable_terms = {
         "notion": "Notion",

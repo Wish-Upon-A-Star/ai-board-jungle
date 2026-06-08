@@ -1413,6 +1413,14 @@ def test_watched_automation_commit_summary_is_specific_korean():
     )
     assert "새 커밋, 이슈, 페이지 변경" in summary
     assert "AI 모델 호출과 외부 쓰기를 건너뛰도록" in summary
+    clarified = korean_summary_for_source(
+        {
+            "source_type": "github_commit",
+            "title": "[GitHub MCP OAuth profile] Commit b0c8a0c4ac05: Clarify watched automation commit summaries",
+            "summary": "author: Wish-Upon-A-Star sha: b0c8a0c4ac051a3982d6b8d97b0584359ca77bd9",
+        }
+    )
+    assert "포괄 문장으로 보이지 않도록" in clarified
 
 
 def test_custom_connection_validation_rejects_incomplete_entries():
