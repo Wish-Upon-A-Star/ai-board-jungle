@@ -14,7 +14,7 @@ os.environ["AI_BOARD_DATABASE_URL"] = "sqlite:///:memory:"
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect
 
-from app.collectors import CollectedItem
+from app.collectors import CollectedItem, parse_github_repo
 from app.config import settings
 from app.db import SessionLocal, engine, init_db
 import app.main as main_module
@@ -41,6 +41,13 @@ def test_health_recovers_after_startup_database_error(monkeypatch):
     assert health.json()["database"]["ok"] is True
     assert calls["init"] >= 1
     assert main_module.STARTUP_DB_ERROR == ""
+
+
+def test_parse_github_repo_accepts_https_and_ssh_urls():
+    assert parse_github_repo("https://github.com/acme/private-repo") == ("acme", "private-repo")
+    assert parse_github_repo("https://github.com/acme/private-repo.git/") == ("acme", "private-repo")
+    assert parse_github_repo("git@github.com:acme/private-repo.git") == ("acme", "private-repo")
+    assert parse_github_repo("https://gitlab.com/acme/private-repo") is None
 
 
 def test_full_fastapi_flow(monkeypatch):
@@ -894,7 +901,7 @@ def test_github_webhook_signature_triggers_matching_automation(monkeypatch):
                 json={
                     "name": "Hooked GitHub",
                     "source_kind": "github",
-                    "base_url": "https://github.com/acme/hooked",
+                    "base_url": "git@github.com:acme/hooked.git",
                     "api_provider": "GitHub REST API",
                     "token_name": "GITHUB_TOKEN",
                     "token_value": "github_hook_token",
@@ -938,7 +945,7 @@ def test_github_webhook_signature_triggers_matching_automation(monkeypatch):
                     "template": "commit / link / next action",
                     "api_provider": "GitHub REST API + Notion API",
                     "ai_agent": "WebhookAgent",
-                    "github_repo_url": "https://github.com/acme/hooked",
+                    "github_repo_url": "",
                     "custom_connections": [
                         {
                             "label": "Notion task DB",

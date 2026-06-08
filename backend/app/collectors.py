@@ -36,6 +36,9 @@ def parse_targets(raw: str) -> set[str]:
 
 
 def parse_github_repo(url: str) -> tuple[str, str] | None:
+    ssh_match = re.fullmatch(r"\s*git@github\.com:([^/\s]+)/([^/\s#?]+?)(?:\.git)?\s*", url)
+    if ssh_match:
+        return ssh_match.group(1), ssh_match.group(2)
     parsed = urlparse(url)
     parts = [part for part in parsed.path.strip("/").split("/") if part]
     if parsed.netloc.lower() != "github.com" or len(parts) < 2:
