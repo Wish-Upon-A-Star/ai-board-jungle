@@ -15,6 +15,35 @@ function Field({ label, children }) {
   return <label className="field"><span>{label}</span>{children}</label>;
 }
 
+function renderPostContent(content) {
+  const text = String(content || "");
+  if (!text.trim()) return <p className="post-paragraph">본문이 비어 있습니다.</p>;
+  const blocks = text.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
+  return blocks.map((block, index) => {
+    const lines = block.split("\n").map((line) => line.trimEnd()).filter(Boolean);
+    const isCodeLike = lines.some((line) => /^[{\[\]}]|^\s*"/.test(line) || line.includes('":') || line.includes('\\"'));
+    const isList = lines.every((line) => /^[-*]\s+/.test(line));
+    if (isCodeLike) {
+      return <pre key={index} className="post-code-block">{block}</pre>;
+    }
+    if (isList) {
+      return (
+        <ul key={index} className="post-bullet-list">
+          {lines.map((line, lineIndex) => <li key={lineIndex}>{line.replace(/^[-*]\s+/, "")}</li>)}
+        </ul>
+      );
+    }
+    if (lines.length > 1) {
+      return (
+        <div key={index} className="post-line-group">
+          {lines.map((line, lineIndex) => <p key={lineIndex}>{line}</p>)}
+        </div>
+      );
+    }
+    return <p key={index} className="post-paragraph">{block}</p>;
+  });
+}
+
 const mainTabs = [
   { id: "automations", label: "Automation", description: "작업 실행, 예약, 생성" },
   { id: "integrations", label: "MCP / Profiles", description: "GitHub, Notion 로그인과 프로필" },
@@ -973,25 +1002,55 @@ function App() {
 
             <article id="board-panel" className={`panel ${activeMainTab === "board" ? "" : "tab-hidden"}`}>
               <div className="panel-title row-title">
-                <span>게시판</span>
+                <span>게시판 / 자동화 기록</span>
                 <div className="search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="검색" /><button onClick={() => loadAll(q)}><Search size={13} /></button></div>
               </div>
-              <div className="post-list">
-                {posts.map((post) => (
-                  <button key={post.id} data-post-id={post.id} className={post.automationTaskId ? "post-link shared" : "post-link"} onClick={() => setSelected(post)}>
-                    <span>{post.title}</span><small>{post.author.name}</small>
-                  </button>
-                ))}
-                <div className="post-page-row">
-                  <span>{posts.length} / {postPage.total}</span>
-                  {postPage.hasMore ? <button type="button" onClick={loadMorePosts}>Load more posts</button> : null}
+              <div className="board-reader">
+                <div className="post-list" aria-label="게시글 목록">
+                  {posts.map((post) => {
+                    const isSelected = selected?.id === post.id;
+                    const tags = post.tags?.map((tag) => tag.tag.name).join(", ");
+                    return (
+                      <button
+                        key={post.id}
+                        type="button"
+                        data-post-id={post.id}
+                        aria-pressed={isSelected}
+                        className={`${post.automationTaskId ? "post-link shared" : "post-link"} ${isSelected ? "selected" : ""}`}
+                        onClick={() => setSelected(post)}
+                      >
+                        <span className="post-title">{post.title}</span>
+                        <span className="post-meta">{post.author.name}{tags ? ` · ${tags}` : ""}</span>
+                        <span className="post-excerpt">{post.content?.slice(0, 120) || "내용 없음"}</span>
+                      </button>
+                    );
+                  })}
+                  <div className="post-page-row">
+                    <span>{posts.length} / {postPage.total}</span>
+                    {postPage.hasMore ? <button type="button" onClick={loadMorePosts}>더 불러오기</button> : null}
+                  </div>
+                </div>
+                <div className="post-preview" aria-label="선택한 게시글 내용">
+                  {selected ? (
+                    <>
+                      <div className="post-preview-head">
+                        <span>{selected.automationTaskId ? "자동화 공유" : "게시글"}</span>
+                        <small>{selected.author?.name || "작성자 없음"}</small>
+                      </div>
+                      <h2>{selected.title}</h2>
+                      <div className="post-content">{renderPostContent(selected.content)}</div>
+                      <div className="tag-row">{selected.tags?.map((tag) => <span key={tag.tag.name}>#{tag.tag.name}</span>)}</div>
+                    </>
+                  ) : (
+                    <p className="empty-state">왼쪽 목록에서 게시글을 선택하세요.</p>
+                  )}
                 </div>
               </div>
               <form className="write-form" onSubmit={createPost}>
-                <input name="title" placeholder="제목" />
-                <textarea name="content" placeholder="내용" />
+                <input name="title" placeholder="제목" aria-label="게시글 제목" />
+                <textarea name="content" placeholder="내용" aria-label="게시글 내용" />
                 <input name="tags" placeholder="github,notion,rag" />
-                <button>작성</button>
+                <button>게시글 작성</button>
               </form>
             </article>
 
@@ -1015,7 +1074,7 @@ function App() {
               <button type="button" role="tab" aria-label="AI 결과 보기" aria-selected={sideTab === "api"} className={sideTab === "api" ? "active" : ""} onClick={() => setSideTab("api")}>AI 결과</button>
             </div>
             {sideTab === "selected" ? (
-              selected ? <><h2>{selected.title}</h2><p>{selected.content}</p><p>{selected.tags?.map((tag) => `#${tag.tag.name}`).join(" ")}</p></> : <p>선택된 게시글이 없습니다.</p>
+              selected ? <><h2>{selected.title}</h2><div className="post-content compact">{renderPostContent(selected.content)}</div><p className="tag-line">{selected.tags?.map((tag) => `#${tag.tag.name}`).join(" ")}</p></> : <p>선택된 게시글이 없습니다.</p>
             ) : (
               <pre>{JSON.stringify(apiResult || result || { status: "AI 도구를 실행하면 결과가 표시됩니다." }, null, 2)}</pre>
             )}

@@ -22,7 +22,7 @@ from app.db import SessionLocal, engine, init_db
 import app.main as main_module
 from app.main import app
 from app.models import AutomationRun, AutomationTask, IntegrationProfile, KnowledgeSource
-from app.live_writers import write_github_issue, write_notion_sources_report, write_notion_task
+from app.live_writers import notion_sources_template_children, write_github_issue, write_notion_sources_report, write_notion_task
 from app.security import reveal_secret
 
 
@@ -83,6 +83,57 @@ def test_github_issue_writer_uses_shared_repo_parser_for_ssh_urls():
     assert write["status"] == "ready"
     assert write["url"] == "https://api.github.com/repos/acme/private-repo/issues"
     assert "plain-token-for-dry-run" not in str(write)
+
+
+def test_github_issue_writer_comments_on_existing_automation_issue(monkeypatch):
+    calls = []
+
+    class Response:
+        def __init__(self, status_code, data):
+            self.status_code = status_code
+            self._data = data
+            self.headers = {"content-type": "application/json"}
+            self.is_success = 200 <= status_code < 300
+            self.text = json.dumps(data)
+
+        def json(self):
+            return self._data
+
+    def fake_get(url, headers=None, params=None, timeout=15.0):
+        calls.append(("GET", url, params))
+        return Response(
+            200,
+            [
+                {
+                    "number": 12,
+                    "title": "[AI Board] Existing task",
+                    "html_url": "https://github.com/acme/repo/issues/12",
+                    "comments_url": "https://api.github.com/repos/acme/repo/issues/12/comments",
+                }
+            ],
+        )
+
+    def fake_post(url, headers=None, json=None, timeout=15.0):
+        calls.append(("POST", url, json))
+        return Response(201, {"html_url": "https://github.com/acme/repo/issues/12#issuecomment-1"})
+
+    monkeypatch.setattr("app.live_writers.httpx.get", fake_get)
+    monkeypatch.setattr("app.live_writers.httpx.post", fake_post)
+    profile = IntegrationProfile(
+        owner_id=1,
+        name="GitHub writer",
+        source_kind="github",
+        base_url="https://github.com/acme/repo",
+        token_value="plain-token",
+    )
+    write = write_github_issue(profile, "[AI Board] Existing task", "Updated automation result", dry_run=False)
+    assert write["status"] == "updated"
+    assert write["id"] == 12
+    assert write["mode"] == "comment"
+    assert calls[0] == ("GET", "https://api.github.com/repos/acme/repo/issues", {"state": "open", "labels": "ai-board,automation", "per_page": 50})
+    assert calls[1][0] == "POST"
+    assert calls[1][1] == "https://api.github.com/repos/acme/repo/issues/12/comments"
+    assert calls[1][2]["body"] == "Updated automation result"
 
 
 def test_notion_task_writer_uses_shared_id_parser_for_dashed_ids():
@@ -227,6 +278,28 @@ def test_notion_sources_report_writer_chunks_large_template_payload(monkeypatch)
     assert len(calls) > 1
     assert all(len(call["children"]) <= 100 for call in calls)
     assert sum(len(call["children"]) for call in calls) > 100
+
+
+def test_notion_sources_report_uses_real_table_for_markdown_table_template():
+    blocks = notion_sources_template_children(
+        "GitHub 변경사항 자동 요약",
+        [
+            {
+                "title": "Improve dashboard design",
+                "sourceType": "github_commit",
+                "url": "https://github.com/Wish-Upon-A-Star/ai-board-jungle/commit/bd2bc8b",
+                "summary": "대시보드 디자인과 접근성을 개선했습니다.",
+            }
+        ],
+        "| 번호 | 유형 | 제목 | 한국어 요약 | 위험도 | 다음 조치 | 링크 |\n|---|---|---|---|---|---|---|",
+    )
+    table = next(block for block in blocks if block["type"] == "table")
+    rows = table["table"]["children"]
+    assert table["table"]["table_width"] == 7
+    assert table["table"]["has_column_header"] is True
+    assert rows[0]["table_row"]["cells"][0][0]["text"]["content"] == "번호"
+    assert rows[1]["table_row"]["cells"][2][0]["text"]["content"] == "Improve dashboard design"
+    assert "대시보드 디자인" in rows[1]["table_row"]["cells"][3][0]["text"]["content"]
 
 
 def test_replay_notion_hydrates_legacy_collected_summary(monkeypatch):

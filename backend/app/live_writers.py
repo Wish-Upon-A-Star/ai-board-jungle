@@ -28,20 +28,44 @@ def write_github_issue(profile: IntegrationProfile, title: str, body: str, dry_r
         return {"service": "github", "status": "blocked", "reason": "missing token or GitHub repository URL", "dryRun": dry_run}
     owner, name = repo
     url = f"https://api.github.com/repos/{owner}/{name}/issues"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
     payload = {"title": title[:256], "body": body[:65000], "labels": ["ai-board", "automation"]}
     if dry_run:
         return {"service": "github", "status": "ready", "method": "POST", "url": url, "payload": payload, "dryRun": True}
     try:
-        response = httpx.post(
+        existing_response = httpx.get(
             url,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-            json=payload,
+            headers=headers,
+            params={"state": "open", "labels": "ai-board,automation", "per_page": 50},
             timeout=15.0,
         )
+        if existing_response.is_success:
+            existing_issues = existing_response.json()
+            existing = next((issue for issue in existing_issues if issue.get("title") == payload["title"]), None)
+            if existing:
+                comment_url = existing.get("comments_url") or f"{url}/{existing.get('number')}/comments"
+                comment_response = httpx.post(comment_url, headers=headers, json={"body": body[:65000]}, timeout=15.0)
+                comment_data = (
+                    comment_response.json()
+                    if comment_response.headers.get("content-type", "").startswith("application/json")
+                    else {"raw": comment_response.text}
+                )
+                if not comment_response.is_success:
+                    return {"service": "github", "status": "failed", "code": comment_response.status_code, "response": comment_data, "dryRun": False, "mode": "comment"}
+                return {
+                    "service": "github",
+                    "status": "updated",
+                    "id": existing.get("number", ""),
+                    "url": existing.get("html_url", ""),
+                    "commentUrl": comment_data.get("html_url", ""),
+                    "dryRun": False,
+                    "mode": "comment",
+                }
+        response = httpx.post(url, headers=headers, json=payload, timeout=15.0)
     except httpx.HTTPError as exc:
         return {"service": "github", "status": "failed", "reason": str(exc), "dryRun": False}
     data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"raw": response.text}
@@ -177,6 +201,173 @@ def notion_sources_template_children(title: str, sources: list[object], template
             children.append(paragraph_block(line))
         if index < len(sources):
             children.append({"object": "block", "type": "divider", "divider": {}})
+    return children
+
+
+def heading_2_block(text: str) -> dict:
+    return {"object": "block", "type": "heading_2", "heading_2": {"rich_text": notion_text(text, 200)}}
+
+
+def heading_3_block(text: str) -> dict:
+    return {"object": "block", "type": "heading_3", "heading_3": {"rich_text": notion_text(text, 200)}}
+
+
+def divider_block() -> dict:
+    return {"object": "block", "type": "divider", "divider": {}}
+
+
+def markdown_table_rows(text: str) -> list[list[str]]:
+    lines = [line.strip() for line in str(text or "").splitlines() if line.strip()]
+    table_lines = [line for line in lines if line.startswith("|") and line.endswith("|")]
+    if len(table_lines) < 2:
+        return []
+    rows: list[list[str]] = []
+    for line in table_lines:
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        if cells and all(re.fullmatch(r":?-{3,}:?", cell.replace(" ", "")) for cell in cells):
+            continue
+        rows.append(cells)
+    if not rows:
+        return []
+    width = max(len(row) for row in rows)
+    return [row + [""] * (width - len(row)) for row in rows]
+
+
+def notion_table_block(rows: list[list[str]], header: bool = True) -> dict:
+    width = max(1, max((len(row) for row in rows), default=1))
+    normalized = [row + [""] * (width - len(row)) for row in rows]
+    return {
+        "object": "block",
+        "type": "table",
+        "table": {
+            "table_width": width,
+            "has_column_header": header,
+            "has_row_header": False,
+            "children": [
+                {
+                    "object": "block",
+                    "type": "table_row",
+                    "table_row": {"cells": [notion_text(cell, 900) for cell in row]},
+                }
+                for row in normalized
+            ],
+        },
+    }
+
+
+def source_context(source: object, index: int) -> dict[str, str]:
+    title = source_attr(source, "title")
+    source_type = source_attr(source, "source_type") or source_attr(source, "sourceType")
+    url = source_attr(source, "file_name") or source_attr(source, "url")
+    summary = source_attr(source, "extracted_text") or source_attr(source, "summary") or source_attr(source, "text")
+    return {
+        "index": str(index),
+        "title": title,
+        "summary": summary,
+        "reason": summary,
+        "source_url": url,
+        "github_url": url,
+        "url": url,
+        "source_type": source_type,
+        "status": "수집됨",
+        "next_action": "요청 템플릿 기준으로 검토",
+        "assignee": "",
+        "due_date": "",
+    }
+
+
+def korean_summary_for_source(context: dict[str, str]) -> str:
+    text = context.get("summary") or ""
+    title = context.get("title") or ""
+    source_type = (context.get("source_type") or "").lower()
+    normalized = text.strip()
+    metadata_only = bool(re.fullmatch(r"(author|sha|date|url|state|number|repository|branch):[\s\S]+", normalized, re.IGNORECASE))
+    if normalized and not metadata_only and "author:" not in normalized.lower() and "sha:" not in normalized.lower():
+        return normalized[:360]
+    author_match = re.search(r"author:\s*([^\n]+)", text, re.IGNORECASE)
+    sha_match = re.search(r"sha:\s*([0-9a-f]{7,40})", text, re.IGNORECASE)
+    if "commit" in source_type or "commit" in title.lower():
+        message = title
+        commit_match = re.search(r"Commit\s+[0-9a-f]{7,40}:\s*(.+)$", title)
+        if commit_match:
+            message = commit_match.group(1)
+        author = author_match.group(1).strip() if author_match else "알 수 없음"
+        sha = sha_match.group(1)[:12] if sha_match else ""
+        suffix = f" 커밋({sha})" if sha else " 커밋"
+        return f"{author}가 '{message}' 변경을 포함한{suffix}을 푸시했습니다. 변경 범위와 자동화 영향도를 확인해야 합니다."
+    if "issue" in source_type or "issue" in title.lower():
+        if normalized and not metadata_only:
+            return normalized[:360]
+        return f"GitHub 이슈 '{title}'가 수집되었습니다. 요구사항, 재현 조건, 후속 작업 필요 여부를 확인해야 합니다."
+    if not text:
+        return "요약 정보가 비어 있습니다. 원문 링크를 확인해야 합니다."
+    return f"수집된 원문 요약: {text[:360]}"
+
+
+def clean_table_header(header: list[str]) -> list[str]:
+    default = ["번호", "유형", "제목", "한국어 요약", "위험도", "다음 조치", "링크"]
+    joined = "".join(header)
+    if not header or "??" in joined or len(joined.replace("?", "").strip()) <= 2:
+        return default
+    return header
+
+
+def default_sources_table_rows(sources: list[object]) -> list[list[str]]:
+    rows = [["번호", "유형", "제목", "한국어 요약", "위험도", "다음 조치", "링크"]]
+    for index, source in enumerate(sources, start=1):
+        context = source_context(source, index)
+        source_type = context["source_type"] or "GitHub"
+        lowered = f"{context['title']} {context['summary']}".lower()
+        risk = "높음" if any(token in lowered for token in ["security", "auth", "token", "secret", "fail", "error", "보안", "실패"]) else "보통"
+        rows.append(
+            [
+                str(index),
+                source_type,
+                context["title"] or "(제목 없음)",
+                korean_summary_for_source(context),
+                risk,
+                context["next_action"],
+                context["source_url"],
+            ]
+        )
+    return rows
+
+
+def notion_sources_template_children(title: str, sources: list[object], template: str) -> list[dict]:
+    children = [
+        heading_2_block(title),
+        paragraph_block(f"총 {len(sources)}개 GitHub 변경사항을 자동화가 수집해 한국어로 정리했습니다."),
+    ]
+    template_rows = markdown_table_rows(template)
+    if template_rows:
+        header = clean_table_header(template_rows[0])
+        rows = [header]
+        for index, source in enumerate(sources, start=1):
+            context = source_context(source, index)
+            rows.append(
+                [
+                    context.get("index", str(index)),
+                    context.get("source_type") or "GitHub",
+                    context.get("title") or "(제목 없음)",
+                    korean_summary_for_source(context),
+                    "보통",
+                    context.get("next_action") or "검토",
+                    context.get("source_url") or "",
+                ][: len(header)]
+            )
+        children.append(notion_table_block(rows, header=True))
+        return children
+    children.append(notion_table_block(default_sources_table_rows(sources), header=True))
+    if not template.strip():
+        return children
+    children.append(paragraph_block("아래는 자동화 요청 템플릿을 각 항목에 적용한 상세 내용입니다."))
+    for index, source in enumerate(sources, start=1):
+        context = source_context(source, index)
+        children.append(heading_3_block(f"{index}. {context['title']}"))
+        for line in render_template(template, context).strip().splitlines():
+            children.append(paragraph_block(line))
+        if index < len(sources):
+            children.append(divider_block())
     return children
 
 
