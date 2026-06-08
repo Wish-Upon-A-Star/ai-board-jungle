@@ -21,7 +21,7 @@ from app.config import settings
 from app.db import SessionLocal, engine, init_db
 import app.main as main_module
 from app.main import app
-from app.models import AutomationTask, IntegrationProfile
+from app.models import AutomationRun, AutomationTask, IntegrationProfile, KnowledgeSource
 from app.live_writers import write_github_issue, write_notion_sources_table, write_notion_task
 from app.security import reveal_secret
 
@@ -190,6 +190,97 @@ def test_notion_sources_table_writer_preserves_korean_headers(monkeypatch):
     first_row = table["children"][1]["table_row"]["cells"]
     assert first_row[1][0]["text"]["content"] == "커밋"
     assert "OAuth 콜백" in first_row[3][0]["text"]["content"]
+
+
+def test_replay_notion_hydrates_legacy_collected_summary(monkeypatch):
+    captured = []
+
+    def fake_write_notion_sources_table(profile, title, sources, dry_run=True, target_url=None):
+        captured.append({"title": title, "sources": sources, "dryRun": dry_run})
+        return {"service": "notion", "status": "written", "format": "korean-summary-table", "count": len(sources), "dryRun": dry_run}
+
+    monkeypatch.setattr("app.main.write_notion_sources_table", fake_write_notion_sources_table)
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "replay-summary@example.com", "name": "Replay Summary", "password": "password123"},
+        )
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+        github = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Replay GitHub",
+                "source_kind": "github",
+                "base_url": "https://github.com/acme/replay",
+                "api_provider": "GitHub REST API",
+                "token_name": "GITHUB_TOKEN",
+                "token_value": "github_token",
+                "rag_targets": ["issues"],
+            },
+        ).json()["profile"]
+        client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Replay Notion",
+                "source_kind": "notion",
+                "base_url": "1234567890abcdef1234567890abcdef",
+                "api_provider": "Notion API",
+                "token_name": "NOTION_TOKEN",
+                "token_value": "notion_token",
+                "rag_targets": [],
+            },
+        )
+        task = client.post(
+            "/api/automations",
+            headers=headers,
+            json={
+                "name": "Replay legacy run",
+                "integration_profile_id": github["id"],
+                "source": "GitHub",
+                "destination": "Notion",
+                "interval_minutes": 5,
+                "instruction": "Replay collected items.",
+                "template": "table",
+                "api_provider": "GitHub REST API + Notion API",
+                "ai_agent": "ReplayAgent",
+                "custom_connections": [
+                    {
+                        "label": "Notion page",
+                        "service": "notion",
+                        "url": "1234567890abcdef1234567890abcdef",
+                        "api": "Notion API",
+                        "auth_key_name": "NOTION_TOKEN",
+                        "operation": "append_korean_status_table",
+                        "template": "summary",
+                    }
+                ],
+            },
+        ).json()["task"]
+        with SessionLocal() as db:
+            source = KnowledgeSource(
+                owner_id=register.json()["user"]["id"],
+                title="Legacy issue",
+                source_type="github_issue",
+                file_name="https://github.com/acme/replay/issues/1",
+                extracted_text="레거시 실행에는 없던 상세 요약입니다.",
+                tags_json="[]",
+            )
+            db.add(source)
+            db.flush()
+            run = AutomationRun(
+                task_id=task["id"],
+                owner_id=register.json()["user"]["id"],
+                result=json.dumps({"collected": [{"id": source.id, "title": source.title, "sourceType": source.source_type, "url": source.file_name}]}, ensure_ascii=False),
+            )
+            db.add(run)
+            db.commit()
+            run_id = run.id
+        replay = client.post(f"/api/automations/{task['id']}/runs/{run_id}/replay-notion", headers=headers)
+        assert replay.status_code == 200
+        assert replay.json()["run"]["result"]["liveWrites"][0]["format"] == "korean-summary-table"
+        assert captured[0]["sources"][0]["summary"] == "레거시 실행에는 없던 상세 요약입니다."
 
 
 def test_mcp_auth_profile_is_user_owned_and_redacted():

@@ -1294,6 +1294,16 @@ def task_due(task: AutomationTask, now: datetime | None = None) -> bool:
     return last_run + timedelta(minutes=max(task.interval_minutes, 1)) <= current_time
 
 
+def serialize_collected_source(source: KnowledgeSource) -> dict:
+    return {
+        "id": source.id,
+        "title": source.title,
+        "sourceType": source.source_type,
+        "url": source.file_name,
+        "summary": source.extracted_text,
+    }
+
+
 WATCHED_AUTOMATION_FIELDS = [
     "source",
     "integration_profile_id",
@@ -1340,10 +1350,7 @@ def execute_automation_task(
         else:
             items, collection_warnings = collect_profile_items(task.integration_profile, limit=limit, pages=pages)
         saved_sources = save_collected_items(db, actor, task.integration_profile, items) if items else []
-        collected = [
-            {"id": source.id, "title": source.title, "sourceType": source.source_type, "url": source.file_name}
-            for source in saved_sources
-        ]
+        collected = [serialize_collected_source(source) for source in saved_sources]
         task.integration_profile.last_collect_status = "collected" if saved_sources else "unchanged" if items else "no-data"
         task.integration_profile.last_collect_count = len(items)
         task.integration_profile.last_collect_saved = len(saved_sources)
@@ -1469,6 +1476,29 @@ def run_automation(task_id: int, user: User = Depends(current_user), db: Session
     return execute_automation_task(db, task, user, scheduled=False)
 
 
+def hydrate_collected_items(db: Session, collected_items: list[dict]) -> list[dict]:
+    source_ids = [int(item["id"]) for item in collected_items if isinstance(item, dict) and str(item.get("id", "")).isdigit()]
+    if not source_ids:
+        return collected_items
+    sources = {source.id: source for source in db.query(KnowledgeSource).filter(KnowledgeSource.id.in_(source_ids)).all()}
+    hydrated: list[dict] = []
+    for item in collected_items:
+        if not isinstance(item, dict):
+            hydrated.append(item)
+            continue
+        source = sources.get(int(item["id"])) if str(item.get("id", "")).isdigit() else None
+        if source:
+            merged = dict(item)
+            merged.setdefault("title", source.title)
+            merged.setdefault("sourceType", source.source_type)
+            merged.setdefault("url", source.file_name)
+            merged["summary"] = merged.get("summary") or source.extracted_text
+            hydrated.append(merged)
+        else:
+            hydrated.append(item)
+    return hydrated
+
+
 @app.post("/api/automations/{task_id}/runs/{run_id}/replay-notion")
 def replay_automation_run_to_notion(task_id: int, run_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     task = db.get(AutomationTask, task_id)
@@ -1490,6 +1520,7 @@ def replay_automation_run_to_notion(task_id: int, run_id: int, user: User = Depe
     collected_items = previous_result.get("collected") or []
     if not collected_items:
         raise HTTPException(status_code=400, detail="This run has no collected items to replay.")
+    collected_items = hydrate_collected_items(db, collected_items)
     profile = profile_for_service(db, task.owner, task, "notion")
     if not profile:
         raise HTTPException(status_code=400, detail="No user-owned Notion integration profile with a token is available.")
