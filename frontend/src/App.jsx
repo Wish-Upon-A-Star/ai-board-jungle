@@ -48,6 +48,7 @@ function App() {
   const [profileSettings, setProfileSettings] = useState(null);
   const [error, setError] = useState("");
   const [validationIssues, setValidationIssues] = useState([]);
+  const [oauthSetup, setOauthSetup] = useState(null);
   const [automationSaveState, setAutomationSaveState] = useState({ status: "idle", message: "" });
 
   const myTasks = useMemo(() => tasks.filter((task) => task.owner?.id === user?.id), [tasks, user]);
@@ -448,6 +449,24 @@ function App() {
     setAutomationSaveState({ status: "error", message: `Create a ${isNotion ? "Notion" : "GitHub"} MCP profile first, then return to the Automation tab.` });
   }
 
+  async function startMcpLogin(kind = "github") {
+    clearErrorState();
+    setActiveMainTab("integrations");
+    try {
+      const data = await api(`/api/oauth/${kind}/start`);
+      setApiResult({ called: `oauth.${kind}.start`, response: data });
+      if (!data.authorizeUrl) {
+        setOauthSetup(data);
+        setError(data.message || `${kind} MCP 로그인 설정이 필요합니다.`);
+        return;
+      }
+      window.location.href = data.authorizeUrl;
+    } catch (err) {
+      showActionError(err);
+      setApiResult({ called: `oauth.${kind}.start`, response: err.response || { message: err.message } });
+    }
+  }
+
   function applyMcpAutomationPreset(preset, primaryKind) {
     const githubProfiles = mcpProfilesFor("github");
     const notionProfiles = mcpProfilesFor("notion");
@@ -769,9 +788,31 @@ function App() {
             <article id="integration-profiles" className={`panel ${activeMainTab === "integrations" ? "" : "tab-hidden"}`}>
               <div className="panel-title row-title"><span>연동 프로필 목록</span><span className="subtle">사용자별 토큰, API, AI 모델, RAG 범위를 저장합니다.</span></div>
               <div className="mcp-setup-actions">
-                <button type="button" onClick={() => openMcpProfileSetup("github")}>Create GitHub MCP profile</button>
-                <button type="button" onClick={() => openMcpProfileSetup("notion")}>Create Notion MCP profile</button>
+                <button type="button" onClick={() => startMcpLogin("github")}><GitBranch size={14} /> GitHub MCP 로그인</button>
+                <button type="button" onClick={() => startMcpLogin("notion")}><Link2 size={14} /> Notion MCP 로그인</button>
+                <button type="button" onClick={() => openMcpProfileSetup("github")}>수동 GitHub 프로필</button>
+                <button type="button" onClick={() => openMcpProfileSetup("notion")}>수동 Notion 프로필</button>
               </div>
+              {oauthSetup ? (
+                <section className="oauth-setup-card">
+                  <div>
+                    <strong>{oauthSetup.provider === "github" ? "GitHub" : "Notion"} MCP 로그인 준비 필요</strong>
+                    <p>{oauthSetup.message}</p>
+                  </div>
+                  <a href={oauthSetup.setupUrl} target="_blank" rel="noreferrer">OAuth 앱 만들기</a>
+                  <div className="oauth-setup-grid">
+                    <label>
+                      Callback URL
+                      <input readOnly value={oauthSetup.redirectUri || ""} onFocus={(event) => event.currentTarget.select()} />
+                    </label>
+                    <label>
+                      서버 환경변수
+                      <textarea readOnly value={(oauthSetup.missing || []).map((name) => `$env:${name}=""`).join("\n")} onFocus={(event) => event.currentTarget.select()} />
+                    </label>
+                  </div>
+                </section>
+              ) : null}
+              <p className="inline-help">기본 흐름은 MCP 로그인입니다. 아래 토큰 입력 폼은 OAuth 앱 설정이 없거나 운영자가 직접 자격증명을 넣어야 할 때만 쓰는 fallback입니다.</p>
               <form className="knowledge-form" onSubmit={saveIntegrationProfile}>
                 <div className="grid3 wide">
                   <Field label="프로필명"><input value={integrationForm.name} onChange={(e) => setIntegrationForm({ ...integrationForm, name: e.target.value })} /></Field>

@@ -1,16 +1,19 @@
 ﻿from __future__ import annotations
 
+import base64
 import json
 import os
 import hashlib
 import hmac
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import httpx
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -32,6 +35,7 @@ FRONTEND_DIST = Path(os.environ.get("AI_BOARD_FRONTEND_DIST", PROJECT_ROOT / "fr
 FRONTEND_INDEX = FRONTEND_DIST / "index.html"
 FRONTEND_ASSETS = FRONTEND_DIST / "assets"
 STARTUP_DB_ERROR = ""
+OAUTH_STATE_TTL_SECONDS = 10 * 60
 
 
 @app.on_event("startup")
@@ -218,6 +222,216 @@ def serialize_integration_profile(profile: IntegrationProfile) -> dict:
         },
         "createdAt": str(profile.created_at),
     }
+
+
+def public_base_url(request: Request) -> str:
+    configured = os.environ.get("AI_BOARD_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if configured:
+        return configured
+    forwarded_host = request.headers.get("x-forwarded-host")
+    host = forwarded_host or request.headers.get("host") or request.url.netloc
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    return f"{proto}://{host}".rstrip("/")
+
+
+def oauth_state_secret() -> bytes:
+    return settings().jwt_secret.encode()
+
+
+def sign_oauth_state(payload: dict) -> str:
+    raw = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
+    signature = hmac.new(oauth_state_secret(), raw.encode(), hashlib.sha256).hexdigest()
+    return f"{raw}.{signature}"
+
+
+def read_oauth_state(state: str) -> dict:
+    try:
+        raw, signature = state.rsplit(".", 1)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="OAuth state is malformed.") from exc
+    expected = hmac.new(oauth_state_secret(), raw.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected):
+        raise HTTPException(status_code=400, detail="OAuth state signature is invalid.")
+    try:
+        padded = raw + ("=" * (-len(raw) % 4))
+        payload = json.loads(base64.urlsafe_b64decode(padded.encode()))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="OAuth state payload is invalid.") from exc
+    if int(payload.get("exp", 0)) < int(time.time()):
+        raise HTTPException(status_code=400, detail="OAuth state expired. Start the connector login again.")
+    return payload
+
+
+def oauth_provider_config(provider: str, request: Request) -> dict:
+    normalized = provider.lower()
+    base_url = public_base_url(request)
+    redirect_uri = f"{base_url}/api/oauth/{normalized}/callback"
+    if normalized == "github":
+        client_id = os.environ.get("AI_BOARD_GITHUB_OAUTH_CLIENT_ID", "").strip()
+        client_secret = os.environ.get("AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET", "").strip()
+        return {
+            "provider": "github",
+            "clientId": client_id,
+            "clientSecret": client_secret,
+            "missing": [
+                name
+                for name, value in {
+                    "AI_BOARD_GITHUB_OAUTH_CLIENT_ID": client_id,
+                    "AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET": client_secret,
+                }.items()
+                if not value
+            ],
+            "authorizeUrl": "https://github.com/login/oauth/authorize",
+            "tokenUrl": "https://github.com/login/oauth/access_token",
+            "redirectUri": redirect_uri,
+            "scope": "repo read:user user:email",
+            "mcpServerUrl": "mcp://github",
+            "apiProvider": "GitHub MCP OAuth",
+            "tokenName": "GITHUB_MCP_OAUTH_TOKEN",
+            "ragTargets": ["issues", "commits", "pull_requests"],
+            "profileName": "GitHub MCP OAuth profile",
+            "baseUrl": "https://github.com/<owner>/<repo>",
+            "setupUrl": "https://github.com/settings/developers",
+        }
+    if normalized == "notion":
+        client_id = os.environ.get("AI_BOARD_NOTION_OAUTH_CLIENT_ID", "").strip()
+        client_secret = os.environ.get("AI_BOARD_NOTION_OAUTH_CLIENT_SECRET", "").strip()
+        return {
+            "provider": "notion",
+            "clientId": client_id,
+            "clientSecret": client_secret,
+            "missing": [
+                name
+                for name, value in {
+                    "AI_BOARD_NOTION_OAUTH_CLIENT_ID": client_id,
+                    "AI_BOARD_NOTION_OAUTH_CLIENT_SECRET": client_secret,
+                }.items()
+                if not value
+            ],
+            "authorizeUrl": "https://api.notion.com/v1/oauth/authorize",
+            "tokenUrl": "https://api.notion.com/v1/oauth/token",
+            "redirectUri": redirect_uri,
+            "scope": "page.read page.write database.read database.write",
+            "mcpServerUrl": "mcp://notion",
+            "apiProvider": "Notion MCP OAuth",
+            "tokenName": "NOTION_MCP_OAUTH_TOKEN",
+            "ragTargets": ["notion_pages", "notion_database"],
+            "profileName": "Notion MCP OAuth profile",
+            "baseUrl": "https://www.notion.so/<workspace>/<page-or-database-id>",
+            "setupUrl": "https://www.notion.so/profile/integrations",
+        }
+    raise HTTPException(status_code=404, detail="지원하지 않는 OAuth 제공자입니다.")
+
+
+def exchange_oauth_code(provider_config: dict, code: str) -> dict:
+    provider = provider_config["provider"]
+    if provider == "github":
+        response = httpx.post(
+            provider_config["tokenUrl"],
+            data={
+                "client_id": provider_config["clientId"],
+                "client_secret": provider_config["clientSecret"],
+                "code": code,
+                "redirect_uri": provider_config["redirectUri"],
+            },
+            headers={"Accept": "application/json"},
+            timeout=20.0,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if payload.get("error"):
+            raise HTTPException(status_code=400, detail=f"GitHub OAuth 실패: {payload.get('error_description') or payload['error']}")
+        return payload
+    basic = base64.b64encode(f"{provider_config['clientId']}:{provider_config['clientSecret']}".encode()).decode()
+    response = httpx.post(
+        provider_config["tokenUrl"],
+        json={"grant_type": "authorization_code", "code": code, "redirect_uri": provider_config["redirectUri"]},
+        headers={"Accept": "application/json", "Content-Type": "application/json", "Authorization": f"Basic {basic}"},
+        timeout=20.0,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def github_oauth_subject(access_token: str) -> str:
+    try:
+        response = httpx.get(
+            "https://api.github.com/user",
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/vnd.github+json"},
+            timeout=15.0,
+        )
+        response.raise_for_status()
+        user_info = response.json()
+        return str(user_info.get("login") or user_info.get("email") or "github-user")
+    except httpx.HTTPError:
+        return "github-user"
+
+
+def notion_oauth_subject(payload: dict) -> str:
+    owner = payload.get("owner") if isinstance(payload.get("owner"), dict) else {}
+    user = owner.get("user") if isinstance(owner.get("user"), dict) else {}
+    person = user.get("person") if isinstance(user.get("person"), dict) else {}
+    return str(
+        person.get("email")
+        or user.get("name")
+        or payload.get("workspace_name")
+        or payload.get("workspace_id")
+        or payload.get("bot_id")
+        or "notion-workspace"
+    )
+
+
+def upsert_oauth_profile(db: Session, user: User, provider_config: dict, token_payload: dict) -> IntegrationProfile:
+    provider = provider_config["provider"]
+    access_token = str(token_payload.get("access_token") or "")
+    if not access_token:
+        raise HTTPException(status_code=400, detail=f"{provider} OAuth 응답에 access_token이 없습니다.")
+    scopes = provider_config["scope"].replace(",", " ").split()
+    returned_scope = token_payload.get("scope")
+    if isinstance(returned_scope, str) and returned_scope.strip():
+        scopes = returned_scope.replace(",", " ").split()
+    subject = github_oauth_subject(access_token) if provider == "github" else notion_oauth_subject(token_payload)
+    profile = db.scalars(
+        select(IntegrationProfile)
+        .where(
+            IntegrationProfile.owner_id == user.id,
+            IntegrationProfile.source_kind == provider,
+            IntegrationProfile.auth_type == "mcp_oauth",
+            IntegrationProfile.token_name == provider_config["tokenName"],
+        )
+        .order_by(IntegrationProfile.created_at.desc())
+    ).first()
+    if not profile:
+        profile = IntegrationProfile(owner_id=user.id, source_kind=provider)
+        db.add(profile)
+    current_base_url = profile.base_url if profile.base_url and "<" not in profile.base_url else provider_config["baseUrl"]
+    profile.name = provider_config["profileName"]
+    profile.base_url = current_base_url
+    profile.api_provider = provider_config["apiProvider"]
+    profile.token_name = provider_config["tokenName"]
+    profile.token_value = protect_secret(access_token)
+    profile.auth_type = "mcp_oauth"
+    profile.mcp_server_url = provider_config["mcpServerUrl"]
+    profile.mcp_auth_subject = subject
+    profile.mcp_scopes_json = json.dumps(scopes, ensure_ascii=False)
+    profile.rag_targets_json = json.dumps(provider_config["ragTargets"], ensure_ascii=False)
+    profile.collect_limit = profile.collect_limit or 20
+    profile.collect_pages = profile.collect_pages or 2
+    profile.custom_connections = json.dumps(
+        [
+            {
+                "label": f"{provider_config['profileName']} connection",
+                "service": provider,
+                "url": current_base_url,
+                "api": provider_config["apiProvider"],
+                "auth_key_name": provider_config["tokenName"],
+                "operation": "oauth_mcp_profile",
+                "template": "Use the user-owned OAuth connector credential stored on this profile.",
+            }
+        ],
+        ensure_ascii=False,
+    )
+    return profile
 
 
 def provider_readiness(user: User, db: Session) -> list[dict]:
@@ -587,6 +801,106 @@ def list_integration_profiles(user: User = Depends(current_user), db: Session = 
         select(IntegrationProfile).where(IntegrationProfile.owner_id == user.id).order_by(IntegrationProfile.created_at.desc())
     ).all()
     return {"profiles": [serialize_integration_profile(profile) for profile in profiles]}
+
+
+@app.get("/api/oauth/status")
+def oauth_status(request: Request, user: User = Depends(current_user)) -> dict:
+    providers = []
+    for provider in ("github", "notion"):
+        config = oauth_provider_config(provider, request)
+        providers.append(
+            {
+                "provider": provider,
+                "configured": not config["missing"],
+                "missing": config["missing"],
+                "redirectUri": config["redirectUri"],
+                "mcpServerUrl": config["mcpServerUrl"],
+            }
+        )
+    return {"providers": providers}
+
+
+@app.get("/api/oauth/{provider}/start")
+def start_oauth_login(provider: str, request: Request, user: User = Depends(current_user)) -> dict:
+    config = oauth_provider_config(provider, request)
+    if config["missing"]:
+        return {
+            "provider": config["provider"],
+            "configured": False,
+            "message": f"{config['provider']} MCP 로그인은 서버 OAuth 앱 설정이 먼저 필요합니다.",
+            "missing": config["missing"],
+            "setupUrl": config["setupUrl"],
+            "redirectUri": config["redirectUri"],
+            "requiredEnv": {name: "" for name in config["missing"]},
+        }
+    state = sign_oauth_state(
+        {
+            "provider": config["provider"],
+            "userId": user.id,
+            "nonce": hashlib.sha256(os.urandom(16)).hexdigest()[:24],
+            "exp": int(time.time()) + OAUTH_STATE_TTL_SECONDS,
+        }
+    )
+    params = {
+        "client_id": config["clientId"],
+        "redirect_uri": config["redirectUri"],
+        "response_type": "code",
+        "state": state,
+    }
+    if config["provider"] == "github":
+        params["scope"] = config["scope"]
+    else:
+        params["owner"] = "user"
+    query = str(httpx.QueryParams(params))
+    return {
+        "provider": config["provider"],
+        "configured": True,
+        "authorizeUrl": f"{config['authorizeUrl']}?{query}",
+        "redirectUri": config["redirectUri"],
+        "expiresInSeconds": OAUTH_STATE_TTL_SECONDS,
+    }
+
+
+@app.get("/api/oauth/{provider}/callback")
+def oauth_callback(provider: str, request: Request, code: str = "", state: str = "", db: Session = Depends(get_db)) -> HTMLResponse:
+    if not code:
+        raise HTTPException(status_code=400, detail="OAuth callback code is missing.")
+    payload = read_oauth_state(state)
+    config = oauth_provider_config(provider, request)
+    if payload.get("provider") != config["provider"]:
+        raise HTTPException(status_code=400, detail="OAuth provider state mismatch.")
+    if config["missing"]:
+        raise HTTPException(status_code=400, detail=f"OAuth 설정이 누락되었습니다: {', '.join(config['missing'])}")
+    user = db.get(User, int(payload.get("userId", 0)))
+    if not user:
+        raise HTTPException(status_code=404, detail="OAuth state user was not found.")
+    try:
+        token_payload = exchange_oauth_code(config, code)
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=400, detail=f"{config['provider']} OAuth token exchange failed: {exc.response.text[:240]}") from exc
+    profile = upsert_oauth_profile(db, user, config, token_payload)
+    db.flush()
+    log_activity(
+        db,
+        user,
+        "integration_profile.oauth_connected",
+        config["provider"],
+        "connected",
+        f"{config['provider']} MCP OAuth login connected for {profile.mcp_auth_subject}.",
+        {"profileId": profile.id, "mcpServerUrl": profile.mcp_server_url, "scopes": parse_string_list(profile.mcp_scopes_json)},
+        profile_id=profile.id,
+    )
+    db.commit()
+    target = f"/?oauth=connected&provider={config['provider']}&profile={profile.id}"
+    html = f"""<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta http-equiv="refresh" content="1; url={target}"><title>AI Board MCP OAuth</title></head>
+<body>
+<p>{config['provider']} MCP OAuth 연결이 완료되었습니다. AI Board로 돌아갑니다.</p>
+<p><a href="{target}">돌아가기</a></p>
+</body>
+</html>"""
+    return HTMLResponse(html)
 
 
 @app.get("/api/provider-readiness")

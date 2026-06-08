@@ -6,6 +6,7 @@ import subprocess
 import sys
 import hashlib
 import hmac
+from urllib.parse import parse_qs, urlparse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -188,6 +189,53 @@ def test_mcp_auth_profile_is_user_owned_and_redacted():
         assert any(item["id"] == profile["id"] and item["authType"] == "mcp_oauth" for item in first_profiles)
         second_profiles = client.get("/api/integration-profiles", headers=second_headers).json()["profiles"]
         assert all(item["id"] != profile["id"] for item in second_profiles)
+
+
+def test_mcp_oauth_start_reports_missing_server_config(monkeypatch):
+    for key in (
+        "AI_BOARD_GITHUB_OAUTH_CLIENT_ID",
+        "AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET",
+        "AI_BOARD_NOTION_OAUTH_CLIENT_ID",
+        "AI_BOARD_NOTION_OAUTH_CLIENT_SECRET",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "oauth-missing@example.com", "name": "OAuth Missing", "password": "password123"},
+        )
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+        response = client.get("/api/oauth/github/start", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["configured"] is False
+    assert data["setupUrl"] == "https://github.com/settings/developers"
+    assert "AI_BOARD_GITHUB_OAUTH_CLIENT_ID" in data["missing"]
+    assert "AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET" in data["missing"]
+    assert data["redirectUri"].endswith("/api/oauth/github/callback")
+
+
+def test_mcp_oauth_start_builds_provider_authorize_url(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_PUBLIC_BASE_URL", "https://board.example.test")
+    monkeypatch.setenv("AI_BOARD_GITHUB_OAUTH_CLIENT_ID", "github-client")
+    monkeypatch.setenv("AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET", "github-secret")
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "oauth-ready@example.com", "name": "OAuth Ready", "password": "password123"},
+        )
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+        response = client.get("/api/oauth/github/start", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    parsed = urlparse(data["authorizeUrl"])
+    params = parse_qs(parsed.query)
+    assert parsed.netloc == "github.com"
+    assert parsed.path == "/login/oauth/authorize"
+    assert params["client_id"] == ["github-client"]
+    assert params["redirect_uri"] == ["https://board.example.test/api/oauth/github/callback"]
+    assert "repo read:user user:email" in params["scope"]
+    assert params["state"][0].count(".") == 1
 
 
 def test_full_fastapi_flow(monkeypatch):

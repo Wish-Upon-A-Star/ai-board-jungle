@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createConnection } from "node:net";
-import { createWriteStream, mkdirSync } from "node:fs";
+import { mkdirSync, openSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { postgresDatabaseUrl, postgresEnv, assertPostgresUrl } from "./postgres-env.mjs";
@@ -14,7 +14,7 @@ const apiPort = process.env.AI_BOARD_API_PORT || "8000";
 const webPort = process.env.AI_BOARD_WEB_PORT || "3000";
 const host = process.env.AI_BOARD_HOST || "0.0.0.0";
 const publicHost = process.env.AI_BOARD_PUBLIC_HOST || "127.0.0.1";
-const apiBase = process.env.VITE_API_BASE || `http://${publicHost}:${apiPort}`;
+const apiBase = process.env.VITE_API_BASE || "";
 const webUrl = `http://${publicHost}:${webPort}`;
 const dbUrl = postgresDatabaseUrl();
 
@@ -58,8 +58,8 @@ function stopPids(pids) {
 }
 
 function startDetached(command, args, env, logName, cwd = root) {
-  const out = createWriteStream(join(logDir, `${logName}.out.log`), { flags: "a" });
-  const err = createWriteStream(join(logDir, `${logName}.err.log`), { flags: "a" });
+  const out = openSync(join(logDir, `${logName}.out.log`), "a");
+  const err = openSync(join(logDir, `${logName}.err.log`), "a");
   const child = spawn(command, args, {
     cwd,
     env: { ...process.env, ...env },

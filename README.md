@@ -125,6 +125,27 @@ AI Board does not receive or reuse the private Notion/GitHub connector session t
 - Automations keep using the selected user-owned integration profile, so webhook-triggered GitHub/Notion writes can be audited back to the user identity and MCP scope set that authorized the run.
 - Demo setup can use the desktop token template files, but real operation requires replacing placeholders with real user-owned credentials and sharing the target Notion page/database with that integration.
 
+#### MCP login / OAuth connector flow
+
+The normal user path is no longer "paste an API token first." In the `연동 프로필` tab, users can click `GitHub MCP 로그인` or `Notion MCP 로그인`. The backend starts a provider OAuth authorization-code flow, stores the returned access token as the user's protected `mcp_oauth` integration profile, and records the MCP subject/scopes for audit.
+
+Required server settings:
+
+```powershell
+$env:AI_BOARD_PUBLIC_BASE_URL="https://your-public-domain.example"
+$env:AI_BOARD_GITHUB_OAUTH_CLIENT_ID="..."
+$env:AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET="..."
+$env:AI_BOARD_NOTION_OAUTH_CLIENT_ID="..."
+$env:AI_BOARD_NOTION_OAUTH_CLIENT_SECRET="..."
+```
+
+Callback URLs to register in the provider apps:
+
+- GitHub OAuth App callback: `https://your-public-domain.example/api/oauth/github/callback`
+- Notion public integration redirect URI: `https://your-public-domain.example/api/oauth/notion/callback`
+
+If these variables are missing, the login buttons return a visible setup error that names the missing variables instead of silently doing nothing. The manual token form remains only as an admin/fallback path.
+
 ### AI Agent
 
 Agent는 사용자가 적은 자동화 지침을 분석해 다음 정보를 계획합니다.
