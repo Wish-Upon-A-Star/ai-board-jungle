@@ -150,10 +150,15 @@ function App() {
   }
 
   async function demoLogin(email) {
-    const data = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password: "password123" }) });
-    localStorage.setItem("ai-board-token", data.token);
-    setToken(data.token);
-    setUser(data.user);
+    clearErrorState();
+    try {
+      const data = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password: "password123" }) });
+      localStorage.setItem("ai-board-token", data.token);
+      setToken(data.token);
+      setUser(data.user);
+    } catch (err) {
+      showActionError(err);
+    }
   }
 
   function logout() {
@@ -499,8 +504,8 @@ function App() {
             <button>{authMode === "register" ? <UserPlus size={14} /> : null}{authMode === "register" ? "계정 만들기" : "로그인"}</button>
           </form>
           <div className="demo-actions">
-            <button onClick={() => demoLogin("admin@example.com")}>관리자 데모</button>
-            <button onClick={() => demoLogin("user@example.com")}>일반 사용자 데모</button>
+            <button type="button" onClick={() => demoLogin("admin@example.com")}>관리자 데모</button>
+            <button type="button" onClick={() => demoLogin("user@example.com")}>일반 사용자 데모</button>
           </div>
           {error && <p className="error">{error}</p>}
           <small>일반 사용자는 자기 자동화만 보고, 관리자는 전체 작업을 볼 수 있습니다.</small>

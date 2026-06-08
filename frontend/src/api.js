@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8000`;
+const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 function labelValidationLocation(location = []) {
   const parts = location.filter((part) => part !== "body").map((part) => (typeof part === "number" ? `#${part + 1}` : String(part)));
