@@ -95,8 +95,48 @@ def test_notion_task_writer_uses_shared_id_parser_for_dashed_ids():
     write = write_notion_task(profile, "Check Notion parser", "Dry-run only.", dry_run=True)
     assert write["status"] == "ready"
     assert write["databaseUrl"] == "https://api.notion.com/v1/databases/1234567890abcdef1234567890abcdef"
-    assert write["payload"]["parent"]["database_id"] == "1234567890abcdef1234567890abcdef"
+    assert write["payload"]["parent"]["database_or_page_id"] == "1234567890abcdef1234567890abcdef"
     assert "plain-notion-token-for-dry-run" not in str(write)
+
+
+def test_notion_task_writer_appends_to_plain_page(monkeypatch):
+    calls = []
+
+    class Response:
+        def __init__(self, status_code, data):
+            self.status_code = status_code
+            self._data = data
+            self.headers = {"content-type": "application/json"}
+            self.is_success = 200 <= status_code < 300
+            self.text = json.dumps(data)
+
+        def json(self):
+            return self._data
+
+    def fake_get(url, headers=None, timeout=15.0):
+        calls.append(("GET", url, None))
+        return Response(404, {"object": "error", "message": "not a database"})
+
+    def fake_patch(url, headers=None, json=None, timeout=15.0):
+        calls.append(("PATCH", url, json))
+        return Response(200, {"results": []})
+
+    monkeypatch.setattr("app.live_writers.httpx.get", fake_get)
+    monkeypatch.setattr("app.live_writers.httpx.patch", fake_patch)
+    profile = IntegrationProfile(
+        owner_id=1,
+        name="Notion Page Writer",
+        source_kind="notion",
+        base_url="https://www.notion.so/workspace/Demo-3797051c2f9981b4bad3fe6545622eb8",
+        token_value="plain-notion-page-token",
+    )
+    write = write_notion_task(profile, "Webhook commit summary", "Commit body", dry_run=False)
+    assert write["status"] == "written"
+    assert write["target"] == "page"
+    assert calls[0][0] == "GET"
+    assert calls[1][0] == "PATCH"
+    assert calls[1][1] == "https://api.notion.com/v1/blocks/3797051c2f9981b4bad3fe6545622eb8/children"
+    assert calls[1][2]["children"][0]["heading_2"]["rich_text"][0]["text"]["content"] == "Webhook commit summary"
 
 
 def test_full_fastapi_flow(monkeypatch):
@@ -1029,6 +1069,124 @@ def test_github_webhook_signature_triggers_matching_automation(monkeypatch):
             assert "Source URL: https://github.com/acme/hooked/commit/abc" in writes[0]["body"]
             activities = client.get("/api/integration-activities?event_type=automation.live_write", headers=headers).json()["activities"]
             assert any(item["provider"] == "notion" and item["status"] == "written" for item in activities)
+    finally:
+        monkeypatch.delenv("AI_BOARD_GITHUB_WEBHOOK_SECRET", raising=False)
+        settings.cache_clear()
+
+
+def test_github_webhook_commits_are_written_to_notion_without_collector(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_GITHUB_WEBHOOK_SECRET", "hook-secret")
+    settings.cache_clear()
+    writes = []
+
+    def no_live_collect(profile, limit=20, pages=2):
+        return [], ["collector should not be required for webhook commit payloads"]
+
+    def fake_write(profile, title, body, dry_run=True, start_minutes_from_now=15, duration_minutes=30):
+        writes.append({"service": profile.source_kind, "title": title, "body": body, "dryRun": dry_run})
+        return {
+            "service": profile.source_kind,
+            "status": "written",
+            "id": "page-write",
+            "url": "https://www.notion.so/3797051c2f9981b4bad3fe6545622eb8",
+            "dryRun": dry_run,
+            "target": "page",
+        }
+
+    monkeypatch.setattr("app.main.collect_profile_items", no_live_collect)
+    monkeypatch.setattr("app.main.execute_profile_write", fake_write)
+    try:
+        with TestClient(app) as client:
+            register = client.post(
+                "/api/auth/register",
+                json={"email": "webhook-commit-page@example.com", "name": "Webhook Commit User", "password": "password123"},
+            )
+            headers = {"Authorization": f"Bearer {register.json()['token']}"}
+            github = client.post(
+                "/api/integration-profiles",
+                headers=headers,
+                json={
+                    "name": "Webhook Payload GitHub",
+                    "source_kind": "github",
+                    "base_url": "https://github.com/Wish-Upon-A-Star/ai-board-jungle",
+                    "api_provider": "GitHub REST API",
+                    "token_name": "GITHUB_TOKEN",
+                    "token_value": "github_hook_token",
+                    "rag_targets": ["commits"],
+                },
+            ).json()["profile"]
+            client.post(
+                "/api/integration-profiles",
+                headers=headers,
+                json={
+                    "name": "Small Demo Notion Page",
+                    "source_kind": "notion",
+                    "base_url": "https://app.notion.com/p/3797051c2f9981b4bad3fe6545622eb8",
+                    "api_provider": "Notion API",
+                    "token_name": "NOTION_TOKEN",
+                    "token_value": "notion_page_token",
+                    "rag_targets": ["notion_pages"],
+                },
+            )
+            task = client.post(
+                "/api/automations",
+                headers=headers,
+                json={
+                    "name": "GitHub commits to small Notion page",
+                    "integration_profile_id": github["id"],
+                    "source": "GitHub Push",
+                    "destination": "Small Notion Page",
+                    "interval_minutes": 5,
+                    "instruction": "When GitHub pushes arrive, append commit summaries to the small Notion demo page.",
+                    "template": "commit / author / link / next action",
+                    "api_provider": "GitHub webhook + Notion API",
+                    "ai_agent": "WebhookCommitAgent",
+                    "custom_connections": [
+                        {
+                            "label": "Small Notion demo page",
+                            "service": "notion",
+                            "url": "https://app.notion.com/p/3797051c2f9981b4bad3fe6545622eb8",
+                            "api": "Notion API",
+                            "auth_key_name": "NOTION_TOKEN",
+                            "operation": "append_page_update",
+                            "template": "commit: {title}\nsummary: {summary}\nlink: {url}",
+                        }
+                    ],
+                },
+            ).json()["task"]
+            payload = json.dumps(
+                {
+                    "repository": {
+                        "full_name": "Wish-Upon-A-Star/ai-board-jungle",
+                        "html_url": "https://github.com/Wish-Upon-A-Star/ai-board-jungle",
+                    },
+                    "commits": [
+                        {
+                            "id": "7ee9f823ab2a61a52cba4eb4bbd29f6713af6a14",
+                            "message": "Add guarded live apply command",
+                            "url": "https://github.com/Wish-Upon-A-Star/ai-board-jungle/commit/7ee9f82",
+                            "author": {"name": "Codex"},
+                        }
+                    ],
+                }
+            ).encode()
+            signature = "sha256=" + hmac.new(b"hook-secret", payload, hashlib.sha256).hexdigest()
+            triggered = client.post(
+                "/api/webhooks/github",
+                content=payload,
+                headers={"X-Hub-Signature-256": signature, "X-GitHub-Event": "push"},
+            )
+            assert triggered.status_code == 200
+            data = triggered.json()
+            assert data["matched"] == 1
+            assert data["commits"] == 1
+            assert data["triggered"][0]["taskId"] == task["id"]
+            assert data["triggered"][0]["status"] == "changed"
+            assert writes
+            assert writes[0]["service"] == "notion"
+            assert writes[0]["title"].startswith("[AI Board] [Webhook Payload GitHub] Webhook commit 7ee9f823ab2a")
+            assert "Source URL: https://github.com/Wish-Upon-A-Star/ai-board-jungle/commit/7ee9f82" in writes[0]["body"]
+            assert "Add guarded live apply command" in writes[0]["body"]
     finally:
         monkeypatch.delenv("AI_BOARD_GITHUB_WEBHOOK_SECRET", raising=False)
         settings.cache_clear()

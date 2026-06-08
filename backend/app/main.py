@@ -16,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from .collectors import collect_profile_items, extract_notion_id, parse_github_repo, save_collected_items
+from .collectors import CollectedItem, collect_profile_items, extract_notion_id, parse_github_repo, save_collected_items
 from .db import check_db, database_reachable, get_db, init_db
 from .live_writers import execute_profile_write
 from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, User
@@ -397,6 +397,44 @@ def github_webhook_repos(payload: dict) -> list[str]:
     if re.fullmatch(r"[^/\s]+/[^/\s]+", full_name):
         targets.append(f"https://github.com/{full_name}")
     return list(dict.fromkeys(targets))
+
+
+def github_webhook_collected_items(payload: dict) -> list[CollectedItem]:
+    repository = payload.get("repository") if isinstance(payload, dict) else {}
+    repo_url = str(repository.get("html_url") or "").rstrip("/")
+    commits = payload.get("commits") if isinstance(payload, dict) else []
+    if not isinstance(commits, list):
+        return []
+    items: list[CollectedItem] = []
+    for commit in commits[:50]:
+        if not isinstance(commit, dict):
+            continue
+        sha = str(commit.get("id") or commit.get("sha") or "")[:12]
+        message = str(commit.get("message") or "").strip()
+        author = commit.get("author") if isinstance(commit.get("author"), dict) else {}
+        author_name = str(author.get("name") or author.get("username") or "").strip()
+        url = str(commit.get("url") or (f"{repo_url}/commit/{sha}" if repo_url and sha else "")).strip()
+        first_line = message.splitlines()[0] if message else "no message"
+        text = "\n".join(
+            part
+            for part in [
+                message,
+                f"sha: {sha}" if sha else "",
+                f"author: {author_name}" if author_name else "",
+                f"url: {url}" if url else "",
+            ]
+            if part
+        )
+        items.append(
+            CollectedItem(
+                title=f"Webhook commit {sha}: {first_line}" if sha else f"Webhook commit: {first_line}",
+                source_type="github_webhook_commit",
+                url=url or f"webhook://github/{sha or len(items) + 1}",
+                text=text,
+                tags=["github", "webhook", "commit"],
+            )
+        )
+    return items
 
 
 async def extract_upload_text(upload: UploadFile | None) -> tuple[str, str, str]:
@@ -960,14 +998,25 @@ WATCHED_AUTOMATION_FIELDS = [
 ]
 
 
-def execute_automation_task(db: Session, task: AutomationTask, actor: User, scheduled: bool = False) -> dict:
+def execute_automation_task(
+    db: Session,
+    task: AutomationTask,
+    actor: User,
+    scheduled: bool = False,
+    external_items: list[CollectedItem] | None = None,
+    external_event_key: str = "",
+) -> dict:
     collected: list[dict] = []
     collection_warnings: list[str] = []
     saved_sources: list[KnowledgeSource] = []
     if task.integration_profile:
         limit = max(1, min(task.integration_profile.collect_limit, 100))
         pages = max(1, min(task.integration_profile.collect_pages, 5))
-        items, collection_warnings = collect_profile_items(task.integration_profile, limit=limit, pages=pages)
+        if external_items:
+            items = external_items
+            collection_warnings = []
+        else:
+            items, collection_warnings = collect_profile_items(task.integration_profile, limit=limit, pages=pages)
         saved_sources = save_collected_items(db, actor, task.integration_profile, items) if items else []
         collected = [
             {"id": source.id, "title": source.title, "sourceType": source.source_type, "url": source.file_name}
@@ -986,11 +1035,11 @@ def execute_automation_task(db: Session, task: AutomationTask, actor: User, sche
             task.integration_profile.source_kind,
             task.integration_profile.last_collect_status,
             f"Automation {task.name} collected {len(saved_sources)} new RAG items",
-            {"taskId": task.id, "collected": len(items), "saved": len(saved_sources), "warnings": collection_warnings},
+            {"taskId": task.id, "collected": len(items), "saved": len(saved_sources), "warnings": collection_warnings, "externalEvent": bool(external_items)},
             task_id=task.id,
             profile_id=task.integration_profile_id,
         )
-    external_change_key = "|".join(sorted(source.file_name for source in saved_sources))
+    external_change_key = "|".join(sorted([source.file_name for source in saved_sources] + ([external_event_key] if external_event_key else [])))
     current_hash = hashlib.sha256(f"{automation_fingerprint(task)}|{external_change_key}".encode("utf-8")).hexdigest()
     if task.last_input_hash == current_hash:
         result = {
@@ -1179,6 +1228,11 @@ async def github_webhook(
         raise HTTPException(status_code=401, detail="Invalid GitHub webhook signature.")
     payload = json.loads(body.decode("utf-8") or "{}")
     repo_urls = github_webhook_repos(payload)
+    webhook_items = github_webhook_collected_items(payload)
+    event_key = hashlib.sha256(
+        "|".join(item.url for item in webhook_items).encode("utf-8")
+        or body
+    ).hexdigest()
     stmt = select(AutomationTask).where(AutomationTask.status == "ACTIVE")
     tasks = []
     for task in db.scalars(stmt).all():
@@ -1188,13 +1242,24 @@ async def github_webhook(
             for repo_url in repo_urls
         ):
             tasks.append(task)
-    results = [execute_automation_task(db, task, task.owner, scheduled=True) for task in tasks[:20]]
+    results = [
+        execute_automation_task(
+            db,
+            task,
+            task.owner,
+            scheduled=True,
+            external_items=webhook_items,
+            external_event_key=f"github:{x_github_event}:{event_key}",
+        )
+        for task in tasks[:20]
+    ]
     return {
         "ok": True,
         "provider": "github",
         "event": x_github_event,
         "repo": repo_urls[0] if repo_urls else "",
         "repos": repo_urls,
+        "commits": len(webhook_items),
         "matched": len(tasks),
         "triggered": [{"taskId": item["task"]["id"], "status": item["run"]["result"]["status"]} for item in results],
         "signatureRequired": bool(settings().github_webhook_secret),

@@ -52,20 +52,22 @@ def write_github_issue(profile: IntegrationProfile, title: str, body: str, dry_r
 
 def write_notion_task(profile: IntegrationProfile, title: str, body: str, dry_run: bool = True, target_url: str | None = None) -> dict:
     token = reveal_secret(profile.token_value)
-    database_id = extract_notion_id(target_url or profile.base_url)
-    if not token or not database_id:
-        return {"service": "notion", "status": "blocked", "reason": "missing token or Notion database URL", "dryRun": dry_run}
+    target_id = extract_notion_id(target_url or profile.base_url)
+    if not token or not target_id:
+        return {"service": "notion", "status": "blocked", "reason": "missing token or Notion page/database URL", "dryRun": dry_run}
     headers = {"Authorization": f"Bearer {token}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"}
-    database_url = f"https://api.notion.com/v1/databases/{database_id}"
+    database_url = f"https://api.notion.com/v1/databases/{target_id}"
     page_url = "https://api.notion.com/v1/pages"
+    block_children_url = f"https://api.notion.com/v1/blocks/{target_id}/children"
     if dry_run:
         return {
             "service": "notion",
             "status": "ready",
             "method": "POST",
             "url": page_url,
+            "pageAppendUrl": block_children_url,
             "databaseUrl": database_url,
-            "payload": {"parent": {"database_id": database_id}, "title": title[:200], "body": body[:1800]},
+            "payload": {"parent": {"database_or_page_id": target_id}, "title": title[:200], "body": body[:1800]},
             "dryRun": True,
         }
     try:
@@ -73,8 +75,28 @@ def write_notion_task(profile: IntegrationProfile, title: str, body: str, dry_ru
     except httpx.HTTPError as exc:
         return {"service": "notion", "status": "failed", "reason": str(exc), "dryRun": False}
     if not database_response.is_success:
-        data = database_response.json() if database_response.headers.get("content-type", "").startswith("application/json") else {"raw": database_response.text}
-        return {"service": "notion", "status": "failed", "code": database_response.status_code, "response": data, "dryRun": False}
+        children_payload = {
+            "children": [
+                {
+                    "object": "block",
+                    "type": "heading_2",
+                    "heading_2": {"rich_text": [{"type": "text", "text": {"content": title[:200]}}]},
+                },
+                {
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {"rich_text": [{"type": "text", "text": {"content": body[:1900]}}]},
+                },
+            ]
+        }
+        try:
+            response = httpx.patch(block_children_url, headers=headers, json=children_payload, timeout=15.0)
+        except httpx.HTTPError as exc:
+            return {"service": "notion", "status": "failed", "reason": str(exc), "dryRun": False, "target": "page"}
+        data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"raw": response.text}
+        if not response.is_success:
+            return {"service": "notion", "status": "failed", "code": response.status_code, "response": data, "dryRun": False, "target": "page"}
+        return {"service": "notion", "status": "written", "id": target_id, "url": f"https://www.notion.so/{target_id}", "dryRun": False, "target": "page"}
     database = database_response.json()
     properties: dict = {}
     title_property = next((name for name, prop in database.get("properties", {}).items() if prop.get("type") == "title"), "Name")
@@ -91,7 +113,7 @@ def write_notion_task(profile: IntegrationProfile, title: str, body: str, dry_ru
             if match:
                 properties[name] = {"url": match.group(0)[:2000]}
     payload = {
-        "parent": {"database_id": database_id},
+        "parent": {"database_id": target_id},
         "properties": properties,
         "children": [
             {
