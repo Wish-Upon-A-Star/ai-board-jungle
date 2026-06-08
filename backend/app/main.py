@@ -9,13 +9,14 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .collectors import collect_profile_items, save_collected_items
-from .db import get_db, init_db
+from .db import check_db, database_reachable, get_db, init_db
 from .live_writers import execute_profile_write
 from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, User
 from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LiveWriteIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
@@ -29,11 +30,21 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIST = Path(os.environ.get("AI_BOARD_FRONTEND_DIST", PROJECT_ROOT / "frontend" / "dist")).resolve()
 FRONTEND_INDEX = FRONTEND_DIST / "index.html"
 FRONTEND_ASSETS = FRONTEND_DIST / "assets"
+STARTUP_DB_ERROR = ""
 
 
 @app.on_event("startup")
 def startup() -> None:
-    init_db()
+    global STARTUP_DB_ERROR
+    reachable, reason = database_reachable()
+    if not reachable:
+        STARTUP_DB_ERROR = reason
+        return
+    try:
+        init_db()
+        STARTUP_DB_ERROR = ""
+    except SQLAlchemyError as exc:
+        STARTUP_DB_ERROR = f"{exc.__class__.__name__}: {str(exc).splitlines()[0][:240]}"
 
 
 def serialize_user(user: User) -> dict:
@@ -388,9 +399,31 @@ def serialize_task(task: AutomationTask) -> dict:
     }
 
 
-@app.get("/api/health")
-def health() -> dict:
-    return {"ok": True, "stack": "React + FastAPI + PostgreSQL + Redis", "docs": "/docs"}
+@app.get("/api/health", response_model=None)
+def health() -> dict | JSONResponse:
+    if STARTUP_DB_ERROR:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "ok": False,
+                "stack": "React + FastAPI + PostgreSQL + Redis",
+                "docs": "/docs",
+                "database": {"ok": False, "error": STARTUP_DB_ERROR},
+            },
+        )
+    try:
+        database = check_db()
+    except SQLAlchemyError as exc:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "ok": False,
+                "stack": "React + FastAPI + PostgreSQL + Redis",
+                "docs": "/docs",
+                "database": {"ok": False, "error": f"{exc.__class__.__name__}: {str(exc).splitlines()[0][:240]}"},
+            },
+        )
+    return {"ok": True, "stack": "React + FastAPI + PostgreSQL + Redis", "docs": "/docs", "database": database}
 
 
 @app.post("/api/auth/register")

@@ -39,6 +39,10 @@ def test_full_fastapi_flow(monkeypatch):
     monkeypatch.setattr("app.main.collect_profile_items", fake_collect)
 
     with TestClient(app) as client:
+        health = client.get("/api/health")
+        assert health.status_code == 200
+        assert health.json()["database"]["ok"] is True
+
         register = client.post(
             "/api/auth/register",
             json={"email": "a@example.com", "name": "Tester", "password": "password123"},

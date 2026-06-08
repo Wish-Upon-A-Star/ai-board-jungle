@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import socket
 from pathlib import Path
+from urllib.parse import urlparse
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
@@ -40,6 +42,25 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def check_db() -> dict:
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+    return {"ok": True, "url": database_url.split("://", 1)[0]}
+
+
+def database_reachable(timeout_seconds: float = 1.0) -> tuple[bool, str]:
+    if not database_url.startswith("postgresql"):
+        return True, ""
+    parsed = urlparse(database_url.replace("postgresql+psycopg://", "postgresql://", 1))
+    host = parsed.hostname or "localhost"
+    port = parsed.port or 5432
+    try:
+        with socket.create_connection((host, port), timeout=timeout_seconds):
+            return True, ""
+    except OSError as exc:
+        return False, f"PostgreSQL is not reachable at {host}:{port}: {exc.__class__.__name__}"
 
 
 def init_db() -> None:
