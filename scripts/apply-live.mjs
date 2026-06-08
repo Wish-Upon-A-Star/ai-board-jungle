@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createConnection } from "node:net";
-import { mkdirSync, openSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { postgresDatabaseUrl, postgresEnv, assertPostgresUrl } from "./postgres-env.mjs";
@@ -17,6 +17,50 @@ const publicHost = process.env.AI_BOARD_PUBLIC_HOST || "127.0.0.1";
 const apiBase = process.env.VITE_API_BASE || "";
 const webUrl = `http://${publicHost}:${webPort}`;
 const dbUrl = postgresDatabaseUrl();
+
+function readKvFile(path) {
+  if (!existsSync(path)) return {};
+  return Object.fromEntries(
+    readFileSync(path, "utf8")
+      .split(/\r?\n/)
+      .map((line) => line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.+?)\s*$/))
+      .filter(Boolean)
+      .map((match) => [match[1], match[2]])
+  );
+}
+
+function readRawPair(path) {
+  if (!existsSync(path)) return [];
+  return readFileSync(path, "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function readFirstLine(path) {
+  if (!existsSync(path)) return "";
+  return readFileSync(path, "utf8").split(/\r?\n/).find((line) => line.trim())?.trim() || "";
+}
+
+function desktopOAuthEnv() {
+  const desktop = join(process.env.USERPROFILE || "", "Desktop");
+  const github = readKvFile(join(desktop, "ai-board-demo-github-api-token.txt"));
+  const notion = readKvFile(join(desktop, "ai-board-demo-notion-api-token.txt"));
+  const figma = readRawPair(join(desktop, "figma.txt"));
+  const google = readRawPair(join(desktop, "google.txt"));
+  return {
+    AI_BOARD_GITHUB_OAUTH_CLIENT_ID: github.GITHUB_CLIENT_ID || process.env.AI_BOARD_GITHUB_OAUTH_CLIENT_ID || "",
+    AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET:
+      github.AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET || process.env.AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET || "",
+    AI_BOARD_NOTION_OAUTH_CLIENT_ID: notion.CLIENT_ID || process.env.AI_BOARD_NOTION_OAUTH_CLIENT_ID || "",
+    AI_BOARD_NOTION_OAUTH_CLIENT_SECRET: notion.SECRET_KEY || process.env.AI_BOARD_NOTION_OAUTH_CLIENT_SECRET || "",
+    AI_BOARD_FIGMA_OAUTH_CLIENT_ID: figma[0] || process.env.AI_BOARD_FIGMA_OAUTH_CLIENT_ID || "",
+    AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET: figma[1] || process.env.AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET || "",
+    AI_BOARD_GOOGLE_OAUTH_CLIENT_ID: google[0] || process.env.AI_BOARD_GOOGLE_OAUTH_CLIENT_ID || "",
+    AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET: google[1] || process.env.AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET || "",
+    AI_BOARD_PUBLIC_BASE_URL: process.env.AI_BOARD_PUBLIC_BASE_URL || readFirstLine(join(root, ".cloudflare-url.txt")),
+  };
+}
 
 function parsedPostgresTarget(url) {
   const parsed = new URL(url.replace("postgresql+psycopg://", "postgresql://"));
@@ -89,7 +133,7 @@ async function main() {
   const apiPid = startDetached(
     "python",
     ["-m", "uvicorn", "app.main:app", "--app-dir", "backend", "--host", host, "--port", apiPort],
-    postgresEnv(),
+    { ...postgresEnv(), ...desktopOAuthEnv() },
     "live-api",
   );
   const webPid = startDetached(
