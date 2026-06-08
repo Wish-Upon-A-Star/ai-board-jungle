@@ -444,6 +444,12 @@ function App() {
         <section className="login-box">
           <div className="wordmark">AI<span>/</span>BOARD<span>&gt;</span></div>
           <p>GitHub, Notion, Figma, Google Calendar 자동화를 중심으로 한 AI 게시판입니다.</p>
+          {healthStatus && !healthStatus.ok ? (
+            <div className="health-alert">
+              <strong>Server health check failed</strong>
+              <span>{healthStatus.data?.database?.error || healthStatus.statusText || `HTTP ${healthStatus.status}`}</span>
+            </div>
+          ) : null}
           <div className="auth-tabs">
             <button className={authMode === "login" ? "active" : ""} onClick={() => setAuthMode("login")}>로그인</button>
             <button className={authMode === "register" ? "active" : ""} onClick={() => setAuthMode("register")}>회원가입</button>

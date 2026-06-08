@@ -27,6 +27,9 @@ a:hover { color: #0086d1; }
 .auth-form { display: grid; gap: 7px; }
 .auth-form button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; width: 100px; }
 .demo-actions { display: flex; gap: 6px; margin: 10px 0; }
+.health-alert { display: grid; gap: 4px; margin: 0 0 12px; padding: 9px 10px; border: 1px solid #fecaca; background: #fff5f5; color: #991b1b; line-height: 1.45; }
+.health-alert strong { color: #7f1d1d; }
+.health-alert span { overflow-wrap: anywhere; }
 .error, .top-error { color: #b91c1c; background: #fff5f5; border: 1px solid #ffd4d4; padding: 8px 10px; }
 .top-error { margin-bottom: 14px; }
 .top-error strong { display: block; margin-bottom: 4px; }
