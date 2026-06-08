@@ -16,6 +16,7 @@
     "demo:screenshot": "node scripts/capture-demo-screenshot.mjs",
     "test": "python -m pytest backend/tests",
     "test:live-integrations": "node scripts/test-live-integrations.mjs",
+    "demo:github-notion-webhook": "node scripts/demo-github-notion-webhook.mjs",
     "verify:hygiene": "node scripts/verify-hygiene.mjs",
     "verify:frontend-helpers": "node scripts/verify-frontend-helpers.mjs",
     "verify:template-presets": "node scripts/verify-template-presets.mjs",

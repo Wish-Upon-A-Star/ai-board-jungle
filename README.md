@@ -301,6 +301,14 @@ npm run apply:live
 
 `apply:live` first checks that `AI_BOARD_DATABASE_URL` is PostgreSQL and reachable. If PostgreSQL is not reachable, it exits before stopping the current live ports. When PostgreSQL is reachable, it builds the frontend, restarts FastAPI on `8000` and Vite on `3000`, then waits for `/api/health` and the web app before reporting success.
 
+Demo a GitHub webhook writing to the small Notion page:
+
+```powershell
+npm run demo:github-notion-webhook
+```
+
+This command reads the desktop token setup files `ai-board-demo-github-api-token.txt` and `ai-board-demo-notion-api-token.txt`, creates a demo user, GitHub source profile, Notion small-page target profile, automation task, and signed GitHub push webhook call. It writes through the AI Board automation path, not through manual Codex Notion updates. The Notion demo page is `https://app.notion.com/p/3797051c2f9981b4bad3fe6545622eb8`; share that page with the Notion integration before running a real write.
+
 Verify this mode with:
 
 ```powershell
