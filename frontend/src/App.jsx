@@ -63,6 +63,26 @@ const mainTabs = [
   { id: "api", label: "API", description: "상태 점검과 도구 호출" },
 ];
 
+const aiProviderOptions = ["OpenAI", "OpenAI-compatible", "Anthropic", "Google Gemini", "Local"];
+const aiModelOptions = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "o4-mini", "claude-sonnet-4", "gemini-1.5-pro", "local-model"];
+const aiApiBaseOptions = ["https://api.openai.com/v1", "https://api.anthropic.com", "https://generativelanguage.googleapis.com/v1beta", "http://localhost:11434/v1"];
+
+function AiOptionDatalists() {
+  return (
+    <>
+      <datalist id="ai-provider-options">
+        {aiProviderOptions.map((option) => <option key={option} value={option} />)}
+      </datalist>
+      <datalist id="ai-model-options">
+        {aiModelOptions.map((option) => <option key={option} value={option} />)}
+      </datalist>
+      <datalist id="ai-api-base-options">
+        {aiApiBaseOptions.map((option) => <option key={option} value={option} />)}
+      </datalist>
+    </>
+  );
+}
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem("ai-board-token") || "");
   const [user, setUser] = useState(null);
@@ -647,6 +667,7 @@ function App() {
         </nav>
         <div className="user-menu" aria-label="현재 사용자">{user.email} <Badge role={user.role} /> <button type="button" onClick={logout} aria-label="로그아웃"><LogOut size={13} /> 로그아웃</button></div>
       </header>
+      <AiOptionDatalists />
 
       <main id="workspace" className="container">
         <section className="profile-head">
@@ -801,9 +822,9 @@ function App() {
                   <Field label="목적지"><input value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} /></Field>
                 </div>
                 <div className="grid3 wide">
-                  <Field label="AI 제공자"><input value={form.ai_provider} onChange={(e) => setForm({ ...form, ai_provider: e.target.value })} /></Field>
-                  <Field label="AI 모델"><input value={form.ai_model} onChange={(e) => setForm({ ...form, ai_model: e.target.value })} /></Field>
-                  <Field label="AI API Base"><input value={form.ai_api_base} onChange={(e) => setForm({ ...form, ai_api_base: e.target.value })} /></Field>
+                  <Field label="AI 제공자"><input list="ai-provider-options" value={form.ai_provider} onChange={(e) => setForm({ ...form, ai_provider: e.target.value })} placeholder="OpenAI 또는 OpenAI-compatible" /></Field>
+                  <Field label="AI 모델"><input list="ai-model-options" value={form.ai_model} onChange={(e) => setForm({ ...form, ai_model: e.target.value })} placeholder="gpt-4o-mini" /></Field>
+                  <Field label="AI API Base"><input list="ai-api-base-options" value={form.ai_api_base} onChange={(e) => setForm({ ...form, ai_api_base: e.target.value })} placeholder="https://api.openai.com/v1" /></Field>
                 </div>
                 <Field label="API Provider"><input value={form.api_provider} onChange={(e) => setForm({ ...form, api_provider: e.target.value })} /></Field>
                 <div className="grid2">
@@ -832,9 +853,9 @@ function App() {
               <div className="panel-title row-title"><span>사용자 기본 자동화 설정</span><span className="subtle">새 자동화나 커스텀 지침에 재사용할 AI 모델, 템플릿, 연결 기본값입니다.</span></div>
               <form className="knowledge-form" onSubmit={saveProfileSettings}>
                 <div className="grid3 wide">
-                  <Field label="AI 제공자"><input value={profileSettings?.aiProvider || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiProvider: e.target.value })} /></Field>
-                  <Field label="AI 모델"><input value={profileSettings?.aiModel || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiModel: e.target.value })} /></Field>
-                  <Field label="AI API Base"><input value={profileSettings?.aiApiBase || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiApiBase: e.target.value })} /></Field>
+                  <Field label="AI 제공자"><input list="ai-provider-options" value={profileSettings?.aiProvider || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiProvider: e.target.value })} placeholder="OpenAI 또는 OpenAI-compatible" /></Field>
+                  <Field label="AI 모델"><input list="ai-model-options" value={profileSettings?.aiModel || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiModel: e.target.value })} placeholder="gpt-4o-mini" /></Field>
+                  <Field label="AI API Base"><input list="ai-api-base-options" value={profileSettings?.aiApiBase || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiApiBase: e.target.value })} placeholder="https://api.openai.com/v1" /></Field>
                 </div>
                 <div className="grid2">
                   <Field label="템플릿 프리셋"><input value={profileSettings?.templatePreset || ""} onChange={(e) => setProfileSettings({ ...profileSettings, templatePreset: e.target.value })} /></Field>
@@ -930,9 +951,9 @@ function App() {
                   <Field label="토큰/API Key"><input type="password" value={integrationForm.token_value} onChange={(e) => setIntegrationForm({ ...integrationForm, token_value: e.target.value })} placeholder="서버 DB에 사용자별 저장" /></Field>
                 </div>
                 <div className="grid3 wide">
-                  <Field label="AI 제공자"><input value={integrationForm.ai_provider} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_provider: e.target.value })} /></Field>
-                  <Field label="AI 모델"><input value={integrationForm.ai_model} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_model: e.target.value })} /></Field>
-                  <Field label="AI API Base"><input value={integrationForm.ai_api_base} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_api_base: e.target.value })} /></Field>
+                  <Field label="AI 제공자"><input list="ai-provider-options" value={integrationForm.ai_provider} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_provider: e.target.value })} placeholder="OpenAI 또는 OpenAI-compatible" /></Field>
+                  <Field label="AI 모델"><input list="ai-model-options" value={integrationForm.ai_model} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_model: e.target.value })} placeholder="gpt-4o-mini" /></Field>
+                  <Field label="AI API Base"><input list="ai-api-base-options" value={integrationForm.ai_api_base} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_api_base: e.target.value })} placeholder="https://api.openai.com/v1" /></Field>
                   <Field label="Auth Type">
                     <select value={integrationForm.auth_type} onChange={(e) => setIntegrationForm({ ...integrationForm, auth_type: e.target.value })}>
                       <option value="api_key">API key</option>

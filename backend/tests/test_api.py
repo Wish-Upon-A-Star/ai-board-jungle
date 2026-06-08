@@ -1339,6 +1339,70 @@ def test_selected_profile_custom_connections_are_part_of_skip_fingerprint():
         assert third_run.json()["run"]["result"]["targets"][0]["operation"] == "upsert_task_v2"
 
 
+def test_automation_no_data_skips_ai_policy_and_live_writes(monkeypatch):
+    monkeypatch.setattr("app.main.collect_profile_items", lambda profile, limit=20, pages=2: ([], []))
+
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "nodata@example.com", "name": "No Data User", "password": "password123"},
+        )
+        assert register.status_code == 200
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+
+        profile = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "No data GitHub profile",
+                "source_kind": "github",
+                "base_url": "https://github.com/example/repo",
+                "api_provider": "GitHub API",
+                "token_name": "GITHUB_TOKEN",
+                "token_value": "secret",
+                "rag_targets": ["commits"],
+            },
+        )
+        assert profile.status_code == 200
+        profile_id = profile.json()["profile"]["id"]
+
+        automation = client.post(
+            "/api/automations",
+            headers=headers,
+            json={
+                "name": "No data automation",
+                "integration_profile_id": profile_id,
+                "source": "GitHub",
+                "destination": "Notion",
+                "interval_minutes": 10,
+                "instruction": "Write only when a real source change exists.",
+                "template": "요청 템플릿에 맞춰 정리",
+                "api_provider": "GitHub + Notion",
+                "ai_agent": "TemplateAgent",
+                "custom_connections": [
+                    {
+                        "label": "Notion report",
+                        "service": "notion",
+                        "url": "3797051c2f998094b2a5e5062d353881",
+                        "api": "Notion API",
+                        "auth_key_name": "NOTION_TOKEN",
+                        "operation": "append_template_report",
+                        "template": "요청 템플릿 유지",
+                    }
+                ],
+            },
+        )
+        assert automation.status_code == 200
+        task_id = automation.json()["task"]["id"]
+
+        run = client.post(f"/api/automations/{task_id}/run", headers=headers)
+        assert run.status_code == 200
+        result = run.json()["run"]["result"]
+        assert result["status"] == "no-data"
+        assert result["liveWrites"] == []
+        assert "no collected source items" in result["aiCallPolicy"]
+
+
 def test_custom_connection_validation_rejects_incomplete_entries():
     with TestClient(app) as client:
         register = client.post(

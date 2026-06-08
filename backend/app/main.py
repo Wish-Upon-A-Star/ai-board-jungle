@@ -1516,6 +1516,7 @@ def execute_automation_task(
             "taskId": task.id,
             "status": "skipped",
             "reason": "Watched automation input did not change since the previous run.",
+            "aiCallPolicy": "skipped: no watched input change, so no AI/model call or live write is allowed.",
             "changeHash": current_hash,
             "scheduled": scheduled,
             "watchedFields": WATCHED_AUTOMATION_FIELDS,
@@ -1537,8 +1538,47 @@ def execute_automation_task(
         )
         db.commit()
         return {"task": serialize_task(task), "run": {"id": None, "result": result, "createdPostId": None}}
+    watched_profile_without_data = (
+        task.integration_profile is not None
+        and task.integration_profile.source_kind in {"github", "notion"}
+        and not report_sources
+        and not external_event_key
+    )
+    if watched_profile_without_data:
+        result = {
+            "taskId": task.id,
+            "status": "no-data",
+            "reason": "No GitHub/Notion source changes were collected, so no AI/model call or live write was performed.",
+            "aiCallPolicy": "skipped: no collected source items.",
+            "changeHash": current_hash,
+            "scheduled": scheduled,
+            "watchedFields": WATCHED_AUTOMATION_FIELDS,
+            "collected": collected,
+            "collectionWarnings": collection_warnings,
+            "liveWrites": [],
+        }
+        task.last_result = result_to_text(result)
+        task.last_input_hash = current_hash
+        task.last_run_at = datetime.now(timezone.utc)
+        run = AutomationRun(task_id=task.id, owner_id=task.owner_id, result=task.last_result)
+        db.add(run)
+        log_activity(
+            db,
+            actor,
+            "automation.run",
+            task.api_provider,
+            "no-data",
+            f"Skipped live writes for {task.name}: no collected source changes",
+            {"taskId": task.id, "changeHash": current_hash, "scheduled": scheduled},
+            task_id=task.id,
+            profile_id=task.integration_profile_id,
+        )
+        db.commit()
+        db.refresh(run)
+        return {"task": serialize_task(task), "run": {"id": run.id, "result": result, "createdPostId": None}}
     result = automation_plan(task)
     result["status"] = "changed"
+    result["aiCallPolicy"] = "local deterministic summary only unless a configured model call is explicitly added later."
     result["changeHash"] = current_hash
     result["scheduled"] = scheduled
     result["collected"] = collected
