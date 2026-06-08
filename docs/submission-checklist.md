@@ -8,6 +8,12 @@ Run server-required checks sequentially. verify:postgres uses port 8140, verify:
 
 Do not stop a currently shared server for ad-hoc fixes; first verify changes on a separate test port.
 
+PostgreSQL must be reachable before server-required checks. If Docker Desktop is available, run:
+
+```powershell
+npm run setup:postgres
+```
+
 Safe local verification order:
 
 ```powershell

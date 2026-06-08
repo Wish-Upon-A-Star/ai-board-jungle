@@ -1,9 +1,52 @@
 import { start, stop, waitFor } from "./verify-helpers.mjs";
 import { assertPostgresUrl, postgresDatabaseUrl, postgresEnv } from "./postgres-env.mjs";
+import net from "node:net";
 
 const port = process.env.AI_BOARD_POSTGRES_VERIFY_PORT || "8140";
 const dbUrl = postgresDatabaseUrl();
 assertPostgresUrl(dbUrl);
+
+function parsePostgresHostPort(url) {
+  const parsed = new URL(url.replace("postgresql+psycopg://", "postgresql://"));
+  return {
+    host: parsed.hostname || "localhost",
+    port: Number(parsed.port || "5432"),
+  };
+}
+
+function checkTcp(host, targetPort, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const socket = net.createConnection({ host, port: targetPort });
+    const timeout = setTimeout(() => {
+      socket.destroy();
+      reject(new Error("timeout"));
+    }, timeoutMs);
+    timeout.unref?.();
+    socket.once("connect", () => {
+      clearTimeout(timeout);
+      socket.end();
+      resolve(true);
+    });
+    socket.once("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+}
+
+const target = parsePostgresHostPort(dbUrl);
+try {
+  await checkTcp(target.host, target.port);
+} catch (error) {
+  throw new Error(
+    [
+      `PostgreSQL is not reachable at ${target.host}:${target.port}.`,
+      `AI_BOARD_DATABASE_URL=${dbUrl.replace(/:\/\/([^:]+):([^@]+)@/, "://$1:***@")}`,
+      "Start PostgreSQL first, for example `npm run setup:postgres` when Docker is available, or point AI_BOARD_DATABASE_URL at a reachable PostgreSQL server.",
+      `TCP check failed: ${error.code || error.message || String(error)}`,
+    ].join("\n")
+  );
+}
 
 const api = start("python", ["-m", "uvicorn", "app.main:app", "--app-dir", "backend", "--host", "127.0.0.1", "--port", port], postgresEnv());
 

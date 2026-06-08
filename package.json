@@ -10,6 +10,7 @@
     "start": "python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000",
     "start:lan": "python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000",
     "serve:external": "node scripts/serve-external.mjs",
+    "setup:postgres": "node scripts/setup-postgres.mjs",
     "seed": "python scripts/seed-fastapi.py",
     "demo:screenshot": "node scripts/capture-demo-screenshot.mjs",
     "test": "python -m pytest backend/tests",

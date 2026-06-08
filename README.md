@@ -218,6 +218,15 @@ $env:PYTHONPATH="backend"
 $env:AI_BOARD_DATABASE_URL="postgresql://ai_board:ai_board@localhost:5432/ai_board"
 ```
 
+Docker Desktop이 설치되어 있으면 프로젝트의 `docker-compose.yml`로 PostgreSQL을 먼저 올릴 수 있습니다.
+
+```powershell
+npm run setup:postgres
+npm run verify:postgres
+```
+
+Docker가 없는 Windows 환경에서는 PostgreSQL 17 설치 후 같은 URL에 맞춰 사용자/DB를 만들거나, `AI_BOARD_DATABASE_URL`을 이미 접근 가능한 PostgreSQL URL로 지정해야 합니다.
+
 psycopg 드라이버명을 명시하는 예시:
 
 ```powershell
@@ -379,7 +388,8 @@ npm run smoke:http
 - `verify:readme-output`: parses `verify:readme` JSON and checks command/checklist coverage counts
 - `smoke:http`: runs HTTP smoke checks against the managed FastAPI server
 - `smoke:ui`: runs Chrome CDP UI smoke checks against the managed React app
-- `verify:postgres`: starts a separate PostgreSQL-backed FastAPI verification server and checks registration plus integration profile persistence
+- `setup:postgres`: starts the Docker Compose PostgreSQL service when Docker is available, or prints the exact PostgreSQL setup blocker
+- `verify:postgres`: first checks PostgreSQL TCP reachability, then starts a separate PostgreSQL-backed FastAPI verification server and checks registration plus integration profile persistence
 - `verify:fastapi`: runs backend tests and React/FastAPI integration verification
 - `verify:full`: runs the full local verification gate, including live-ready checks that still respect dry-run safeguards
 - `test:live-integrations`: checks real GitHub, Notion, Figma, and Google Calendar integrations when user-owned tokens are configured
