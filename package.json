@@ -37,8 +37,12 @@
     "verify:fastapi": "node scripts/verify-fastapi.mjs",
     "verify:full": "node scripts/verify-full.mjs",
     "verify:full:quick": "node scripts/verify-full.mjs --skip-install",
+    "playtest:user": "node scripts/playtest-user-flow.mjs",
     "smoke:ui": "node scripts/verify-ui-cdp.mjs",
     "smoke:http": "node scripts/smoke-fastapi.mjs"
   },
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "playwright": "^1.60.0"
+  }
 }

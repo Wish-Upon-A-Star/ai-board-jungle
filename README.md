@@ -82,6 +82,8 @@ flowchart LR
 
 앱 런타임과 운영형 검증은 PostgreSQL을 기본 데이터베이스로 사용합니다. 기본 URL은 `postgresql://ai_board:ai_board@localhost:5432/ai_board`이며 `AI_BOARD_DATABASE_URL`로 다른 PostgreSQL 인스턴스를 지정할 수 있습니다. SQLite는 빠른 백엔드 단위 테스트에서만 격리용으로 사용합니다. Redis는 RAG 유사도 검색 캐시가 사용할 수 있도록 옵션 구조를 갖췄고, 로컬에서는 메모리 캐시 fallback으로 동작합니다.
 
+Runtime SQLite guard: FastAPI runtime startup rejects `sqlite` database URLs unless `AI_BOARD_ALLOW_SQLITE_TEST_DB=1` is explicitly set. That flag is only for isolated tests and must not be set on the live server.
+
 ## AI 활용 기능과 구조
 
 ### RAG

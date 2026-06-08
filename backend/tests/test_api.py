@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 os.environ["AI_BOARD_DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["AI_BOARD_ALLOW_SQLITE_TEST_DB"] = "1"
 
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect
@@ -42,6 +43,23 @@ def test_health_recovers_after_startup_database_error(monkeypatch):
     assert health.json()["database"]["ok"] is True
     assert calls["init"] >= 1
     assert main_module.STARTUP_DB_ERROR == ""
+
+
+def test_sqlite_runtime_requires_explicit_test_flag():
+    env = {
+        **os.environ,
+        "PYTHONPATH": "backend",
+        "AI_BOARD_DATABASE_URL": "sqlite:///:memory:",
+    }
+    env.pop("AI_BOARD_ALLOW_SQLITE_TEST_DB", None)
+    result = subprocess.run(
+        [sys.executable, "-c", "import app.db"],
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+    assert result.returncode != 0
+    assert "SQLite is disabled for AI Board runtime" in result.stderr
 
 
 def test_parse_github_repo_accepts_https_and_ssh_urls():

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import socket
+import os
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -19,6 +20,11 @@ def engine_url() -> str:
 
 
 database_url = engine_url()
+if database_url.startswith("sqlite") and os.environ.get("AI_BOARD_ALLOW_SQLITE_TEST_DB") != "1":
+    raise RuntimeError(
+        "SQLite is disabled for AI Board runtime. "
+        "Use PostgreSQL via AI_BOARD_DATABASE_URL, or set AI_BOARD_ALLOW_SQLITE_TEST_DB=1 only for isolated tests."
+    )
 engine_kwargs = {"pool_pre_ping": True}
 if database_url.startswith("sqlite"):
     engine_kwargs["connect_args"] = {"check_same_thread": False}
