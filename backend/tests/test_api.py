@@ -444,6 +444,26 @@ def test_notion_sources_report_commit_summary_describes_oauth_login_change():
     assert "확인해야 합니다" not in summary
 
 
+def test_notion_sources_report_commit_summary_describes_cleanup_change():
+    blocks = notion_sources_template_children(
+        "GitHub 변경사항 자동 요약",
+        [
+            {
+                "title": "[GitHub MCP OAuth profile] Commit 20a380ba809d: Clean obsolete summary assertions",
+                "sourceType": "github_commit",
+                "url": "https://github.com/acme/repo/commit/20a380ba809d",
+                "summary": "Clean obsolete summary assertions sha: 20a380ba809d author: Wish-Upon-A-Star",
+            }
+        ],
+        "| 번호 | 유형 | 제목 | 한국어 요약 | 위험도 | 다음 조치 | 링크 |\n|---|---|---|---|---|---|---|",
+    )
+    table = next(block for block in blocks if block["type"] == "table")
+    summary = table["table"]["children"][1]["table_row"]["cells"][3][0]["text"]["content"]
+    assert "요약 테스트에 남아 있던 이전 assertion과 죽은 코드를 제거" in summary
+    assert "커밋 메시지 '" not in summary
+    assert "확인해야 합니다" not in summary
+
+
 def test_replay_notion_hydrates_legacy_collected_summary(monkeypatch):
     captured = []
 

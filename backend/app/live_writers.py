@@ -341,6 +341,8 @@ def korean_commit_change_summary(message: str) -> str:
         "Improve dashboard design and accessibility": "대시보드의 탭 구조, 정보 배치, 버튼 접근성, 시각 계층을 정리해 사용자가 기능을 찾기 쉽게 개선했습니다.",
         "Render Notion automation output from request templates": "자동화 요청 템플릿을 기준으로 Notion 출력 형식을 렌더링하도록 변경했습니다.",
         "Hydrate replayed Notion summaries": "Notion 재전송 시 저장된 수집 요약을 다시 채워 넣도록 보강했습니다.",
+        "Clean obsolete summary assertions": "요약 테스트에 남아 있던 이전 assertion과 죽은 코드를 제거해 검증 로직을 정리했습니다.",
+        "Describe cleanup commit summaries": "정리 커밋도 Notion에서 의미 있는 한국어 문장으로 표시되도록 커밋 요약 규칙을 보강했습니다.",
     }
     if normalized in exact:
         return exact[normalized]
@@ -351,6 +353,8 @@ def korean_commit_change_summary(message: str) -> str:
         (r"^Improve\s+(.+)$", "{item}을 개선했습니다."),
         (r"^Update\s+(.+)$", "{item}을 최신 요구사항에 맞게 갱신했습니다."),
         (r"^Refactor\s+(.+)$", "{item} 구조를 정리했습니다."),
+        (r"^Clean\s+(.+)$", "{item}을 정리했습니다."),
+        (r"^Describe\s+(.+)$", "{item} 설명을 보강했습니다."),
     ]
     readable_terms = {
         "notion": "Notion",
@@ -371,6 +375,10 @@ def korean_commit_change_summary(message: str) -> str:
         "automation": "자동화",
         "table": "표",
         "tables": "표",
+        "obsolete": "이전",
+        "assertion": "assertion",
+        "assertions": "assertion",
+        "cleanup": "정리",
     }
     for pattern, sentence in patterns:
         match = re.match(pattern, normalized, re.IGNORECASE)
