@@ -16,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from .collectors import collect_profile_items, extract_notion_id, save_collected_items
+from .collectors import collect_profile_items, extract_notion_id, parse_github_repo, save_collected_items
 from .db import check_db, database_reachable, get_db, init_db
 from .live_writers import execute_profile_write
 from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, User
@@ -352,6 +352,14 @@ def notion_webhook_target_matches(target: str, candidate: str) -> bool:
     if target_is_id and candidate_is_id:
         return target_id.lower() == candidate_id.lower()
     return target in candidate or candidate in target
+
+
+def github_webhook_repo_matches(repo_url: str, candidate: str) -> bool:
+    repo = parse_github_repo(repo_url.strip())
+    candidate_repo = parse_github_repo(candidate.strip())
+    if not repo or not candidate_repo:
+        return False
+    return tuple(part.lower() for part in repo) == tuple(part.lower() for part in candidate_repo)
 
 
 async def extract_upload_text(upload: UploadFile | None) -> tuple[str, str, str]:
@@ -1133,17 +1141,13 @@ async def github_webhook(
     if not verify_hmac_signature(settings().github_webhook_secret, body, x_hub_signature_256):
         raise HTTPException(status_code=401, detail="Invalid GitHub webhook signature.")
     payload = json.loads(body.decode("utf-8") or "{}")
-    repo_url = ((payload.get("repository") or {}).get("html_url") or "").rstrip("/")
+    repo_url = ((payload.get("repository") or {}).get("html_url") or "").strip()
     stmt = select(AutomationTask).where(AutomationTask.status == "ACTIVE")
-    tasks = [
-        task
-        for task in db.scalars(stmt).all()
-        if repo_url
-        and (
-            task.github_repo_url.rstrip("/") == repo_url
-            or (task.integration_profile and task.integration_profile.base_url.rstrip("/") == repo_url)
-        )
-    ]
+    tasks = []
+    for task in db.scalars(stmt).all():
+        profile_target = task.integration_profile.base_url if task.integration_profile else ""
+        if github_webhook_repo_matches(repo_url, task.github_repo_url) or github_webhook_repo_matches(repo_url, profile_target):
+            tasks.append(task)
     results = [execute_automation_task(db, task, task.owner, scheduled=True) for task in tasks[:20]]
     return {
         "ok": True,

@@ -952,7 +952,7 @@ def test_github_webhook_signature_triggers_matching_automation(monkeypatch):
                     ],
                 },
             ).json()["task"]
-            payload = json.dumps({"repository": {"html_url": "https://github.com/acme/hooked"}}).encode()
+            payload = json.dumps({"repository": {"html_url": "https://github.com/ACME/Hooked.git/"}}).encode()
             bad = client.post("/api/webhooks/github", content=payload, headers={"X-Hub-Signature-256": "sha256=bad"})
             assert bad.status_code == 401
             signature = "sha256=" + hmac.new(b"hook-secret", payload, hashlib.sha256).hexdigest()
