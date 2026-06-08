@@ -792,6 +792,12 @@ def test_command_secret_provider_stores_external_references(monkeypatch, tmp_pat
             assert profile["tokenStorage"] == "external"
             assert profile["hasToken"] is True
             assert "vault_secret_value" not in str(profile)
+            readiness = client.get("/api/provider-readiness", headers=headers)
+            assert readiness.status_code == 200
+            readiness_by_key = {item["key"]: item for item in readiness.json()["providers"]}
+            assert readiness_by_key["github"]["ready"] is True
+            assert readiness_by_key["github"]["profiles"][0]["tokenStorage"] == "external"
+            assert "vault_secret_value" not in str(readiness.json())
             with SessionLocal() as db:
                 stored = db.get(IntegrationProfile, profile["id"])
                 assert stored is not None
