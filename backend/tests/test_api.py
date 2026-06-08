@@ -4,6 +4,8 @@ import os
 import json
 import subprocess
 import sys
+import hashlib
+import hmac
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -126,6 +128,34 @@ def test_full_fastapi_flow(monkeypatch):
         readiness_by_key = {item["key"]: item for item in readiness.json()["providers"]}
         assert readiness_by_key["github"]["ready"] is True
         assert readiness_by_key["figma"]["ready"] is False
+        notion_profile = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Notion task writer",
+                "source_kind": "notion",
+                "base_url": "1234567890abcdef1234567890abcdef",
+                "api_provider": "Notion API",
+                "token_name": "NOTION_TOKEN",
+                "token_value": "notion_secret_value",
+                "ai_provider": "OpenAI",
+                "ai_model": "gpt-4o-mini",
+                "ai_api_base": "https://api.openai.com/v1",
+                "rag_targets": ["notion_database"],
+                "custom_connections": [
+                    {
+                        "label": "Notion task DB",
+                        "service": "notion",
+                        "url": "1234567890abcdef1234567890abcdef",
+                        "api": "Notion API",
+                        "auth_key_name": "NOTION_TOKEN",
+                        "operation": "upsert_task_page",
+                        "template": "title: {title}",
+                    }
+                ],
+            },
+        )
+        assert notion_profile.status_code == 200
 
         figma_profile = client.post(
             "/api/integration-profiles",
@@ -326,8 +356,15 @@ def test_full_fastapi_flow(monkeypatch):
         activities_after_create = client.get("/api/integration-activities", headers=headers).json()["activities"]
         assert any(item["eventType"] == "automation.created" and item["automationTaskId"] == task_id for item in activities_after_create)
         assert automation.json()["task"]["integrationProfile"]["sourceKind"] == "github"
-        assert automation.json()["task"]["customConnections"][0]["service"] == "github"
+        assert [item["service"] for item in automation.json()["task"]["customConnections"]] == ["github", "notion"]
         assert client.get("/api/automations", headers=headers).json()["tasks"]
+        written = []
+
+        def fake_execute_profile_write(profile, title, body, dry_run=True, start_minutes_from_now=15, duration_minutes=30):
+            written.append({"service": profile.source_kind, "title": title, "body": body, "dryRun": dry_run})
+            return {"service": profile.source_kind, "status": "written", "url": f"https://example.test/{profile.source_kind}", "dryRun": dry_run}
+
+        monkeypatch.setattr("app.main.execute_profile_write", fake_execute_profile_write)
         first_run = client.post(f"/api/automations/{task_id}/run", headers=headers)
         assert first_run.status_code == 200
         assert first_run.json()["run"]["result"]["status"] == "changed"
@@ -335,6 +372,10 @@ def test_full_fastapi_flow(monkeypatch):
         assert first_run.json()["run"]["result"]["targets"][0]["target"] == "github"
         assert first_run.json()["run"]["result"]["targets"][0]["operation"] == "rag_collect_issues_commits_prs"
         assert {"issues", "commits", "pull_requests"} <= {item["target"] for item in first_run.json()["run"]["result"]["externalRagSources"]}
+        assert first_run.json()["run"]["result"]["liveWrites"][0]["service"] == "notion"
+        assert first_run.json()["run"]["result"]["liveWrites"][0]["status"] == "written"
+        assert written and written[0]["service"] == "notion"
+        assert written[0]["dryRun"] is False
         second_run = client.post(f"/api/automations/{task_id}/run", headers=headers)
         assert second_run.status_code == 200
         assert second_run.json()["run"]["result"]["status"] == "skipped"
@@ -350,6 +391,7 @@ def test_full_fastapi_flow(monkeypatch):
         run_activities = client.get("/api/integration-activities", headers=headers).json()["activities"]
         assert any(item["eventType"] == "automation.run" and item["status"] == "changed" for item in run_activities)
         assert any(item["eventType"] == "automation.run" and item["status"] == "skipped" for item in run_activities)
+        assert any(item["eventType"] == "automation.live_write" and item["provider"] == "notion" for item in run_activities)
         assert any(item["eventType"] == "automation.shared" for item in run_activities)
         changed_runs = client.get("/api/integration-activities?event_type=automation.run&status=changed", headers=headers).json()["activities"]
         assert changed_runs
@@ -779,6 +821,123 @@ def test_rag_degrades_when_redis_handshake_is_malformed(monkeypatch):
 
     assert response.status_code == 200
     assert "answer" in response.json()
+
+
+def test_github_webhook_signature_triggers_matching_automation(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_GITHUB_WEBHOOK_SECRET", "hook-secret")
+    settings.cache_clear()
+
+    def fake_collect(profile, limit=20, pages=2):
+        return [
+            CollectedItem(
+                title="Webhook commit",
+                source_type="github_commit",
+                url="https://github.com/acme/hooked/commit/abc",
+                text="Webhook-triggered commit body",
+                tags=["github", "commit"],
+            )
+        ], []
+
+    monkeypatch.setattr("app.main.collect_profile_items", fake_collect)
+    monkeypatch.setattr(
+        "app.main.execute_profile_write",
+        lambda profile, title, body, dry_run=True, start_minutes_from_now=15, duration_minutes=30: {
+            "service": profile.source_kind,
+            "status": "written",
+            "url": f"https://example.test/{profile.source_kind}",
+            "dryRun": dry_run,
+        },
+    )
+    try:
+        with TestClient(app) as client:
+            register = client.post(
+                "/api/auth/register",
+                json={"email": "webhook@example.com", "name": "Webhook User", "password": "password123"},
+            )
+            headers = {"Authorization": f"Bearer {register.json()['token']}"}
+            github = client.post(
+                "/api/integration-profiles",
+                headers=headers,
+                json={
+                    "name": "Hooked GitHub",
+                    "source_kind": "github",
+                    "base_url": "https://github.com/acme/hooked",
+                    "api_provider": "GitHub REST API",
+                    "token_name": "GITHUB_TOKEN",
+                    "token_value": "github_hook_token",
+                    "rag_targets": ["commits"],
+                    "custom_connections": [
+                        {
+                            "label": "GitHub repo",
+                            "service": "github",
+                            "url": "https://github.com/acme/hooked",
+                            "api": "GitHub REST API",
+                            "auth_key_name": "GITHUB_TOKEN",
+                            "operation": "rag_collect_issues_commits_prs",
+                            "template": "commit: {title}",
+                        }
+                    ],
+                },
+            ).json()["profile"]
+            client.post(
+                "/api/integration-profiles",
+                headers=headers,
+                json={
+                    "name": "Webhook Notion",
+                    "source_kind": "notion",
+                    "base_url": "1234567890abcdef1234567890abcdef",
+                    "api_provider": "Notion API",
+                    "token_name": "NOTION_TOKEN",
+                    "token_value": "notion_hook_token",
+                    "rag_targets": [],
+                },
+            )
+            task = client.post(
+                "/api/automations",
+                headers=headers,
+                json={
+                    "name": "Webhook sync",
+                    "integration_profile_id": github["id"],
+                    "source": "GitHub Commits",
+                    "destination": "Notion Tasks",
+                    "interval_minutes": 5,
+                    "instruction": "When GitHub changes arrive, write a Notion task.",
+                    "template": "commit / link / next action",
+                    "api_provider": "GitHub REST API + Notion API",
+                    "ai_agent": "WebhookAgent",
+                    "github_repo_url": "https://github.com/acme/hooked",
+                    "custom_connections": [
+                        {
+                            "label": "Notion task DB",
+                            "service": "notion",
+                            "url": "1234567890abcdef1234567890abcdef",
+                            "api": "Notion API",
+                            "auth_key_name": "NOTION_TOKEN",
+                            "operation": "upsert_task_page",
+                            "template": "title: {title}",
+                        }
+                    ],
+                },
+            ).json()["task"]
+            payload = json.dumps({"repository": {"html_url": "https://github.com/acme/hooked"}}).encode()
+            bad = client.post("/api/webhooks/github", content=payload, headers={"X-Hub-Signature-256": "sha256=bad"})
+            assert bad.status_code == 401
+            signature = "sha256=" + hmac.new(b"hook-secret", payload, hashlib.sha256).hexdigest()
+            triggered = client.post(
+                "/api/webhooks/github",
+                content=payload,
+                headers={"X-Hub-Signature-256": signature, "X-GitHub-Event": "push"},
+            )
+            assert triggered.status_code == 200
+            data = triggered.json()
+            assert data["matched"] == 1
+            assert data["triggered"][0]["taskId"] == task["id"]
+            assert data["triggered"][0]["status"] == "changed"
+            activities = client.get("/api/integration-activities?event_type=automation.live_write", headers=headers).json()["activities"]
+            assert any(item["provider"] == "notion" and item["status"] == "written" for item in activities)
+    finally:
+        monkeypatch.delenv("AI_BOARD_GITHUB_WEBHOOK_SECRET", raising=False)
+        settings.cache_clear()
 
 
 def test_high_volume_query_indexes_exist():

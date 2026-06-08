@@ -85,6 +85,10 @@ a:hover { color: #0086d1; }
 .automation-form { display: grid; gap: 8px; padding: 10px; }
 .automation-form button { width: 116px; border-color: #1687c9; color: #1687c9; }
 .automation-form button, .api-buttons button, .task-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.form-status { min-height: 28px; display: flex; align-items: center; padding: 6px 8px; border: 1px solid #e1e5ea; background: #f8fafc; color: #475569; font-size: 12px; }
+.form-status.saving { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
+.form-status.ok { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; }
+.form-status.error { border-color: #fecaca; background: #fff5f5; color: #b91c1c; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field span { color: #555; font-weight: 700; }
 .field input, .field textarea { min-width: 0; }

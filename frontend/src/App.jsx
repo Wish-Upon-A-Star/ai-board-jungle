@@ -46,6 +46,7 @@ function App() {
   const [profileSettings, setProfileSettings] = useState(null);
   const [error, setError] = useState("");
   const [validationIssues, setValidationIssues] = useState([]);
+  const [automationSaveState, setAutomationSaveState] = useState({ status: "idle", message: "" });
 
   const myTasks = useMemo(() => tasks.filter((task) => task.owner?.id === user?.id), [tasks, user]);
   const sharedCount = posts.filter((post) => post.automationTaskId).length;
@@ -146,14 +147,17 @@ function App() {
   async function createAutomation(event) {
     event.preventDefault();
     clearErrorState();
+    setAutomationSaveState({ status: "saving", message: "자동화를 저장하는 중입니다." });
     try {
       const payload = { ...form, interval_minutes: Number(form.interval_minutes), integration_profile_id: form.integration_profile_id ? Number(form.integration_profile_id) : null };
       const data = await api("/api/automations", { method: "POST", body: JSON.stringify(payload) });
       setResult(data.plan);
       setApiResult({ called: "automation.create", response: data });
+      setAutomationSaveState({ status: "ok", message: `자동화가 저장되었습니다: ${data.task.name}` });
       await loadAll();
     } catch (err) {
       showActionError(err);
+      setAutomationSaveState({ status: "error", message: err.message || "자동화 저장에 실패했습니다." });
     }
   }
 
@@ -616,7 +620,10 @@ function App() {
                   <strong>자동화 연결 미리보기</strong>
                   <span>{(form.custom_connections || []).length ? `${form.custom_connections.length}개 연결: ${form.custom_connections.map((connection) => `${connection.service}:${connection.operation}`).join(" / ")}` : "자동화 텍스트와 선택 프로필에서 연결을 추론합니다."}</span>
                 </div>
-                <button><CalendarClock size={14} /> 자동화 저장</button>
+                <div className={`form-status ${automationSaveState.status}`}>
+                  {automationSaveState.message || "저장 버튼을 누르면 자동화가 생성되고 오른쪽 AI 결과 패널에 응답이 표시됩니다."}
+                </div>
+                <button disabled={automationSaveState.status === "saving"}><CalendarClock size={14} /> {automationSaveState.status === "saving" ? "저장 중" : "자동화 저장"}</button>
               </form>
             </article>
 

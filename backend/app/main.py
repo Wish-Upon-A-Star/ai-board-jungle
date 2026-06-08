@@ -2,10 +2,12 @@
 
 import json
 import os
+import hashlib
+import hmac
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,6 +21,7 @@ from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity,
 from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LiveWriteIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
 from .security import create_token, current_user, hash_password, protect_secret, reveal_secret, secret_preview, secret_storage_type, verify_password
 from .services import agent_review, automation_fingerprint, automation_plan, get_or_create_tags, instruction_hub, rag_answer, result_to_text, search_posts, summarize
+from .config import settings
 
 app = FastAPI(title="AI Board API", description="React + FastAPI + PostgreSQL + Redis AI board API.")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -51,6 +54,30 @@ def parse_string_list(raw: str) -> list[str]:
         return [str(item) for item in value] if isinstance(value, list) else []
     except json.JSONDecodeError:
         return []
+
+
+def merge_connection_lists(primary: list[dict], secondary: list[dict]) -> list[dict]:
+    merged: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+    for item in [*primary, *secondary]:
+        service = str(item.get("service", "")).lower()
+        operation = str(item.get("operation", "")).lower()
+        url = str(item.get("url", "")).strip()
+        key = (service, operation, url)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(item)
+    return merged
+
+
+def connection_dicts(value: list | str) -> list[dict]:
+    if isinstance(value, str):
+        return parse_connections(value)
+    result = []
+    for item in value:
+        result.append(item.model_dump() if hasattr(item, "model_dump") else dict(item))
+    return result
 
 
 def serialize_profile_settings(user: User) -> dict:
@@ -237,6 +264,44 @@ def provider_readiness(user: User, db: Session) -> list[dict]:
             "nextAction": "ready" if ready_profiles else f"Add an integration profile with {provider['requiredUrl']} and {provider['requiredToken']}.",
         })
     return results
+
+
+def profile_for_service(db: Session, user: User, task: AutomationTask, service: str) -> IntegrationProfile | None:
+    normalized = service.lower()
+    if task.integration_profile and task.integration_profile.source_kind.lower() == normalized and reveal_secret(task.integration_profile.token_value):
+        return task.integration_profile
+    return db.scalars(
+        select(IntegrationProfile)
+        .where(IntegrationProfile.owner_id == user.id, IntegrationProfile.source_kind == normalized)
+        .order_by(IntegrationProfile.created_at.desc())
+    ).first()
+
+
+def automation_write_body(task: AutomationTask, summary: str, source_urls: list[str]) -> str:
+    links = "\n".join(f"- {url}" for url in source_urls if url)
+    return "\n".join(
+        part
+        for part in [
+            f"Automation: {task.name}",
+            f"Route: {task.source} -> {task.destination}",
+            f"Instruction: {task.instruction}",
+            f"Summary: {summary}",
+            f"Next action: {task.template or task.custom_template}",
+            "Sources:",
+            links or "- No new external source URL was saved.",
+        ]
+        if part
+    )
+
+
+def verify_hmac_signature(secret: str, body: bytes, signature: str, prefix: str = "sha256=") -> bool:
+    if not secret:
+        return True
+    if not signature:
+        return False
+    expected = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    supplied = signature.removeprefix(prefix)
+    return hmac.compare_digest(expected, supplied)
 
 
 async def extract_upload_text(upload: UploadFile | None) -> tuple[str, str, str]:
@@ -679,6 +744,7 @@ def create_automation(data: AutomationIn, user: User = Depends(current_user), db
     ai_api_base = data.ai_api_base
     api_provider = data.api_provider
     api_key_strategy = data.api_key_strategy
+    custom_connections = connection_dicts(custom_connections)
     if selected_profile:
         ai_provider = selected_profile.ai_provider
         ai_model = selected_profile.ai_model
@@ -688,7 +754,7 @@ def create_automation(data: AutomationIn, user: User = Depends(current_user), db
         custom_template = selected_profile.custom_template or custom_template
         profile_connections = parse_connections(selected_profile.custom_connections)
         if profile_connections:
-            custom_connections = profile_connections
+            custom_connections = merge_connection_lists(profile_connections, custom_connections)
     task = AutomationTask(
         name=data.name,
         integration_profile_id=selected_profile.id if selected_profile else None,
@@ -715,7 +781,7 @@ def create_automation(data: AutomationIn, user: User = Depends(current_user), db
         figma_template=data.figma_template,
         template_preset=data.template_preset,
         custom_template=custom_template,
-        custom_connections=json.dumps([item.model_dump() if hasattr(item, "model_dump") else item for item in custom_connections], ensure_ascii=False),
+        custom_connections=json.dumps(custom_connections, ensure_ascii=False),
         status=data.status,
     )
     db.add(task)
@@ -775,7 +841,37 @@ WATCHED_AUTOMATION_FIELDS = [
 
 
 def execute_automation_task(db: Session, task: AutomationTask, actor: User, scheduled: bool = False) -> dict:
-    current_hash = automation_fingerprint(task)
+    collected: list[dict] = []
+    collection_warnings: list[str] = []
+    saved_sources: list[KnowledgeSource] = []
+    if task.integration_profile:
+        limit = max(1, min(task.integration_profile.collect_limit, 100))
+        pages = max(1, min(task.integration_profile.collect_pages, 5))
+        items, collection_warnings = collect_profile_items(task.integration_profile, limit=limit, pages=pages)
+        saved_sources = save_collected_items(db, actor, task.integration_profile, items) if items else []
+        collected = [
+            {"id": source.id, "title": source.title, "sourceType": source.source_type, "url": source.file_name}
+            for source in saved_sources
+        ]
+        task.integration_profile.last_collect_status = "collected" if saved_sources else "unchanged" if items else "no-data"
+        task.integration_profile.last_collect_count = len(items)
+        task.integration_profile.last_collect_saved = len(saved_sources)
+        task.integration_profile.last_collect_duplicates = max(len(items) - len(saved_sources), 0)
+        task.integration_profile.last_collect_warnings = json.dumps(collection_warnings, ensure_ascii=False)
+        task.integration_profile.last_collected_at = datetime.now(timezone.utc)
+        log_activity(
+            db,
+            actor,
+            "integration_profile.collect",
+            task.integration_profile.source_kind,
+            task.integration_profile.last_collect_status,
+            f"Automation {task.name} collected {len(saved_sources)} new RAG items",
+            {"taskId": task.id, "collected": len(items), "saved": len(saved_sources), "warnings": collection_warnings},
+            task_id=task.id,
+            profile_id=task.integration_profile_id,
+        )
+    external_change_key = "|".join(sorted(source.file_name for source in saved_sources))
+    current_hash = hashlib.sha256(f"{automation_fingerprint(task)}|{external_change_key}".encode("utf-8")).hexdigest()
     if task.last_input_hash == current_hash:
         result = {
             "taskId": task.id,
@@ -784,6 +880,8 @@ def execute_automation_task(db: Session, task: AutomationTask, actor: User, sche
             "changeHash": current_hash,
             "scheduled": scheduled,
             "watchedFields": WATCHED_AUTOMATION_FIELDS,
+            "collected": collected,
+            "collectionWarnings": collection_warnings,
         }
         task.last_result = result_to_text(result)
         task.last_run_at = datetime.now(timezone.utc)
@@ -804,6 +902,43 @@ def execute_automation_task(db: Session, task: AutomationTask, actor: User, sche
     result["status"] = "changed"
     result["changeHash"] = current_hash
     result["scheduled"] = scheduled
+    result["collected"] = collected
+    result["collectionWarnings"] = collection_warnings
+    result["liveWrites"] = []
+    custom_connections = parse_connections(task.custom_connections)
+    source_urls = [source.file_name for source in saved_sources]
+    summary = summarize(task.name, "\n".join([source.extracted_text for source in saved_sources]) or task.instruction)
+    write_body = automation_write_body(task, summary, source_urls)
+    for connection in custom_connections:
+        service = str(connection.get("service", "")).lower()
+        operation = str(connection.get("operation", "")).lower()
+        should_write = (
+            service == "notion"
+            or service in {"figma", "google_calendar"}
+            or (service == "github" and any(key in operation for key in ["issue_create", "create_issue", "issue_create_or_update"]))
+        )
+        if not should_write:
+            continue
+        profile = profile_for_service(db, actor, task, service)
+        if not profile:
+            write = {"service": service, "status": "blocked", "reason": f"No user-owned {service} integration profile with a token is available.", "dryRun": False}
+        else:
+            original_base_url = profile.base_url
+            profile.base_url = str(connection.get("url") or profile.base_url)
+            write = execute_profile_write(profile, f"[AI Board] {task.name}", write_body, dry_run=False)
+            profile.base_url = original_base_url
+        result["liveWrites"].append(write)
+        log_activity(
+            db,
+            actor,
+            "automation.live_write",
+            service,
+            write.get("status", "unknown"),
+            f"Automation {task.name} {service} write {write.get('status', 'unknown')}",
+            {"taskId": task.id, "operation": operation, "write": write},
+            task_id=task.id,
+            profile_id=profile.id if profile else task.integration_profile_id,
+        )
     task.last_result = result_to_text(result)
     task.last_input_hash = current_hash
     task.last_run_at = datetime.now(timezone.utc)
@@ -894,6 +1029,73 @@ def tick_automations(limit: int = 20, user: User = Depends(current_user), db: Se
             }
             for item in results
         ],
+    }
+
+
+@app.post("/api/webhooks/github")
+async def github_webhook(
+    request: Request,
+    x_hub_signature_256: str = Header(default=""),
+    x_github_event: str = Header(default=""),
+    db: Session = Depends(get_db),
+) -> dict:
+    body = await request.body()
+    if not verify_hmac_signature(settings().github_webhook_secret, body, x_hub_signature_256):
+        raise HTTPException(status_code=401, detail="Invalid GitHub webhook signature.")
+    payload = json.loads(body.decode("utf-8") or "{}")
+    repo_url = ((payload.get("repository") or {}).get("html_url") or "").rstrip("/")
+    stmt = select(AutomationTask).where(AutomationTask.status == "ACTIVE")
+    tasks = [
+        task
+        for task in db.scalars(stmt).all()
+        if repo_url
+        and (
+            task.github_repo_url.rstrip("/") == repo_url
+            or (task.integration_profile and task.integration_profile.base_url.rstrip("/") == repo_url)
+        )
+    ]
+    results = [execute_automation_task(db, task, task.owner, scheduled=True) for task in tasks[:20]]
+    return {
+        "ok": True,
+        "provider": "github",
+        "event": x_github_event,
+        "repo": repo_url,
+        "matched": len(tasks),
+        "triggered": [{"taskId": item["task"]["id"], "status": item["run"]["result"]["status"]} for item in results],
+        "signatureRequired": bool(settings().github_webhook_secret),
+    }
+
+
+@app.post("/api/webhooks/notion")
+async def notion_webhook(
+    request: Request,
+    x_ai_board_signature: str = Header(default=""),
+    db: Session = Depends(get_db),
+) -> dict:
+    body = await request.body()
+    if not verify_hmac_signature(settings().notion_webhook_secret, body, x_ai_board_signature):
+        raise HTTPException(status_code=401, detail="Invalid Notion webhook signature.")
+    payload = json.loads(body.decode("utf-8") or "{}")
+    target = str(payload.get("database_url") or payload.get("database_id") or payload.get("page_url") or payload.get("page_id") or "")
+    stmt = select(AutomationTask).where(AutomationTask.status == "ACTIVE")
+    tasks = [
+        task
+        for task in db.scalars(stmt).all()
+        if target
+        and (
+            target in task.notion_database_url
+            or task.notion_database_url in target
+            or (task.integration_profile and (target in task.integration_profile.base_url or task.integration_profile.base_url in target))
+        )
+    ]
+    results = [execute_automation_task(db, task, task.owner, scheduled=True) for task in tasks[:20]]
+    return {
+        "ok": True,
+        "provider": "notion",
+        "target": target,
+        "matched": len(tasks),
+        "triggered": [{"taskId": item["task"]["id"], "status": item["run"]["result"]["status"]} for item in results],
+        "signatureRequired": bool(settings().notion_webhook_secret),
     }
 
 

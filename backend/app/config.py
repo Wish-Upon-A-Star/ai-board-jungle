@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     google_access_token: str = ""
     figma_file_url: str = ""
     figma_token: str = ""
+    github_webhook_secret: str = ""
+    notion_webhook_secret: str = ""
     redis_url: str = "redis://localhost:6379/0"
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="AI_BOARD_")
