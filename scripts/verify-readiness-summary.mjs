@@ -2,7 +2,11 @@ import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { serverRequiredCommands, serverRequiredConcurrencyNote } from "./verification-command-lists.mjs";
+import {
+  safeLocalVerificationOrder,
+  serverRequiredCommands,
+  serverRequiredConcurrencyNote,
+} from "./verification-command-lists.mjs";
 
 export const readinessNote = `This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick by itself for end-to-end smoke. ${serverRequiredConcurrencyNote}`;
 
@@ -95,6 +99,7 @@ export function buildReadinessSummary({ forceFailCompactFixture = false } = {}) 
     failed: failed.map((item) => item.name),
     latestEvaluationRound,
     serverRequired,
+    safeLocalVerificationOrder,
     note: readinessNote,
     results,
   };
@@ -103,6 +108,7 @@ export function buildReadinessSummary({ forceFailCompactFixture = false } = {}) 
 export function formatCompactReadinessSummary(summary) {
   const lines = [
     `READINESS ${summary.ok ? "OK" : "FAILED"} ${summary.passed}/${summary.checked} passed; latest-evaluation-round: ${summary.latestEvaluationRound}; server-required: ${summary.serverRequired.join(", ")}`,
+    `SAFE-ORDER ${summary.safeLocalVerificationOrder.map((command) => `npm run ${command}`).join(" -> ")}`,
     `NOTE ${summary.note}`,
   ];
 

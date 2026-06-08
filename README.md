@@ -390,6 +390,16 @@ Server-required checks start or expect FastAPI, Vite, Chrome CDP, or live API cr
 
 Run server-required checks sequentially; verify:full:quick and verify:fastapi both own and clean ports 3000/8000.
 
+Safe local verification order:
+
+```powershell
+npm run verify:readiness
+npm run verify:command-scope
+npm run verify:readme-output
+npm run verify:fastapi
+npm run verify:full:quick
+```
+
 - `npm run verify:contract`
 - `npm run smoke:http`
 - `npm run smoke:ui`

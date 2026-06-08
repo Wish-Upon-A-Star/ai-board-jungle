@@ -6,6 +6,16 @@ Serverless checks can run without starting FastAPI, Vite, or Chrome CDP. Server-
 
 Run server-required checks sequentially; verify:full:quick and verify:fastapi both own and clean ports 3000/8000.
 
+Safe local verification order:
+
+```powershell
+npm run verify:readiness
+npm run verify:command-scope
+npm run verify:readme-output
+npm run verify:fastapi
+npm run verify:full:quick
+```
+
 1. Refresh the demo screenshot when the visible dashboard changes.
 
    ```powershell

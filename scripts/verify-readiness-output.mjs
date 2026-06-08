@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { serverRequiredCommands, serverRequiredConcurrencyNote } from "./verification-command-lists.mjs";
+import {
+  safeLocalVerificationOrder,
+  serverRequiredCommands,
+  serverRequiredConcurrencyNote,
+} from "./verification-command-lists.mjs";
 import { getLatestEvaluationRound } from "./verify-evaluation-reports.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
 const expectedServerRequiredLine = `server-required: ${serverRequiredCommands.join(", ")}`;
+const expectedSafeOrderLine = `SAFE-ORDER ${safeLocalVerificationOrder.map((command) => `npm run ${command}`).join(" -> ")}`;
 const expectedReadinessNote = `This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick by itself for end-to-end smoke. ${serverRequiredConcurrencyNote}`;
 const expectedLatestEvaluationRound = getLatestEvaluationRound();
 const requiredLines = [
@@ -171,6 +176,7 @@ export function assertCompactReadinessOutput(output) {
     "compact output must include the latest evaluation report round"
   );
   assert.ok(output.includes(expectedServerRequiredLine), "compact output must list server-required checks");
+  assert.ok(output.includes(expectedSafeOrderLine), "compact output must include the safe local verification order");
   assert.ok(output.includes(`NOTE ${expectedReadinessNote}`), "compact output must include the server-required warning note");
   assert.ok(output.includes("FastAPI, Vite, or Chrome CDP"), "compact output must name the servers it does not start");
   assert.ok(output.includes("npm run verify:full:quick"), "compact output must name the end-to-end smoke command");
@@ -400,6 +406,11 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     readinessSummary.serverRequired,
     serverRequiredCommands,
     "json readiness must expose the server-required command list"
+  );
+  assert.deepEqual(
+    readinessSummary.safeLocalVerificationOrder,
+    safeLocalVerificationOrder,
+    "json readiness must expose the safe local verification order"
   );
   assert.equal(
     readinessSummary.note,

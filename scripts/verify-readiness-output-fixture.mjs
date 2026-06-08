@@ -13,7 +13,7 @@ import {
   buildReadinessOutputCliSummary,
   expectedFixtureSummaryKeys,
 } from "./verify-readiness-output.mjs";
-import { serverRequiredCommands } from "./verification-command-lists.mjs";
+import { safeLocalVerificationOrder, serverRequiredCommands } from "./verification-command-lists.mjs";
 import {
   formatCompactReadinessSummary,
   readinessNote,
@@ -186,6 +186,7 @@ const expectedDirectCompactFormatterGuards = [
 ];
 
 const expectedReadinessNote = readinessNote;
+const expectedSafeOrderLine = `SAFE-ORDER ${safeLocalVerificationOrder.map((command) => `npm run ${command}`).join(" -> ")}`;
 
 const evaluationReportRounds = readEvaluationReportRounds();
 const expectedEvaluationReportSummary = buildEvaluationReportSummary(evaluationReportRounds);
@@ -428,6 +429,7 @@ function buildReadiness(textOutputOptions, {
   return {
     latestEvaluationRound: expectedLatestEvaluationRound,
     ...(includeServerRequired ? { serverRequired: serverRequiredCommands } : {}),
+    safeLocalVerificationOrder,
     ...(includeNote ? { note: expectedReadinessNote } : {}),
     results,
   };
@@ -852,6 +854,7 @@ function buildReadinessWithFixtureSummary(fixtureOutput) {
   return {
     latestEvaluationRound: expectedLatestEvaluationRound,
     serverRequired: serverRequiredCommands,
+    safeLocalVerificationOrder,
     note: expectedReadinessNote,
     results: [
       buildReadmeResult(),
@@ -985,6 +988,7 @@ function buildCompactReadinessOutput({ omitTotal = false, omitLatestRound = fals
   }
   return [
     headerParts.join("; "),
+    expectedSafeOrderLine,
     omitNote ? null : `NOTE ${expectedReadinessNote}`,
     ...passLines,
   ].filter(Boolean).join("\n");
@@ -1029,6 +1033,7 @@ function buildFormatterSummaryFixture({ failed = false } = {}) {
     failed: failedResults.map((item) => item.name),
     latestEvaluationRound: expectedLatestEvaluationRound,
     serverRequired: serverRequiredCommands,
+    safeLocalVerificationOrder,
     note: readinessNote,
     results,
   };
