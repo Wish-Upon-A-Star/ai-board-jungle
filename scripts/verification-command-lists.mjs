@@ -17,6 +17,7 @@ export const serverlessCommands = [
 
 export const serverRequiredCommands = [
   "verify:contract",
+  "verify:production-serve",
   "smoke:http",
   "smoke:ui",
   "verify:fastapi",

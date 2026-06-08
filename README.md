@@ -258,6 +258,23 @@ Useful overrides:
 
 Windows Firewall must allow inbound access to the selected frontend/backend ports, and remote devices must be on a network that can reach this machine or the configured tunnel.
 
+## Single Process Production Serve
+
+Use this when another environment should run the API and built React app from one FastAPI process:
+
+```powershell
+npm run build
+npm run start:lan
+```
+
+FastAPI serves the built React files from `frontend/dist`, keeps `/api/*` and `/mcp/rpc` as backend routes, and falls back to `index.html` for React deep links. If the build is missing, `/` returns a clear `Frontend build not found. Run npm run build first.` error instead of a blank page.
+
+Verify this mode with:
+
+```powershell
+npm run verify:production-serve
+```
+
 기본 계정:
 
 - `admin@example.com` / `password123`
@@ -294,6 +311,7 @@ npm run verify:command-scope
 npm run verify:readme
 npm run verify:readme-output
 npm run verify:contract
+npm run verify:production-serve
 npm run verify:fastapi
 npm run smoke:ui
 npm run smoke:http
@@ -308,6 +326,7 @@ npm run smoke:http
 - `verify:network-config`: checks LAN dev-server host, public API base, `.env.example`, and README external access instructions
 - `verify:readme`: 제출 README 구조, 체크리스트, PNG 스크린샷 무결성 확인
 - `verify:contract`: React UI가 의존하는 FastAPI 응답 계약 확인
+- `verify:production-serve`: builds React and checks FastAPI can serve the built UI, SPA fallback, API health, and API 404 isolation from one process
 - `verify:full:quick`: hygiene, text, frontend helper, README, backend tests, frontend build, API contract, HTTP smoke, UI CDP smoke, MCP smoke
 - `verify:template-presets`: checks reusable automation templates for GitHub + Notion, Figma + Google Calendar, and custom API setups
 - `verify:evaluation-reports`: checks contiguous round reports with scores and next-risk evidence
@@ -431,6 +450,7 @@ npm run verify:full:quick
 ```
 
 - `npm run verify:contract`
+- `npm run verify:production-serve`
 - `npm run smoke:http`
 - `npm run smoke:ui`
 - `npm run verify:fastapi`

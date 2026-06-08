@@ -10,6 +10,7 @@ run("node", ["scripts/verify-hygiene.mjs"]);
 run("node", ["scripts/verify-text-integrity.mjs"]);
 run("node", ["scripts/verify-frontend-helpers.mjs"]);
 run("node", ["scripts/verify-template-presets.mjs"]);
+run("node", ["scripts/verify-network-config.mjs"]);
 run("node", ["scripts/verify-evaluation-reports.mjs"]);
 run("node", ["scripts/verify-readiness-output-fixture.mjs"]);
 run("node", ["scripts/verify-readiness-output.mjs"]);
@@ -26,6 +27,7 @@ if (!skipInstall) {
   run("npm", ["--prefix", "frontend", "install"], { timeout: 180000 });
 }
 run("npm", ["--prefix", "frontend", "run", "build"]);
+run("node", ["scripts/verify-production-serve.mjs", "--skip-build"], { env, timeout: 120000 });
 run("python", ["scripts/seed-fastapi.py"], { env });
 
 const api = start("python", ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"], env);

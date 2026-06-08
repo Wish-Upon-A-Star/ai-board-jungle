@@ -1,10 +1,14 @@
 ﻿from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -18,6 +22,10 @@ from .services import agent_review, automation_fingerprint, automation_plan, get
 
 app = FastAPI(title="AI Board API", description="React + FastAPI + PostgreSQL + Redis AI board API.")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+FRONTEND_DIST = Path(os.environ.get("AI_BOARD_FRONTEND_DIST", PROJECT_ROOT / "frontend" / "dist")).resolve()
+FRONTEND_INDEX = FRONTEND_DIST / "index.html"
+FRONTEND_ASSETS = FRONTEND_DIST / "assets"
 
 
 @app.on_event("startup")
@@ -994,3 +1002,29 @@ async def mcp_rpc(payload: dict) -> dict:
     if method == "automation.describe":
         return {"jsonrpc": "2.0", "id": payload.get("id"), "result": {"summary": "자동화 작업의 주기, 경로, API, AI Agent를 설명합니다."}}
     return {"jsonrpc": "2.0", "id": payload.get("id"), "error": {"code": -32601, "message": "method not found"}}
+
+
+def frontend_file_response(path: str = "") -> FileResponse:
+    if not FRONTEND_INDEX.exists():
+        raise HTTPException(status_code=404, detail="Frontend build not found. Run npm run build first.")
+    if path:
+        requested = (FRONTEND_DIST / path).resolve()
+        if FRONTEND_DIST in requested.parents and requested.is_file():
+            return FileResponse(requested)
+    return FileResponse(FRONTEND_INDEX)
+
+
+if FRONTEND_ASSETS.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_ASSETS), name="frontend-assets")
+
+
+@app.get("/", include_in_schema=False)
+def serve_frontend_root() -> FileResponse:
+    return frontend_file_response()
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def serve_frontend_spa(full_path: str) -> FileResponse:
+    if full_path.startswith(("api/", "mcp/")):
+        raise HTTPException(status_code=404, detail="API route not found.")
+    return frontend_file_response(full_path)

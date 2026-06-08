@@ -48,12 +48,13 @@ npm run verify:full:quick
 3. Run the full local smoke path without reinstalling dependencies.
 
    ```powershell
+   npm run verify:production-serve
    npm run verify:full:quick
    npm run smoke:http
    npm run smoke:ui
    ```
 
-   This includes `npm run verify:frontend-helpers`, `npm run verify:network-config`, and `npm run verify:evaluation-reports` before the build, then `npm run verify:contract` after the managed FastAPI and React servers are available.
+   This includes `npm run verify:frontend-helpers`, `npm run verify:network-config`, and `npm run verify:evaluation-reports` before the build, then `npm run verify:production-serve` for single-process FastAPI static serving and `npm run verify:contract` after the managed FastAPI and React servers are available.
 
 4. For live external writes, set real GitHub/Notion/Google Calendar/Figma credentials in `.env` and run:
 
