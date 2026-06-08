@@ -348,6 +348,8 @@ def korean_commit_change_summary(message: str) -> str:
         "Skip watched automations without source changes": "GitHub/Notion 감시 자동화가 새 커밋, 이슈, 페이지 변경을 수집하지 못한 경우 AI 모델 호출과 외부 쓰기를 건너뛰도록 변경했습니다.",
         "Clarify watched automation commit summaries": "변경 감시 자동화 관련 커밋이 Notion 표에서 포괄 문장으로 보이지 않도록 한국어 요약 규칙과 테스트를 보강했습니다.",
         "Clarify commit summary wording": "Notion 자동화 표의 커밋 요약 문장을 더 구체적으로 만들기 위해 요약 매핑과 표현 규칙을 정리했습니다.",
+        "Filter automation generated GitHub issues": "AI Board 자동화가 자기 자신이 만든 GitHub 이슈와 댓글을 다시 입력으로 수집하지 않도록 루프 방지 필터를 추가했습니다.",
+        "Describe automation loop filter summaries": "자동화 루프 방지 필터 관련 커밋이 Notion 표에서 구체적인 한국어 요약으로 보이도록 요약 규칙을 보강했습니다.",
     }
     if normalized in exact:
         return exact[normalized]
@@ -361,6 +363,7 @@ def korean_commit_change_summary(message: str) -> str:
         (r"^Clean\s+(.+)$", "{item}을 정리했습니다."),
         (r"^Describe\s+(.+)$", "{item} 설명을 보강했습니다."),
         (r"^Clarify\s+(.+)$", "{item} 문구를 더 명확하게 정리했습니다."),
+        (r"^Filter\s+(.+)$", "{item}을 필터링하도록 변경했습니다."),
     ]
     readable_terms = {
         "notion": "Notion",
@@ -380,6 +383,7 @@ def korean_commit_change_summary(message: str) -> str:
         "readability": "가독성",
         "automation": "자동화",
         "automations": "자동화",
+        "generated": "생성한",
         "table": "표",
         "tables": "표",
         "watched": "변경 감시",

@@ -1421,6 +1421,14 @@ def test_watched_automation_commit_summary_is_specific_korean():
         }
     )
     assert "포괄 문장으로 보이지 않도록" in clarified
+    filtered = korean_summary_for_source(
+        {
+            "source_type": "github_commit",
+            "title": "[GitHub MCP OAuth profile] Commit 28ff25212345: Filter automation generated GitHub issues",
+            "summary": "author: Wish-Upon-A-Star sha: 28ff25212345",
+        }
+    )
+    assert "자기 자신이 만든 GitHub 이슈와 댓글" in filtered
 
 
 def test_ai_board_generated_issue_is_filtered_from_automation_inputs():
