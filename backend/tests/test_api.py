@@ -137,6 +137,12 @@ def test_notion_task_writer_appends_to_plain_page(monkeypatch):
     assert calls[1][0] == "PATCH"
     assert calls[1][1] == "https://api.notion.com/v1/blocks/3797051c2f9981b4bad3fe6545622eb8/children"
     assert calls[1][2]["children"][0]["heading_2"]["rich_text"][0]["text"]["content"] == "Webhook commit summary"
+    assert calls[1][2]["children"][1]["type"] == "table"
+    table = calls[1][2]["children"][1]["table"]
+    assert table["table_width"] == 2
+    assert table["has_column_header"] is True
+    assert table["children"][0]["table_row"]["cells"][0][0]["text"]["content"] == "Field"
+    assert table["children"][1]["table_row"]["cells"][0][0]["text"]["content"] == "Title"
 
 
 def test_full_fastapi_flow(monkeypatch):

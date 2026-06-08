@@ -50,6 +50,55 @@ def write_github_issue(profile: IntegrationProfile, title: str, body: str, dry_r
     return {"service": "github", "status": "written", "id": data.get("number", ""), "url": data.get("html_url", ""), "dryRun": False}
 
 
+def notion_text(content: str, limit: int = 1900) -> list[dict]:
+    return [{"type": "text", "text": {"content": str(content or "")[:limit]}}]
+
+
+def notion_table_row(field: str, value: str) -> dict:
+    return {
+        "object": "block",
+        "type": "table_row",
+        "table_row": {"cells": [notion_text(field, 400), notion_text(value, 1800)]},
+    }
+
+
+def notion_page_children(title: str, body: str) -> list[dict]:
+    rows = [notion_table_row("Field", "Value"), notion_table_row("Title", title)]
+    seen = {"title"}
+    for line in str(body or "").splitlines():
+        if ":" not in line:
+            continue
+        field, value = line.split(":", 1)
+        field = field.strip().strip("-").strip()
+        value = value.strip()
+        key = field.lower()
+        if not field or not value or key in seen or len(field) > 48:
+            continue
+        seen.add(key)
+        rows.append(notion_table_row(field, value))
+        if len(rows) >= 12:
+            break
+    if len(rows) <= 2:
+        rows.append(notion_table_row("Body", body))
+    return [
+        {
+            "object": "block",
+            "type": "heading_2",
+            "heading_2": {"rich_text": notion_text(title, 200)},
+        },
+        {
+            "object": "block",
+            "type": "table",
+            "table": {
+                "table_width": 2,
+                "has_column_header": True,
+                "has_row_header": False,
+                "children": rows,
+            },
+        },
+    ]
+
+
 def write_notion_task(profile: IntegrationProfile, title: str, body: str, dry_run: bool = True, target_url: str | None = None) -> dict:
     token = reveal_secret(profile.token_value)
     target_id = extract_notion_id(target_url or profile.base_url)
@@ -59,6 +108,7 @@ def write_notion_task(profile: IntegrationProfile, title: str, body: str, dry_ru
     database_url = f"https://api.notion.com/v1/databases/{target_id}"
     page_url = "https://api.notion.com/v1/pages"
     block_children_url = f"https://api.notion.com/v1/blocks/{target_id}/children"
+    table_children = notion_page_children(title, body)
     if dry_run:
         return {
             "service": "notion",
@@ -67,7 +117,7 @@ def write_notion_task(profile: IntegrationProfile, title: str, body: str, dry_ru
             "url": page_url,
             "pageAppendUrl": block_children_url,
             "databaseUrl": database_url,
-            "payload": {"parent": {"database_or_page_id": target_id}, "title": title[:200], "body": body[:1800]},
+            "payload": {"parent": {"database_or_page_id": target_id}, "title": title[:200], "body": body[:1800], "pageFormat": "table"},
             "dryRun": True,
         }
     try:
@@ -75,28 +125,14 @@ def write_notion_task(profile: IntegrationProfile, title: str, body: str, dry_ru
     except httpx.HTTPError as exc:
         return {"service": "notion", "status": "failed", "reason": str(exc), "dryRun": False}
     if not database_response.is_success:
-        children_payload = {
-            "children": [
-                {
-                    "object": "block",
-                    "type": "heading_2",
-                    "heading_2": {"rich_text": [{"type": "text", "text": {"content": title[:200]}}]},
-                },
-                {
-                    "object": "block",
-                    "type": "paragraph",
-                    "paragraph": {"rich_text": [{"type": "text", "text": {"content": body[:1900]}}]},
-                },
-            ]
-        }
         try:
-            response = httpx.patch(block_children_url, headers=headers, json=children_payload, timeout=15.0)
+            response = httpx.patch(block_children_url, headers=headers, json={"children": table_children}, timeout=15.0)
         except httpx.HTTPError as exc:
             return {"service": "notion", "status": "failed", "reason": str(exc), "dryRun": False, "target": "page"}
         data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"raw": response.text}
         if not response.is_success:
             return {"service": "notion", "status": "failed", "code": response.status_code, "response": data, "dryRun": False, "target": "page"}
-        return {"service": "notion", "status": "written", "id": target_id, "url": f"https://www.notion.so/{target_id}", "dryRun": False, "target": "page"}
+        return {"service": "notion", "status": "written", "id": target_id, "url": f"https://www.notion.so/{target_id}", "dryRun": False, "target": "page", "format": "table"}
     database = database_response.json()
     properties: dict = {}
     title_property = next((name for name, prop in database.get("properties", {}).items() if prop.get("type") == "title"), "Name")
@@ -106,23 +142,13 @@ def write_notion_task(profile: IntegrationProfile, title: str, body: str, dry_ru
         prop_type = prop.get("type")
         if name == title_property:
             continue
-        if prop_type == "rich_text" and any(key in lowered for key in ["summary", "요약", "next", "action", "내용"]):
+        if prop_type == "rich_text" and any(key in lowered for key in ["summary", "next", "action", "content"]):
             properties[name] = {"rich_text": [{"text": {"content": body[:1800]}}]}
-        if prop_type == "url" and any(key in lowered for key in ["github", "link", "url", "링크"]):
+        if prop_type == "url" and any(key in lowered for key in ["github", "link", "url"]):
             match = re.search(r"https?://\S+", body)
             if match:
                 properties[name] = {"url": match.group(0)[:2000]}
-    payload = {
-        "parent": {"database_id": target_id},
-        "properties": properties,
-        "children": [
-            {
-                "object": "block",
-                "type": "paragraph",
-                "paragraph": {"rich_text": [{"type": "text", "text": {"content": body[:1800]}}]},
-            }
-        ],
-    }
+    payload = {"parent": {"database_id": target_id}, "properties": properties, "children": table_children}
     try:
         response = httpx.post(page_url, headers=headers, json=payload, timeout=15.0)
     except httpx.HTTPError as exc:
@@ -130,8 +156,7 @@ def write_notion_task(profile: IntegrationProfile, title: str, body: str, dry_ru
     data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"raw": response.text}
     if not response.is_success:
         return {"service": "notion", "status": "failed", "code": response.status_code, "response": data, "dryRun": False}
-    return {"service": "notion", "status": "written", "id": data.get("id", ""), "url": data.get("url", ""), "dryRun": False}
-
+    return {"service": "notion", "status": "written", "id": data.get("id", ""), "url": data.get("url", ""), "dryRun": False, "format": "table"}
 
 def write_figma_comment(profile: IntegrationProfile, title: str, body: str, dry_run: bool = True, target_url: str | None = None) -> dict:
     token = reveal_secret(profile.token_value)
