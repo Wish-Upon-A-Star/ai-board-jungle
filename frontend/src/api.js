@@ -21,20 +21,29 @@ export function formatApiError(data = {}, fallback = "요청을 처리하지 못
   return { message: fallback, issues: [] };
 }
 
-export async function api(path, options = {}) {
+function buildHeaders(options = {}) {
   const token = localStorage.getItem("ai-board-token");
   const headers = new Headers(options.headers || {});
   if (!(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  return headers;
+}
+
+export async function apiStatus(path, options = {}) {
+  const response = await fetch(`${API_BASE}${path}`, { ...options, headers: buildHeaders(options) });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const formatted = formatApiError(data, response.statusText);
+  return { ok: response.ok, status: response.status, statusText: response.statusText, data };
+}
+
+export async function api(path, options = {}) {
+  const result = await apiStatus(path, options);
+  if (!result.ok) {
+    const formatted = formatApiError(result.data, result.statusText);
     const error = new Error(formatted.message);
-    error.status = response.status;
+    error.status = result.status;
     error.validationIssues = formatted.issues;
-    error.response = data;
+    error.response = result.data;
     throw error;
   }
-  return data;
+  return result.data;
 }

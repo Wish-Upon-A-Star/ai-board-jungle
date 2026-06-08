@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Bot, CalendarClock, Database, FileText, GitBranch, KeyRound, Link2, LogOut, Play, Plus, Search, Share2, Trash2, Upload, UserPlus } from "lucide-react";
-import { api } from "./api";
+import { api, apiStatus } from "./api";
 import { customPreset, defaultAutomation, defaultIntegration, defaultKnowledge, figmaCalendarPreset, integrationConnectionPresets } from "./presets";
 import { buildSystemReadinessCards, getRunStatus, mergePostsById, parseRunResult, summarizeRunResult } from "./viewModel";
 import "./style.css";
@@ -205,13 +205,28 @@ function App() {
   }
 
   async function callApiDemo(kind) {
-    let data;
-    if (kind === "health") data = await api("/api/health");
-    if (kind === "rag") data = await api("/api/knowledge/rag", { method: "POST", body: JSON.stringify({ question: apiPrompt }) });
-    if (kind === "mcp") data = await api("/mcp/rpc", { method: "POST", body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method: "automation.describe", params: {} }) });
-    if (kind === "hub") data = await api("/api/integrations/hub/run", { method: "POST", body: JSON.stringify({ instruction: apiPrompt }) });
-    setApiResult({ called: kind, response: data });
-    setResult(data);
+    clearErrorState();
+    try {
+      if (kind === "health") {
+        const health = await apiStatus("/api/health");
+        const payload = { status: health.status, ok: health.ok, response: health.data };
+        setApiResult({ called: kind, response: payload });
+        setResult(payload);
+        if (!health.ok) setError(health.data?.database?.error || health.statusText || "Health check failed.");
+        return;
+      }
+      let data;
+      if (kind === "rag") data = await api("/api/knowledge/rag", { method: "POST", body: JSON.stringify({ question: apiPrompt }) });
+      if (kind === "mcp") data = await api("/mcp/rpc", { method: "POST", body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method: "automation.describe", params: {} }) });
+      if (kind === "hub") data = await api("/api/integrations/hub/run", { method: "POST", body: JSON.stringify({ instruction: apiPrompt }) });
+      setApiResult({ called: kind, response: data });
+      setResult(data);
+    } catch (err) {
+      showActionError(err);
+      const payload = { status: err.status || "error", message: err.message, response: err.response || null };
+      setApiResult({ called: kind, response: payload });
+      setResult(payload);
+    }
   }
 
   async function createPost(event) {
