@@ -77,6 +77,10 @@ class IntegrationProfileIn(BaseModel):
     api_provider: str = Field(default="REST API", max_length=120)
     token_name: str = Field(default="", max_length=120)
     token_value: str = Field(default="", max_length=4000)
+    auth_type: str = Field(default="api_key", max_length=40)
+    mcp_server_url: str = Field(default="", max_length=500)
+    mcp_auth_subject: str = Field(default="", max_length=160)
+    mcp_scopes: list[str] = []
     ai_provider: str = Field(default="OpenAI", min_length=2, max_length=80)
     ai_model: str = Field(default="gpt-4o-mini", min_length=2, max_length=120)
     ai_api_base: str = Field(default="", max_length=240)

@@ -145,6 +145,51 @@ def test_notion_task_writer_appends_to_plain_page(monkeypatch):
     assert table["children"][1]["table_row"]["cells"][0][0]["text"]["content"] == "Title"
 
 
+def test_mcp_auth_profile_is_user_owned_and_redacted():
+    with TestClient(app) as client:
+        first = client.post(
+            "/api/auth/register",
+            json={"email": "mcp-owner@example.com", "name": "MCP Owner", "password": "password123"},
+        )
+        second = client.post(
+            "/api/auth/register",
+            json={"email": "mcp-other@example.com", "name": "MCP Other", "password": "password123"},
+        )
+        first_headers = {"Authorization": f"Bearer {first.json()['token']}"}
+        second_headers = {"Authorization": f"Bearer {second.json()['token']}"}
+
+        created = client.post(
+            "/api/integration-profiles",
+            headers=first_headers,
+            json={
+                "name": "Owner Notion MCP",
+                "source_kind": "notion",
+                "base_url": "https://app.notion.com/p/3797051c2f9981b4bad3fe6545622eb8",
+                "api_provider": "Notion MCP Connector",
+                "token_name": "NOTION_MCP_ACCESS_TOKEN",
+                "token_value": "mcp_secret_value",
+                "auth_type": "mcp_oauth",
+                "mcp_server_url": "https://mcp.notion.com",
+                "mcp_auth_subject": "mcp-owner@example.com",
+                "mcp_scopes": ["notion.page.read", "notion.page.write"],
+                "rag_targets": ["notion_pages"],
+            },
+        )
+        assert created.status_code == 200
+        profile = created.json()["profile"]
+        assert profile["authType"] == "mcp_oauth"
+        assert profile["mcpServerUrl"] == "https://mcp.notion.com"
+        assert profile["mcpAuthSubject"] == "mcp-owner@example.com"
+        assert profile["mcpScopes"] == ["notion.page.read", "notion.page.write"]
+        assert profile["hasToken"] is True
+        assert "mcp_secret_value" not in str(profile)
+
+        first_profiles = client.get("/api/integration-profiles", headers=first_headers).json()["profiles"]
+        assert any(item["id"] == profile["id"] and item["authType"] == "mcp_oauth" for item in first_profiles)
+        second_profiles = client.get("/api/integration-profiles", headers=second_headers).json()["profiles"]
+        assert all(item["id"] != profile["id"] for item in second_profiles)
+
+
 def test_full_fastapi_flow(monkeypatch):
     def fake_collect(profile, limit=20, pages=2):
         assert limit == 12

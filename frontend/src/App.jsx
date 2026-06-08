@@ -300,6 +300,7 @@ function App() {
         collect_limit: Number(integrationForm.collect_limit) || 20,
         collect_pages: Number(integrationForm.collect_pages) || 2,
         rag_targets: integrationForm.rag_targets.split(",").map((item) => item.trim()).filter(Boolean),
+        mcp_scopes: (integrationForm.mcp_scopes || "").split(",").map((item) => item.trim()).filter(Boolean),
         custom_connections: integrationForm.custom_connections || [],
       };
       const data = await api("/api/integration-profiles", { method: "POST", body: JSON.stringify(body) });
@@ -741,7 +742,18 @@ function App() {
                   <Field label="AI 제공자"><input value={integrationForm.ai_provider} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_provider: e.target.value })} /></Field>
                   <Field label="AI 모델"><input value={integrationForm.ai_model} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_model: e.target.value })} /></Field>
                   <Field label="AI API Base"><input value={integrationForm.ai_api_base} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_api_base: e.target.value })} /></Field>
+                  <Field label="Auth Type">
+                    <select value={integrationForm.auth_type} onChange={(e) => setIntegrationForm({ ...integrationForm, auth_type: e.target.value })}>
+                      <option value="api_key">API key</option>
+                      <option value="oauth">OAuth</option>
+                      <option value="mcp">MCP</option>
+                      <option value="mcp_oauth">MCP OAuth</option>
+                    </select>
+                  </Field>
+                  <Field label="MCP Server"><input value={integrationForm.mcp_server_url} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_server_url: e.target.value })} placeholder="mcp://notion or https://mcp.example.com" /></Field>
+                  <Field label="MCP User"><input value={integrationForm.mcp_auth_subject} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_auth_subject: e.target.value })} placeholder="user@example.com" /></Field>
                 </div>
+                <Field label="MCP Scopes"><input value={integrationForm.mcp_scopes} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_scopes: e.target.value })} placeholder="page.read, page.write, comment.write" /></Field>
                 <Field label="RAG 대상"><input value={integrationForm.rag_targets} onChange={(e) => setIntegrationForm({ ...integrationForm, rag_targets: e.target.value })} /></Field>
                 <Field label="프로필 템플릿"><textarea value={integrationForm.custom_template} onChange={(e) => setIntegrationForm({ ...integrationForm, custom_template: e.target.value })} /></Field>
                 <section className="connection-builder">
@@ -809,6 +821,8 @@ function App() {
                 {integrationProfiles.map((profile) => (
                   <div key={profile.id} className="knowledge-item">
                     <strong>{profile.name}</strong>
+                    <p>Auth: {profile.authType || "api_key"}{profile.mcpAuthSubject ? ` / ${profile.mcpAuthSubject}` : ""}{profile.mcpServerUrl ? ` / ${profile.mcpServerUrl}` : ""}</p>
+                    {profile.mcpScopes?.length ? <p>MCP scopes: {profile.mcpScopes.join(", ")}</p> : null}
                     <span>{profile.sourceKind} / {profile.apiProvider} / {profile.aiModel} / token {profile.hasToken ? "저장됨" : "없음"} / {profile.tokenStorage || "empty"}</span>
                     <p>{profile.baseUrl} / RAG: {profile.ragTargets.join(", ") || "미설정"}</p>
                     <p>Connections: {profile.customConnections?.map((connection) => `${connection.service}:${connection.operation}`).join(" / ") || "기본 연결"}</p>

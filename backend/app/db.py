@@ -142,6 +142,10 @@ def init_db() -> None:
                     api_provider VARCHAR(120) DEFAULT 'REST API' NOT NULL,
                     token_name VARCHAR(120) DEFAULT '' NOT NULL,
                     token_value TEXT DEFAULT '' NOT NULL,
+                    auth_type VARCHAR(40) DEFAULT 'api_key' NOT NULL,
+                    mcp_server_url VARCHAR(500) DEFAULT '' NOT NULL,
+                    mcp_auth_subject VARCHAR(160) DEFAULT '' NOT NULL,
+                    mcp_scopes_json TEXT DEFAULT '[]' NOT NULL,
                     ai_provider VARCHAR(80) DEFAULT 'OpenAI' NOT NULL,
                     ai_model VARCHAR(120) DEFAULT 'gpt-4o-mini' NOT NULL,
                     ai_api_base VARCHAR(240) DEFAULT 'https://api.openai.com/v1' NOT NULL,
@@ -170,6 +174,10 @@ def init_db() -> None:
                 "last_collect_duplicates": "INTEGER DEFAULT 0 NOT NULL",
                 "last_collect_warnings": "TEXT DEFAULT '[]' NOT NULL",
                 "last_collected_at": "DATETIME",
+                "auth_type": "VARCHAR(40) DEFAULT 'api_key' NOT NULL",
+                "mcp_server_url": "VARCHAR(500) DEFAULT '' NOT NULL",
+                "mcp_auth_subject": "VARCHAR(160) DEFAULT '' NOT NULL",
+                "mcp_scopes_json": "TEXT DEFAULT '[]' NOT NULL",
             }
             for column, ddl in integration_additions.items():
                 if column not in integration_columns:
