@@ -307,6 +307,8 @@ function buildTextOutputResult({
   includeRequiredScannedFiles = true,
   includeScannedFileCount = true,
   missingRequiredFiles = [],
+  includeSourceGuards = true,
+  missingSourceGuards = [],
 } = {}) {
   const lines = ['  "checked": "verify-text output",'];
 
@@ -326,6 +328,31 @@ function buildTextOutputResult({
     );
   } else {
     lines.push('  "missingRequiredFiles": [],');
+  }
+
+  if (includeSourceGuards) {
+    lines.push(
+      '  "sourceGuards": [',
+      "    {",
+      '      "name": "redisCacheFallbackCatchesMalformedHandshake",',
+      '      "file": "backend/app/cache.py"',
+      "    },",
+      "    {",
+      '      "name": "redisCacheFallbackRagRegressionTest",',
+      '      "file": "backend/tests/test_api.py"',
+      "    }",
+      "  ],"
+    );
+  }
+
+  if (missingSourceGuards.length) {
+    lines.push(
+      '  "missingSourceGuards": [',
+      ...missingSourceGuards.map((guard) => `    "${guard}"`),
+      "  ],"
+    );
+  } else {
+    lines.push('  "missingSourceGuards": [],');
   }
 
   lines.push('  "hits": []');

@@ -483,6 +483,22 @@ export function assertReadinessJsonEvidence(readinessSummary, { requireFixtureSu
     textOutputResult.summary.includes('"missingRequiredFiles": []'),
     "text output summary must include missingRequiredFiles empty evidence"
   );
+  assert.ok(
+    textOutputResult.summary.includes('"sourceGuards": ['),
+    "text output summary must include sourceGuards evidence"
+  );
+  assert.ok(
+    textOutputResult.summary.includes('"redisCacheFallbackCatchesMalformedHandshake"'),
+    "text output summary must include Redis cache fallback malformed-handshake source guard"
+  );
+  assert.ok(
+    textOutputResult.summary.includes('"redisCacheFallbackRagRegressionTest"'),
+    "text output summary must include Redis cache fallback RAG regression source guard"
+  );
+  assert.ok(
+    textOutputResult.summary.includes('"missingSourceGuards": []'),
+    "text output summary must include missingSourceGuards empty evidence"
+  );
   if (requireFixtureSummary) {
     assert.ok(
       readinessFixtureResult.summary.includes('"failureFlags": ['),

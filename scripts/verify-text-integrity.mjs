@@ -5,6 +5,18 @@ const scanTargets = ["README.md", "backend", "frontend/src", "scripts", "docs/su
 const ignoredParts = new Set(["node_modules", "dist", "__pycache__", ".pytest_cache", ".chrome-verify"]);
 const ignoredFiles = new Set(["scripts/verify-text-integrity.mjs"]);
 const requiredScannedFiles = ["scripts/verify-readme-contract.mjs"];
+const requiredSourceGuards = [
+  {
+    name: "redisCacheFallbackCatchesMalformedHandshake",
+    file: "backend/app/cache.py",
+    pattern: /except \(RedisError, OSError, AttributeError, TypeError\):/,
+  },
+  {
+    name: "redisCacheFallbackRagRegressionTest",
+    file: "backend/tests/test_api.py",
+    pattern: /def test_rag_degrades_when_redis_handshake_is_malformed\(monkeypatch\):/,
+  },
+];
 const suspiciousChars = [
   "\u5bc3",
   "\u8e42",
@@ -59,9 +71,17 @@ function listFiles(target) {
 const hits = [];
 const scannedFiles = [];
 const missingRequiredFiles = requiredScannedFiles.filter((file) => !existsSync(file));
+const missingSourceGuards = requiredSourceGuards
+  .filter((guard) => !existsSync(guard.file) || !guard.pattern.test(readFileSync(guard.file, "utf8")))
+  .map((guard) => guard.name);
 
 if (missingRequiredFiles.length) {
-  console.error(JSON.stringify({ ok: false, checked: 0, missingRequiredFiles, hits: [] }, null, 2));
+  console.error(JSON.stringify({ ok: false, checked: 0, missingRequiredFiles, missingSourceGuards, hits: [] }, null, 2));
+  process.exit(1);
+}
+
+if (missingSourceGuards.length) {
+  console.error(JSON.stringify({ ok: false, checked: 0, missingRequiredFiles, missingSourceGuards, hits: [] }, null, 2));
   process.exit(1);
 }
 
@@ -89,8 +109,16 @@ for (const target of scanTargets) {
 const missingRequiredScans = requiredScannedFiles.filter((file) => !scannedFiles.includes(file));
 
 if (hits.length || missingRequiredScans.length) {
-  console.error(JSON.stringify({ ok: false, checked: scannedFiles.length, hits, missingRequiredFiles, missingRequiredScans }, null, 2));
+  console.error(JSON.stringify({ ok: false, checked: scannedFiles.length, hits, missingRequiredFiles, missingRequiredScans, missingSourceGuards }, null, 2));
   process.exit(1);
 }
 
-console.log(JSON.stringify({ ok: true, checked: scannedFiles.length, requiredScannedFiles, missingRequiredFiles, hits: [] }, null, 2));
+console.log(JSON.stringify({
+  ok: true,
+  checked: scannedFiles.length,
+  requiredScannedFiles,
+  missingRequiredFiles,
+  sourceGuards: requiredSourceGuards.map(({ name, file }) => ({ name, file })),
+  missingSourceGuards,
+  hits: [],
+}, null, 2));

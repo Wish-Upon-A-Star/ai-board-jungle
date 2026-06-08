@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 
 const requiredScannedFiles = ["scripts/verify-readme-contract.mjs"];
+const requiredSourceGuards = [
+  { name: "redisCacheFallbackCatchesMalformedHandshake", file: "backend/app/cache.py" },
+  { name: "redisCacheFallbackRagRegressionTest", file: "backend/tests/test_api.py" },
+];
 
 const result = spawnSync(process.execPath, ["scripts/verify-text-integrity.mjs"], {
   shell: false,
@@ -19,6 +23,8 @@ assert.equal(typeof summary.checked, "number", "text integrity checked count mus
 assert.ok(summary.checked > 0, "text integrity must scan at least one file");
 assert.deepEqual(summary.requiredScannedFiles, requiredScannedFiles, "text integrity must report required scanned files");
 assert.deepEqual(summary.missingRequiredFiles, [], "text integrity must report no missing required files");
+assert.deepEqual(summary.sourceGuards, requiredSourceGuards, "text integrity must report cache fallback source guards");
+assert.deepEqual(summary.missingSourceGuards, [], "text integrity must report no missing source guards");
 assert.deepEqual(summary.hits, [], "text integrity must report no suspicious text hits");
 assert.equal(
   Object.hasOwn(summary, "missingRequiredScans"),
@@ -31,6 +37,8 @@ console.log(JSON.stringify({
   checked: "verify-text output",
   requiredScannedFiles: summary.requiredScannedFiles,
   missingRequiredFiles: summary.missingRequiredFiles,
+  sourceGuards: summary.sourceGuards,
+  missingSourceGuards: summary.missingSourceGuards,
   hits: summary.hits,
   scannedFileCount: summary.checked,
 }, null, 2));

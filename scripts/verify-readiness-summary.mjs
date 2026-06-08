@@ -41,8 +41,8 @@ function runCheck(name, cmd, args, opts = {}) {
 
 export const checks = [
   ["hygiene", "node", ["scripts/verify-hygiene.mjs"]],
-  ["text", "node", ["scripts/verify-text-integrity.mjs"]],
-  ["text output", "node", ["scripts/verify-text-output.mjs"]],
+  ["text", "node", ["scripts/verify-text-integrity.mjs"], { summaryLines: 28 }],
+  ["text output", "node", ["scripts/verify-text-output.mjs"], { summaryLines: 32 }],
   ["frontend helpers", "node", ["scripts/verify-frontend-helpers.mjs"]],
   ["template presets", "node", ["scripts/verify-template-presets.mjs"]],
   ["evaluation reports", "node", ["scripts/verify-evaluation-reports.mjs"]],
