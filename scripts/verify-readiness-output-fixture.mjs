@@ -185,7 +185,7 @@ const expectedDirectCompactFormatterGuards = [
   "directCompactFormatterTrailingNewline",
 ];
 
-const expectedReadinessNote = "This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick for end-to-end smoke.";
+const expectedReadinessNote = readinessNote;
 
 const evaluationReportRounds = readEvaluationReportRounds();
 const expectedEvaluationReportSummary = buildEvaluationReportSummary(evaluationReportRounds);

@@ -23,3 +23,8 @@ export const serverRequiredCommands = [
   "verify:full",
   "test:live-integrations",
 ];
+
+export const serverRequiredExclusivePorts = [3000, 8000];
+
+export const serverRequiredConcurrencyNote =
+  "Run server-required checks sequentially; verify:full:quick and verify:fastapi both own and clean ports 3000/8000.";

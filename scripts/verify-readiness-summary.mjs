@@ -2,9 +2,9 @@ import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { serverRequiredCommands } from "./verification-command-lists.mjs";
+import { serverRequiredCommands, serverRequiredConcurrencyNote } from "./verification-command-lists.mjs";
 
-export const readinessNote = "This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick for end-to-end smoke.";
+export const readinessNote = `This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick by itself for end-to-end smoke. ${serverRequiredConcurrencyNote}`;
 
 function commandFor(cmd, args) {
   if (cmd === "node") return { executable: process.execPath, args };

@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { serverlessCommands, serverRequiredCommands } from "./verification-command-lists.mjs";
+import {
+  serverlessCommands,
+  serverRequiredCommands,
+  serverRequiredConcurrencyNote,
+  serverRequiredExclusivePorts,
+} from "./verification-command-lists.mjs";
 
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const readme = readFileSync("README.md", "utf8");
+const submissionChecklist = readFileSync("docs/submission-checklist.md", "utf8");
 
 function extractList(afterHeading, beforeHeading = "\n## ") {
   const start = readme.indexOf(afterHeading);
@@ -29,9 +35,19 @@ for (const command of [...serverless, ...serverRequired]) {
 
 const overlap = serverless.filter((command) => serverRequired.includes(command));
 assert.deepEqual(overlap, [], "serverless and server-required command lists must not overlap");
+assert.ok(
+  readme.includes(serverRequiredConcurrencyNote),
+  "README must warn that server-required checks run sequentially"
+);
+assert.ok(
+  submissionChecklist.includes(serverRequiredConcurrencyNote),
+  "submission checklist must warn that server-required checks run sequentially"
+);
 
 console.log(JSON.stringify({
   ok: true,
   serverless,
   serverRequired,
+  serverRequiredExclusivePorts,
+  serverRequiredConcurrencyNote,
 }, null, 2));

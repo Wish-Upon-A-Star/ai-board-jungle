@@ -388,6 +388,8 @@ Serverless checks do not start FastAPI, Vite, or Chrome CDP:
 
 Server-required checks start or expect FastAPI, Vite, Chrome CDP, or live API credentials:
 
+Run server-required checks sequentially; verify:full:quick and verify:fastapi both own and clean ports 3000/8000.
+
 - `npm run verify:contract`
 - `npm run smoke:http`
 - `npm run smoke:ui`

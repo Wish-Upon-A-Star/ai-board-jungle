@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { serverRequiredCommands } from "./verification-command-lists.mjs";
+import { serverRequiredCommands, serverRequiredConcurrencyNote } from "./verification-command-lists.mjs";
 import { getLatestEvaluationRound } from "./verify-evaluation-reports.mjs";
 import { expectedChecklistCommands, expectedChecklistItems } from "./verify-readme-contract.mjs";
 
 const expectedServerRequiredLine = `server-required: ${serverRequiredCommands.join(", ")}`;
-const expectedReadinessNote = "This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick for end-to-end smoke.";
+const expectedReadinessNote = `This readiness summary does not start FastAPI, Vite, or Chrome CDP. Run npm run verify:full:quick by itself for end-to-end smoke. ${serverRequiredConcurrencyNote}`;
 const expectedLatestEvaluationRound = getLatestEvaluationRound();
 const requiredLines = [
   "PASS hygiene",
@@ -174,6 +174,7 @@ export function assertCompactReadinessOutput(output) {
   assert.ok(output.includes(`NOTE ${expectedReadinessNote}`), "compact output must include the server-required warning note");
   assert.ok(output.includes("FastAPI, Vite, or Chrome CDP"), "compact output must name the servers it does not start");
   assert.ok(output.includes("npm run verify:full:quick"), "compact output must name the end-to-end smoke command");
+  assert.ok(output.includes(serverRequiredConcurrencyNote), "compact output must include the server-required concurrency warning");
 
   for (const line of requiredLines) {
     assert.ok(output.includes(line), `compact output missing ${line}`);
