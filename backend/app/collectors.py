@@ -41,7 +41,10 @@ def parse_github_repo(url: str) -> tuple[str, str] | None:
         return ssh_match.group(1), ssh_match.group(2)
     parsed = urlparse(url)
     parts = [part for part in parsed.path.strip("/").split("/") if part]
-    if parsed.netloc.lower() != "github.com" or len(parts) < 2:
+    host = parsed.netloc.lower()
+    if host.startswith("www."):
+        host = host.removeprefix("www.")
+    if host != "github.com" or len(parts) < 2:
         return None
     return parts[0], parts[1].removesuffix(".git")
 

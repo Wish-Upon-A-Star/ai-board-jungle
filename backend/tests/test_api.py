@@ -46,6 +46,7 @@ def test_health_recovers_after_startup_database_error(monkeypatch):
 
 def test_parse_github_repo_accepts_https_and_ssh_urls():
     assert parse_github_repo("https://github.com/acme/private-repo") == ("acme", "private-repo")
+    assert parse_github_repo("https://www.github.com/acme/private-repo") == ("acme", "private-repo")
     assert parse_github_repo("https://github.com/acme/private-repo.git/") == ("acme", "private-repo")
     assert parse_github_repo("git@github.com:acme/private-repo.git") == ("acme", "private-repo")
     assert parse_github_repo("https://gitlab.com/acme/private-repo") is None
