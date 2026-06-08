@@ -354,6 +354,28 @@ def notion_webhook_target_matches(target: str, candidate: str) -> bool:
     return target in candidate or candidate in target
 
 
+def notion_webhook_targets(payload: object) -> list[str]:
+    targets: list[str] = []
+    target_keys = {"database_url", "database_id", "page_url", "page_id", "url", "id"}
+
+    def visit(value: object, key: str = "") -> None:
+        if isinstance(value, dict):
+            for nested_key, nested_value in value.items():
+                visit(nested_value, str(nested_key).lower())
+            return
+        if isinstance(value, list):
+            for item in value:
+                visit(item, key)
+            return
+        if key in target_keys and value is not None:
+            target = str(value).strip()
+            if target:
+                targets.append(target)
+
+    visit(payload)
+    return list(dict.fromkeys(targets))
+
+
 def github_webhook_repo_matches(repo_url: str, candidate: str) -> bool:
     repo = parse_github_repo(repo_url.strip())
     candidate_repo = parse_github_repo(candidate.strip())
@@ -1170,19 +1192,23 @@ async def notion_webhook(
     if not verify_hmac_signature(settings().notion_webhook_secret, body, x_ai_board_signature):
         raise HTTPException(status_code=401, detail="Invalid Notion webhook signature.")
     payload = json.loads(body.decode("utf-8") or "{}")
-    target = str(payload.get("database_url") or payload.get("database_id") or payload.get("page_url") or payload.get("page_id") or "")
+    targets = notion_webhook_targets(payload)
     stmt = select(AutomationTask).where(AutomationTask.status == "ACTIVE")
     tasks = []
     for task in db.scalars(stmt).all():
         task_target = task.notion_database_url.strip()
         profile_target = task.integration_profile.base_url.strip() if task.integration_profile else ""
-        if notion_webhook_target_matches(target, task_target) or notion_webhook_target_matches(target, profile_target):
+        if any(
+            notion_webhook_target_matches(target, task_target) or notion_webhook_target_matches(target, profile_target)
+            for target in targets
+        ):
             tasks.append(task)
     results = [execute_automation_task(db, task, task.owner, scheduled=True) for task in tasks[:20]]
     return {
         "ok": True,
         "provider": "notion",
-        "target": target,
+        "target": targets[0] if targets else "",
+        "targets": targets,
         "matched": len(tasks),
         "triggered": [{"taskId": item["task"]["id"], "status": item["run"]["result"]["status"]} for item in results],
         "signatureRequired": bool(settings().notion_webhook_secret),

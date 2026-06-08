@@ -1089,7 +1089,7 @@ def test_notion_webhook_signature_triggers_matching_automation(monkeypatch):
                     ],
                 },
             ).json()["task"]
-            payload = json.dumps({"database_id": "12345678-90ab-cdef-1234-567890abcdef"}).encode()
+            payload = json.dumps({"data": {"parent": {"id": "12345678-90ab-cdef-1234-567890abcdef"}}}).encode()
             bad = client.post("/api/webhooks/notion", content=payload, headers={"X-AI-Board-Signature": "sha256=bad"})
             assert bad.status_code == 401
             signature = "sha256=" + hmac.new(b"notion-hook-secret", payload, hashlib.sha256).hexdigest()
@@ -1097,6 +1097,7 @@ def test_notion_webhook_signature_triggers_matching_automation(monkeypatch):
             assert triggered.status_code == 200
             data = triggered.json()
             assert data["matched"] == 1
+            assert data["targets"] == ["12345678-90ab-cdef-1234-567890abcdef"]
             assert data["triggered"][0]["taskId"] == task["id"]
             assert data["triggered"][0]["status"] == "changed"
             assert writes
