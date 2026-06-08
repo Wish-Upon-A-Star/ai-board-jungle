@@ -344,6 +344,7 @@ def korean_commit_change_summary(message: str) -> str:
         "Clean obsolete summary assertions": "요약 테스트에 남아 있던 이전 assertion과 죽은 코드를 제거해 검증 로직을 정리했습니다.",
         "Describe cleanup commit summaries": "정리 커밋도 Notion에서 의미 있는 한국어 문장으로 표시되도록 커밋 요약 규칙을 보강했습니다.",
         "Load desktop OAuth credentials on live restart": "라이브 서버 재시작 시 바탕화면의 GitHub, Notion, Figma, Google OAuth 설정을 자동으로 읽도록 보강했습니다.",
+        "Use Notion demo template page for reports": "302호 1팀 Notion 데모 페이지를 자동화 보고서 목적지로 사용하고, GitHub 변경사항을 해당 템플릿 표 양식에 맞춰 쓰도록 변경했습니다.",
     }
     if normalized in exact:
         return exact[normalized]

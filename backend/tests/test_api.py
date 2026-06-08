@@ -493,6 +493,25 @@ def test_notion_sources_report_maps_table_values_by_header_name():
     assert values[4] != "보통"
 
 
+def test_notion_sources_report_describes_demo_template_page_change():
+    blocks = notion_sources_template_children(
+        "302호 1팀 GitHub 변경사항",
+        [
+            {
+                "title": "[GitHub MCP OAuth profile] Commit ae64a7d7cf40: Use Notion demo template page for reports",
+                "sourceType": "github_commit",
+                "url": "https://github.com/acme/repo/commit/ae64a7d7cf40",
+                "summary": "Use Notion demo template page for reports sha: ae64a7d7cf40 author: Wish-Upon-A-Star",
+            }
+        ],
+        "| 번호 | 유형 | 제목 | 한국어 요약 | 영향 영역 | 다음 조치 | 링크 |\n|---|---|---|---|---|---|---|",
+    )
+    table = next(block for block in blocks if block["type"] == "table")
+    summary = table["table"]["children"][1]["table_row"]["cells"][3][0]["text"]["content"]
+    assert "302호 1팀 Notion 데모 페이지를 자동화 보고서 목적지로 사용" in summary
+    assert "커밋 메시지 '" not in summary
+
+
 def test_replay_notion_hydrates_legacy_collected_summary(monkeypatch):
     captured = []
 
