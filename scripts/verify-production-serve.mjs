@@ -1,28 +1,18 @@
-import { rmSync } from "node:fs";
-import { join } from "node:path";
 import { run, start, stop, waitFor } from "./verify-helpers.mjs";
+import { postgresEnv } from "./postgres-env.mjs";
 
 const port = process.env.AI_BOARD_PRODUCTION_VERIFY_PORT || "8120";
-const dbPath = join("data", "production-serve-verify.db");
 const apiBase = `http://127.0.0.1:${port}`;
 const skipBuild = process.argv.includes("--skip-build");
 const env = {
-  PYTHONPATH: "backend",
-  AI_BOARD_DATABASE_URL: `sqlite:///./${dbPath.replaceAll("\\", "/")}`,
+  ...postgresEnv(),
 };
-
-function cleanupDb() {
-  for (const suffix of ["", "-shm", "-wal"]) {
-    rmSync(`${dbPath}${suffix}`, { force: true });
-  }
-}
 
 async function fetchText(path) {
   const response = await fetch(`${apiBase}${path}`);
   return { response, text: await response.text() };
 }
 
-cleanupDb();
 if (!skipBuild) {
   run("npm", ["run", "build"], { timeout: 120000 });
 }
@@ -63,5 +53,4 @@ try {
   }, null, 2));
 } finally {
   stop(api);
-  cleanupDb();
 }

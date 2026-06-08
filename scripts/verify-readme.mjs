@@ -20,7 +20,7 @@ const requiredSnippets = [
   "## 회고와 개선 아이디어",
   "React",
   "FastAPI",
-  "PostgreSQL-ready SQLAlchemy",
+  "PostgreSQL-first SQLAlchemy",
   "Redis",
   "GitHub issues/commits/pull requests",
   "Notion database/pages",

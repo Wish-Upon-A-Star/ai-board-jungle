@@ -2,9 +2,9 @@
 
 Run these checks before final submission or when the UI changes:
 
-Serverless checks can run without starting FastAPI, Vite, or Chrome CDP. Server-required checks are covered by `npm run verify:full:quick`, `npm run verify:fastapi`, `npm run verify:external-serve`, and live integration tests.
+Serverless checks can run without starting FastAPI, Vite, or Chrome CDP. Server-required checks are covered by `npm run verify:postgres`, `npm run verify:full:quick`, `npm run verify:fastapi`, `npm run verify:external-serve`, and live integration tests.
 
-Run server-required checks sequentially; verify:full:quick and verify:fastapi both own and clean ports 3000/8000. verify:external-serve uses port 8131 and must not stop the current server.
+Run server-required checks sequentially. verify:postgres uses port 8140, verify:fastapi uses ports 8141/3141, verify:full:quick uses ports 8142/3142, and verify:external-serve uses port 8131; these checks must not stop the current 3000/8000 server.
 
 Do not stop a currently shared server for ad-hoc fixes; first verify changes on a separate test port.
 
@@ -14,6 +14,7 @@ Safe local verification order:
 npm run verify:readiness
 npm run verify:command-scope
 npm run verify:readme-output
+npm run verify:postgres
 npm run verify:fastapi
 npm run verify:full:quick
 ```
@@ -22,7 +23,7 @@ npm run verify:full:quick
 
    ```powershell
    $env:PYTHONPATH="backend"
-   $env:AI_BOARD_DATABASE_URL="sqlite:///./data/screenshot-verify.db"
+   $env:AI_BOARD_DATABASE_URL="postgresql://ai_board:ai_board@localhost:5432/ai_board"
    python scripts/seed-fastapi.py
    npm run dev
    npm run demo:screenshot

@@ -294,6 +294,23 @@ def automation_write_body(task: AutomationTask, summary: str, source_urls: list[
     )
 
 
+def source_write_body(task: AutomationTask, source: KnowledgeSource) -> str:
+    return "\n".join(
+        part
+        for part in [
+            f"Automation: {task.name}",
+            f"Route: {task.source} -> {task.destination}",
+            f"Source type: {source.source_type}",
+            f"Source title: {source.title}",
+            f"Source URL: {source.file_name}",
+            f"Next action: {task.template or task.custom_template}",
+            "Extracted text:",
+            source.extracted_text,
+        ]
+        if part
+    )
+
+
 def verify_hmac_signature(secret: str, body: bytes, signature: str, prefix: str = "sha256=") -> bool:
     if not secret:
         return True
@@ -925,7 +942,22 @@ def execute_automation_task(db: Session, task: AutomationTask, actor: User, sche
         else:
             original_base_url = profile.base_url
             profile.base_url = str(connection.get("url") or profile.base_url)
-            write = execute_profile_write(profile, f"[AI Board] {task.name}", write_body, dry_run=False)
+            if service == "notion" and saved_sources:
+                child_writes = [
+                    execute_profile_write(profile, f"[AI Board] {source.title}", source_write_body(task, source), dry_run=False)
+                    for source in saved_sources
+                ]
+                failed = [item for item in child_writes if item.get("status") not in {"written", "ready"}]
+                write = {
+                    "service": service,
+                    "status": "partial" if failed else "written",
+                    "count": len(child_writes),
+                    "failed": len(failed),
+                    "items": child_writes,
+                    "dryRun": False,
+                }
+            else:
+                write = execute_profile_write(profile, f"[AI Board] {task.name}", write_body, dry_run=False)
             profile.base_url = original_base_url
         result["liveWrites"].append(write)
         log_activity(

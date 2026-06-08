@@ -6,6 +6,9 @@ const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const envExample = readFileSync(".env.example", "utf8");
 const readme = readFileSync("README.md", "utf8");
 const serveExternal = readFileSync("scripts/serve-external.mjs", "utf8");
+const postgresEnv = readFileSync("scripts/postgres-env.mjs", "utf8");
+const verifyFastapi = readFileSync("scripts/verify-fastapi.mjs", "utf8");
+const verifyFull = readFileSync("scripts/verify-full.mjs", "utf8");
 
 assert.ok(devFastapi.includes('import os from "node:os"'), "dev server must inspect local network interfaces");
 assert.ok(devFastapi.includes('const host = process.env.AI_BOARD_HOST || "0.0.0.0"'), "dev server must bind to all interfaces by default");
@@ -24,8 +27,15 @@ assert.ok(readme.includes("Open the printed AI Board browser URL"), "README must
 assert.equal(packageJson.scripts["serve:external"], "node scripts/serve-external.mjs", "package.json must expose serve:external");
 assert.equal(packageJson.scripts["verify:external-serve"], "node scripts/verify-external-serve.mjs", "package.json must expose verify:external-serve");
 assert.ok(serveExternal.includes("AI_BOARD_EXTERNAL_PORT"), "external serve must use a configurable non-dev port");
+assert.ok(devFastapi.includes("postgresEnv()"), "dev server must use PostgreSQL by default");
+assert.ok(serveExternal.includes("postgresDatabaseUrl()"), "external server must use PostgreSQL by default");
+assert.ok(postgresEnv.includes("postgresql://ai_board:ai_board@localhost:5432/ai_board"), "shared PostgreSQL default URL must be explicit");
 assert.ok(serveExternal.includes("AI Board public URL:"), "external serve must print the public tunnel URL");
 assert.ok(!serveExternal.includes("stopLocalServers"), "external serve must not stop the running LAN/dev server");
+assert.ok(!verifyFastapi.includes("stopLocalServers"), "verify:fastapi must not stop the current 3000/8000 server");
+assert.ok(!verifyFull.includes("stopLocalServers"), "verify:full must not stop the current 3000/8000 server");
+assert.ok(verifyFastapi.includes('"8141"') && verifyFastapi.includes('"3141"'), "verify:fastapi must use isolated default ports");
+assert.ok(verifyFull.includes('"8142"') && verifyFull.includes('"3142"'), "verify:full must use isolated default ports");
 
 console.log(JSON.stringify({
   ok: true,
@@ -36,5 +46,7 @@ console.log(JSON.stringify({
     ".env.example LAN variables",
     "README LAN instructions",
     "external tunnel serve script",
+    "PostgreSQL-first runtime defaults",
+    "non-destructive verification ports",
   ],
 }, null, 2));

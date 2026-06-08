@@ -826,6 +826,7 @@ def test_rag_degrades_when_redis_handshake_is_malformed(monkeypatch):
 def test_github_webhook_signature_triggers_matching_automation(monkeypatch):
     monkeypatch.setenv("AI_BOARD_GITHUB_WEBHOOK_SECRET", "hook-secret")
     settings.cache_clear()
+    writes = []
 
     def fake_collect(profile, limit=20, pages=2):
         return [
@@ -839,15 +840,16 @@ def test_github_webhook_signature_triggers_matching_automation(monkeypatch):
         ], []
 
     monkeypatch.setattr("app.main.collect_profile_items", fake_collect)
-    monkeypatch.setattr(
-        "app.main.execute_profile_write",
-        lambda profile, title, body, dry_run=True, start_minutes_from_now=15, duration_minutes=30: {
+    def fake_write(profile, title, body, dry_run=True, start_minutes_from_now=15, duration_minutes=30):
+        writes.append({"service": profile.source_kind, "title": title, "body": body, "dryRun": dry_run})
+        return {
             "service": profile.source_kind,
             "status": "written",
             "url": f"https://example.test/{profile.source_kind}",
             "dryRun": dry_run,
-        },
-    )
+        }
+
+    monkeypatch.setattr("app.main.execute_profile_write", fake_write)
     try:
         with TestClient(app) as client:
             register = client.post(
@@ -933,6 +935,10 @@ def test_github_webhook_signature_triggers_matching_automation(monkeypatch):
             assert data["matched"] == 1
             assert data["triggered"][0]["taskId"] == task["id"]
             assert data["triggered"][0]["status"] == "changed"
+            assert writes
+            assert writes[0]["service"] == "notion"
+            assert writes[0]["title"] == "[AI Board] [Hooked GitHub] Webhook commit"
+            assert "Source URL: https://github.com/acme/hooked/commit/abc" in writes[0]["body"]
             activities = client.get("/api/integration-activities?event_type=automation.live_write", headers=headers).json()["activities"]
             assert any(item["provider"] == "notion" and item["status"] == "written" for item in activities)
     finally:

@@ -19,7 +19,6 @@ assert.ok(readme.includes("6-10"), "README must document the expected small-team
 run("node", ["scripts/serve-external.mjs", "--skip-build", "--no-tunnel", "--once"], {
   env: {
     AI_BOARD_EXTERNAL_PORT: "8131",
-    AI_BOARD_DATABASE_URL: "sqlite:///./data/external-serve-verify.db",
   },
   timeout: 120000,
 });

@@ -27,6 +27,7 @@
     "verify:text": "node scripts/verify-text-integrity.mjs",
     "verify:text-output": "node scripts/verify-text-output.mjs",
     "verify:contract": "node scripts/verify-api-contract.mjs",
+    "verify:postgres": "node scripts/verify-postgres.mjs",
     "verify:production-serve": "node scripts/verify-production-serve.mjs",
     "verify:external-serve": "node scripts/verify-external-serve.mjs",
     "verify:readme": "node scripts/verify-readme.mjs",

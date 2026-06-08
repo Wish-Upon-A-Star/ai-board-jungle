@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import { run, start, stop, waitFor } from "./verify-helpers.mjs";
+import { postgresDatabaseUrl } from "./postgres-env.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const args = new Set(process.argv.slice(2));
@@ -14,7 +15,7 @@ const once = args.has("--once");
 const port = process.env.AI_BOARD_EXTERNAL_PORT || "8130";
 const host = process.env.AI_BOARD_EXTERNAL_HOST || "127.0.0.1";
 const workers = process.env.AI_BOARD_EXTERNAL_WORKERS || "1";
-const dbUrl = process.env.AI_BOARD_DATABASE_URL || "sqlite:///./data/external-serve.db";
+const dbUrl = postgresDatabaseUrl();
 const localUrl = `http://127.0.0.1:${port}`;
 const cacheDir = join(root, "data", "bin");
 const cloudflaredPath = join(cacheDir, process.platform === "win32" ? "cloudflared.exe" : "cloudflared");

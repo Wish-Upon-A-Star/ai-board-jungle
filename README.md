@@ -20,7 +20,7 @@ React + FastAPI 기반의 AI 게시판입니다. 기본 게시판 기능 위에 
 
 | 제출 요구 | README 위치 | 구현/검증 근거 |
 | --- | --- | --- |
-| 프로젝트 개요 | [프로젝트 개요](#프로젝트-개요) | React + FastAPI + PostgreSQL-ready SQLAlchemy + Redis-ready 구조 |
+| 프로젝트 개요 | [프로젝트 개요](#프로젝트-개요) | React + FastAPI + PostgreSQL-first SQLAlchemy + Redis-ready 구조 |
 | 주요 구현 기능 | [주요 구현 기능](#주요-구현-기능) | 회원가입/로그인, 게시글 CRUD, 댓글, 태그, 페이징, 검색, 자동화 |
 | 전체 아키텍처 구조 | [전체 아키텍처 구조](#전체-아키텍처-구조) | Frontend, Backend, DB, Redis, RAG, MCP, Agent, 외부 API |
 | RAG 기능 | [RAG](#rag) | 게시글, 자동화, 사용자 지식자료, GitHub issues/commits/pull requests, Notion database/pages |
@@ -69,7 +69,7 @@ flowchart LR
   User["사용자"] --> React["React Frontend"]
   React --> FastAPI["FastAPI Backend"]
   FastAPI --> SQLAlchemy["SQLAlchemy Models"]
-  SQLAlchemy --> PostgreSQL["PostgreSQL-ready DB"]
+  SQLAlchemy --> PostgreSQL["PostgreSQL-first DB"]
   FastAPI --> Redis["Redis-ready Cache"]
   FastAPI --> RAG["RAG Services"]
   FastAPI --> MCP["MCP JSON-RPC /mcp/rpc"]
@@ -80,7 +80,7 @@ flowchart LR
   Agent --> Calendar["Google Calendar dry-run/live write"]
 ```
 
-개발 검증은 SQLite를 기본으로 사용하지만, 모델과 세션 구성은 PostgreSQL-ready SQLAlchemy 구조입니다. `AI_BOARD_DATABASE_URL`을 PostgreSQL URL로 지정하면 운영 DB로 전환할 수 있습니다. Redis는 RAG 유사도 검색 캐시가 사용할 수 있도록 옵션 구조를 갖췄고, 로컬에서는 메모리 캐시 fallback으로 동작합니다.
+앱 런타임과 운영형 검증은 PostgreSQL을 기본 데이터베이스로 사용합니다. 기본 URL은 `postgresql://ai_board:ai_board@localhost:5432/ai_board`이며 `AI_BOARD_DATABASE_URL`로 다른 PostgreSQL 인스턴스를 지정할 수 있습니다. SQLite는 빠른 백엔드 단위 테스트에서만 격리용으로 사용합니다. Redis는 RAG 유사도 검색 캐시가 사용할 수 있도록 옵션 구조를 갖췄고, 로컬에서는 메모리 캐시 fallback으로 동작합니다.
 
 ## AI 활용 기능과 구조
 
@@ -211,14 +211,14 @@ python -m pip install -r backend/requirements.txt
 
 ### 2. 환경 변수
 
-로컬 기본값은 SQLite입니다.
+로컬 앱 런타임 기본값은 PostgreSQL입니다.
 
 ```powershell
 $env:PYTHONPATH="backend"
-$env:AI_BOARD_DATABASE_URL="sqlite:///./data/dev.db"
+$env:AI_BOARD_DATABASE_URL="postgresql://ai_board:ai_board@localhost:5432/ai_board"
 ```
 
-PostgreSQL 예시:
+psycopg 드라이버명을 명시하는 예시:
 
 ```powershell
 $env:AI_BOARD_DATABASE_URL="postgresql+psycopg://user:password@localhost:5432/ai_board"
@@ -302,8 +302,8 @@ Useful overrides:
 
 - `AI_BOARD_EXTERNAL_PORT`: local backing port. Default `8130`.
 - `AI_BOARD_EXTERNAL_HOST`: local bind host. Default `127.0.0.1` for tunnel-backed exposure.
-- `AI_BOARD_EXTERNAL_WORKERS`: Uvicorn worker count. Keep `1` for local SQLite; use `2` or more only with PostgreSQL.
-- `AI_BOARD_DATABASE_URL`: database URL. For 6-10 real users, prefer PostgreSQL instead of the local SQLite file.
+- `AI_BOARD_EXTERNAL_WORKERS`: Uvicorn worker count. Default `1`; use `2` or more only after PostgreSQL connection limits and token storage are configured.
+- `AI_BOARD_DATABASE_URL`: PostgreSQL database URL. Default `postgresql://ai_board:ai_board@localhost:5432/ai_board`.
 
 Test the external server path without opening a public tunnel:
 
@@ -351,6 +351,7 @@ npm run verify:readme-output
 npm run verify:contract
 npm run verify:production-serve
 npm run verify:external-serve
+npm run verify:postgres
 npm run verify:fastapi
 npm run smoke:ui
 npm run smoke:http
@@ -378,6 +379,7 @@ npm run smoke:http
 - `verify:readme-output`: parses `verify:readme` JSON and checks command/checklist coverage counts
 - `smoke:http`: runs HTTP smoke checks against the managed FastAPI server
 - `smoke:ui`: runs Chrome CDP UI smoke checks against the managed React app
+- `verify:postgres`: starts a separate PostgreSQL-backed FastAPI verification server and checks registration plus integration profile persistence
 - `verify:fastapi`: runs backend tests and React/FastAPI integration verification
 - `verify:full`: runs the full local verification gate, including live-ready checks that still respect dry-run safeguards
 - `test:live-integrations`: checks real GitHub, Notion, Figma, and Google Calendar integrations when user-owned tokens are configured
@@ -422,7 +424,7 @@ npm run test:live-integrations
 한계:
 
 - 실제 운영 수준의 LLM 호출 비용/사용량 추적은 샘플 구조입니다.
-- PostgreSQL과 Redis는 ready 구조지만 로컬 검증 기본값은 SQLite와 메모리 캐시입니다.
+- PostgreSQL은 앱 런타임 기본값입니다. SQLite는 빠른 단위 테스트에서만 사용됩니다. Redis는 로컬에서 메모리 캐시 fallback을 사용할 수 있습니다.
 - Google Calendar는 OAuth access token이 있어야 실제 이벤트 생성까지 가능합니다.
 - Figma 실제 write는 토큰과 파일 권한이 필요합니다.
 
@@ -475,7 +477,7 @@ Serverless checks do not start FastAPI, Vite, or Chrome CDP:
 
 Server-required checks start or expect FastAPI, Vite, Chrome CDP, or live API credentials:
 
-Run server-required checks sequentially; verify:full:quick and verify:fastapi both own and clean ports 3000/8000. verify:external-serve uses port 8131 and must not stop the current server.
+Run server-required checks sequentially. verify:postgres uses port 8140, verify:fastapi uses ports 8141/3141, verify:full:quick uses ports 8142/3142, and verify:external-serve uses port 8131; these checks must not stop the current 3000/8000 server.
 
 Safe local verification order:
 
@@ -483,11 +485,13 @@ Safe local verification order:
 npm run verify:readiness
 npm run verify:command-scope
 npm run verify:readme-output
+npm run verify:postgres
 npm run verify:fastapi
 npm run verify:full:quick
 ```
 
 - `npm run verify:contract`
+- `npm run verify:postgres`
 - `npm run verify:production-serve`
 - `npm run verify:external-serve`
 - `npm run smoke:http`

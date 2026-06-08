@@ -17,6 +17,7 @@ export const serverlessCommands = [
 
 export const serverRequiredCommands = [
   "verify:contract",
+  "verify:postgres",
   "verify:production-serve",
   "verify:external-serve",
   "smoke:http",
@@ -27,15 +28,16 @@ export const serverRequiredCommands = [
   "test:live-integrations",
 ];
 
-export const serverRequiredExclusivePorts = [3000, 8000];
+export const serverRequiredExclusivePorts = [8131, 8140, 8141, 8142, 3141, 3142];
 
 export const serverRequiredConcurrencyNote =
-  "Run server-required checks sequentially; verify:full:quick and verify:fastapi both own and clean ports 3000/8000. verify:external-serve uses port 8131 and must not stop the current server.";
+  "Run server-required checks sequentially. verify:postgres uses port 8140, verify:fastapi uses ports 8141/3141, verify:full:quick uses ports 8142/3142, and verify:external-serve uses port 8131; these checks must not stop the current 3000/8000 server.";
 
 export const safeLocalVerificationOrder = [
   "verify:readiness",
   "verify:command-scope",
   "verify:readme-output",
+  "verify:postgres",
   "verify:fastapi",
   "verify:full:quick",
 ];

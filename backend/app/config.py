@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "AI Board API"
-    database_url: str = "sqlite:///./data/demo-fastapi.db"
+    database_url: str = "postgresql://ai_board:ai_board@localhost:5432/ai_board"
     jwt_secret: str = "local-dev-secret-change-me"
     token_encryption_secret: str = ""
     token_secret_provider: str = "local"

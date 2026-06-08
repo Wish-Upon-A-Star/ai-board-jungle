@@ -1,7 +1,8 @@
 import { start, stop } from "./verify-helpers.mjs";
+import { postgresEnv } from "./postgres-env.mjs";
 import os from "node:os";
 
-const apiEnv = { PYTHONPATH: "backend", AI_BOARD_DATABASE_URL: process.env.AI_BOARD_DATABASE_URL || "sqlite:///./data/dev-fastapi.db" };
+const apiEnv = postgresEnv();
 const host = process.env.AI_BOARD_HOST || "0.0.0.0";
 const apiPort = process.env.AI_BOARD_API_PORT || "8000";
 const webPort = process.env.AI_BOARD_WEB_PORT || "3000";

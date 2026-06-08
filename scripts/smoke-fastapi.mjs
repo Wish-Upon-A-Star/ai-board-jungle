@@ -1,4 +1,4 @@
-const API = "http://127.0.0.1:8000";
+const API = process.env.API_BASE || "http://127.0.0.1:8000";
 
 async function call(path, options = {}, token = "") {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };

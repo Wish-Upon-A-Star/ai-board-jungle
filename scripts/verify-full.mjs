@@ -1,11 +1,13 @@
-import { resetSqliteDb, run, start, stop, stopLocalServers, waitFor } from "./verify-helpers.mjs";
+import { run, start, stop, waitFor } from "./verify-helpers.mjs";
+import { postgresEnv } from "./postgres-env.mjs";
 
-const verifyDbPath = "data/full-verify.db";
-const env = { PYTHONPATH: "backend", AI_BOARD_DATABASE_URL: `sqlite:///./${verifyDbPath}` };
+const env = postgresEnv();
 const skipInstall = process.argv.includes("--skip-install");
+const apiPort = process.env.AI_BOARD_VERIFY_API_PORT || "8142";
+const webPort = process.env.AI_BOARD_VERIFY_WEB_PORT || "3142";
+const apiBase = `http://127.0.0.1:${apiPort}`;
+const appUrl = `http://127.0.0.1:${webPort}`;
 
-stopLocalServers();
-resetSqliteDb(verifyDbPath);
 run("node", ["scripts/verify-hygiene.mjs"]);
 run("node", ["scripts/verify-text-integrity.mjs"]);
 run("node", ["scripts/verify-frontend-helpers.mjs"]);
@@ -31,18 +33,17 @@ run("node", ["scripts/verify-production-serve.mjs", "--skip-build"], { env, time
 run("node", ["scripts/verify-external-serve.mjs"], { env, timeout: 120000 });
 run("python", ["scripts/seed-fastapi.py"], { env });
 
-const api = start("python", ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"], env);
-const web = start("node", ["node_modules/vite/bin/vite.js", "--host", "0.0.0.0", "--port", "3000", "--strictPort"], { VITE_API_BASE: "http://127.0.0.1:8000" }, { cwd: "frontend" });
+const api = start("python", ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", apiPort], env);
+const web = start("node", ["node_modules/vite/bin/vite.js", "--host", "0.0.0.0", "--port", webPort, "--strictPort"], { VITE_API_BASE: apiBase }, { cwd: "frontend" });
 
 try {
-  await waitFor("http://127.0.0.1:8000/api/health");
-  await waitFor("http://127.0.0.1:3000");
-  run("node", ["scripts/verify-api-contract.mjs"], { env });
-  run("node", ["scripts/smoke-fastapi.mjs"], { env });
-  run("node", ["scripts/verify-ui-cdp.mjs"], { env, timeout: 180000 });
-  console.log("\nFULL_VERIFY_OK http://127.0.0.1:3000 http://127.0.0.1:8000/docs");
+  await waitFor(`${apiBase}/api/health`);
+  await waitFor(appUrl);
+  run("node", ["scripts/verify-api-contract.mjs"], { env: { ...env, API_BASE: apiBase } });
+  run("node", ["scripts/smoke-fastapi.mjs"], { env: { ...env, API_BASE: apiBase } });
+  run("node", ["scripts/verify-ui-cdp.mjs"], { env: { ...env, API_BASE: apiBase, APP_URL: appUrl }, timeout: 180000 });
+  console.log(`\nFULL_VERIFY_OK ${appUrl} ${apiBase}/docs`);
 } finally {
   stop(api);
   stop(web);
-  stopLocalServers();
 }
