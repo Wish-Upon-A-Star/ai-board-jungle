@@ -15,6 +15,16 @@ function Field({ label, children }) {
   return <label className="field"><span>{label}</span>{children}</label>;
 }
 
+function providerLabel(kind) {
+  return ({
+    github: "GitHub",
+    notion: "Notion",
+    figma: "Figma",
+    google_calendar: "Google Calendar",
+    google: "Google Calendar",
+  })[kind] || kind;
+}
+
 function renderPostContent(content) {
   const text = String(content || "");
   if (!text.trim()) return <p className="post-paragraph">본문이 비어 있습니다.</p>;
@@ -468,23 +478,61 @@ function App() {
   }
 
   function openMcpProfileSetup(kind = "github") {
-    const isNotion = kind === "notion";
+    const defaults = {
+      github: {
+        name: "GitHub MCP profile",
+        base_url: "https://github.com/<owner>/<repo>",
+        api_provider: "GitHub MCP",
+        token_name: "GITHUB_MCP_TOKEN",
+        mcp_server_url: "mcp://github",
+        mcp_scopes: "repo.read, commits.read, issues.write",
+        rag_targets: "commits,issues,pull_requests",
+      },
+      notion: {
+        name: "Notion MCP profile",
+        base_url: "https://www.notion.so/<workspace>/<page-or-database-id>",
+        api_provider: "Notion MCP",
+        token_name: "NOTION_MCP_TOKEN",
+        mcp_server_url: "mcp://notion",
+        mcp_scopes: "page.read, page.write, database.read, database.write",
+        rag_targets: "notion_pages,notion_database",
+      },
+      figma: {
+        name: "Figma MCP profile",
+        base_url: "https://www.figma.com/design/<fileKey>/<fileName>",
+        api_provider: "Figma MCP",
+        token_name: "FIGMA_MCP_TOKEN",
+        mcp_server_url: "mcp://figma",
+        mcp_scopes: "file_read, file_write",
+        rag_targets: "figma_files,figma_comments",
+      },
+      google_calendar: {
+        name: "Google Calendar MCP profile",
+        base_url: "primary",
+        api_provider: "Google Calendar MCP",
+        token_name: "GOOGLE_CALENDAR_MCP_TOKEN",
+        mcp_server_url: "mcp://google-calendar",
+        mcp_scopes: "calendar.events",
+        rag_targets: "calendar_events",
+      },
+    };
+    const config = defaults[kind] || defaults.github;
     setActiveMainTab("integrations");
     setIntegrationForm({
       ...defaultIntegration,
-      name: isNotion ? "Notion MCP profile" : "GitHub MCP profile",
+      name: config.name,
       source_kind: kind,
-      base_url: isNotion ? "https://www.notion.so/<workspace>/<page-or-database-id>" : "https://github.com/<owner>/<repo>",
-      api_provider: isNotion ? "Notion MCP" : "GitHub MCP",
-      token_name: isNotion ? "NOTION_MCP_TOKEN" : "GITHUB_MCP_TOKEN",
+      base_url: config.base_url,
+      api_provider: config.api_provider,
+      token_name: config.token_name,
       token_value: "",
       auth_type: "mcp_oauth",
-      mcp_server_url: isNotion ? "mcp://notion" : "mcp://github",
+      mcp_server_url: config.mcp_server_url,
       mcp_auth_subject: user?.email || "",
-      mcp_scopes: isNotion ? "page.read, page.write, database.read, database.write" : "repo.read, commits.read, issues.write",
-      rag_targets: isNotion ? "notion_pages,notion_database" : "commits,issues,pull_requests",
+      mcp_scopes: config.mcp_scopes,
+      rag_targets: config.rag_targets,
     });
-    setAutomationSaveState({ status: "error", message: `Create a ${isNotion ? "Notion" : "GitHub"} MCP profile first, then return to the Automation tab.` });
+    setAutomationSaveState({ status: "error", message: `Create a ${providerLabel(kind)} MCP profile first, then return to the Automation tab.` });
   }
 
   async function startMcpLogin(kind = "github") {
@@ -835,13 +883,17 @@ function App() {
               <div className="mcp-setup-actions">
                 <button type="button" onClick={() => startMcpLogin("github")}><GitBranch size={14} /> GitHub MCP 로그인</button>
                 <button type="button" onClick={() => startMcpLogin("notion")}><Link2 size={14} /> Notion MCP 로그인</button>
+                <button type="button" onClick={() => startMcpLogin("figma")}><Link2 size={14} /> Figma MCP 로그인</button>
+                <button type="button" onClick={() => startMcpLogin("google_calendar")}><CalendarClock size={14} /> Google Calendar MCP 로그인</button>
                 <button type="button" onClick={() => openMcpProfileSetup("github")}>수동 GitHub 프로필</button>
                 <button type="button" onClick={() => openMcpProfileSetup("notion")}>수동 Notion 프로필</button>
+                <button type="button" onClick={() => openMcpProfileSetup("figma")}>수동 Figma 프로필</button>
+                <button type="button" onClick={() => openMcpProfileSetup("google_calendar")}>수동 Google Calendar 프로필</button>
               </div>
               {oauthSetup ? (
                 <section className="oauth-setup-card">
                   <div>
-                    <strong>{oauthSetup.provider === "github" ? "GitHub" : "Notion"} MCP 로그인 준비 필요</strong>
+                    <strong>{providerLabel(oauthSetup.provider)} MCP 로그인 준비 필요</strong>
                     <p>{oauthSetup.message}</p>
                   </div>
                   <a href={oauthSetup.setupUrl} target="_blank" rel="noreferrer">OAuth 앱 만들기</a>

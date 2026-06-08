@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
@@ -17,12 +18,59 @@ def parse_figma_file_key(url_or_key: str) -> str:
     return match.group(1) if match else url_or_key.strip()
 
 
+def profile_access_token(profile: IntegrationProfile) -> str:
+    token = reveal_secret(profile.token_value)
+    if not token:
+        return ""
+    try:
+        payload = json.loads(token)
+    except json.JSONDecodeError:
+        return token
+    if isinstance(payload, dict):
+        return str(payload.get("access_token") or "")
+    return token
+
+
+def google_calendar_access_token(profile: IntegrationProfile) -> str:
+    token = reveal_secret(profile.token_value)
+    if not token:
+        return ""
+    try:
+        payload = json.loads(token)
+    except json.JSONDecodeError:
+        return token
+    if not isinstance(payload, dict):
+        return token
+    refresh_token = str(payload.get("refresh_token") or "")
+    client_id = os.environ.get("AI_BOARD_GOOGLE_OAUTH_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
+    if refresh_token and client_id and client_secret:
+        try:
+            response = httpx.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_token,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                },
+                headers={"Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"},
+                timeout=15.0,
+            )
+            if response.is_success:
+                refreshed = response.json()
+                return str(refreshed.get("access_token") or payload.get("access_token") or "")
+        except httpx.HTTPError:
+            pass
+    return str(payload.get("access_token") or "")
+
+
 def safe_calendar_id(value: str) -> str:
     return value.strip() or "primary"
 
 
 def write_github_issue(profile: IntegrationProfile, title: str, body: str, dry_run: bool = True, target_url: str | None = None) -> dict:
-    token = reveal_secret(profile.token_value)
+    token = profile_access_token(profile)
     repo = parse_github_repo(target_url or profile.base_url)
     if not token or not repo:
         return {"service": "github", "status": "blocked", "reason": "missing token or GitHub repository URL", "dryRun": dry_run}
@@ -379,7 +427,7 @@ def write_notion_sources_report(
     dry_run: bool = True,
     target_url: str | None = None,
 ) -> dict:
-    token = reveal_secret(profile.token_value)
+    token = google_calendar_access_token(profile)
     target_id = extract_notion_id(target_url or profile.base_url)
     if not token or not target_id:
         return {"service": "notion", "status": "blocked", "reason": "missing token or Notion page/database URL", "dryRun": dry_run}
@@ -423,7 +471,7 @@ def write_notion_sources_report(
 
 
 def write_notion_task(profile: IntegrationProfile, title: str, body: str, dry_run: bool = True, target_url: str | None = None) -> dict:
-    token = reveal_secret(profile.token_value)
+    token = profile_access_token(profile)
     target_id = extract_notion_id(target_url or profile.base_url)
     if not token or not target_id:
         return {"service": "notion", "status": "blocked", "reason": "missing token or Notion page/database URL", "dryRun": dry_run}
@@ -482,7 +530,7 @@ def write_notion_task(profile: IntegrationProfile, title: str, body: str, dry_ru
     return {"service": "notion", "status": "written", "id": data.get("id", ""), "url": data.get("url", ""), "dryRun": False, "format": "table"}
 
 def write_figma_comment(profile: IntegrationProfile, title: str, body: str, dry_run: bool = True, target_url: str | None = None) -> dict:
-    token = reveal_secret(profile.token_value)
+    token = profile_access_token(profile)
     file_key = parse_figma_file_key(target_url or profile.base_url)
     message = f"{title}\n\n{body}".strip()
     payload = {"message": message, "client_meta": {"x": 0, "y": 0}}
@@ -511,7 +559,7 @@ def write_calendar_event(
     duration_minutes: int = 30,
     target_url: str | None = None,
 ) -> dict:
-    token = reveal_secret(profile.token_value)
+    token = google_calendar_access_token(profile)
     calendar_id = safe_calendar_id(target_url or profile.base_url)
     start = datetime.now(timezone.utc) + timedelta(minutes=max(0, start_minutes_from_now))
     end = start + timedelta(minutes=max(5, duration_minutes))

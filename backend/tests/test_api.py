@@ -22,7 +22,7 @@ from app.db import SessionLocal, engine, init_db
 import app.main as main_module
 from app.main import app
 from app.models import AutomationRun, AutomationTask, IntegrationProfile, KnowledgeSource
-from app.live_writers import notion_sources_template_children, write_github_issue, write_notion_sources_report, write_notion_task
+from app.live_writers import notion_sources_template_children, write_calendar_event, write_github_issue, write_notion_sources_report, write_notion_task
 from app.security import reveal_secret
 
 
@@ -136,6 +136,70 @@ def test_github_issue_writer_comments_on_existing_automation_issue(monkeypatch):
     assert calls[1][2]["body"] == "Updated automation result"
 
 
+def test_oauth_status_lists_all_login_providers(monkeypatch):
+    monkeypatch.delenv("AI_BOARD_FIGMA_OAUTH_CLIENT_ID", raising=False)
+    monkeypatch.delenv("AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET", raising=False)
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "oauth-providers@example.com", "name": "OAuth Providers", "password": "password123"},
+        )
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+        status = client.get("/api/oauth/status", headers=headers)
+    assert status.status_code == 200
+    providers = {item["provider"]: item for item in status.json()["providers"]}
+    assert {"github", "notion", "figma", "google_calendar"} <= set(providers)
+    assert providers["figma"]["missing"] == ["AI_BOARD_FIGMA_OAUTH_CLIENT_ID", "AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET"]
+
+
+def test_figma_oauth_start_builds_authorize_url(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_FIGMA_OAUTH_CLIENT_ID", "figma-client")
+    monkeypatch.setenv("AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET", "figma-secret")
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "figma-oauth@example.com", "name": "Figma OAuth", "password": "password123"},
+        )
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+        response = client.get("/api/oauth/figma/start", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    parsed = urlparse(data["authorizeUrl"])
+    params = parse_qs(parsed.query)
+    assert parsed.scheme == "https"
+    assert parsed.netloc == "www.figma.com"
+    assert parsed.path == "/oauth"
+    assert params["client_id"] == ["figma-client"]
+    assert params["response_type"] == ["code"]
+    assert params["scope"] == ["file_read file_write"]
+    assert data["redirectUri"].endswith("/api/oauth/figma/callback")
+
+
+def test_google_calendar_oauth_start_requests_offline_calendar_access(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_GOOGLE_OAUTH_CLIENT_ID", "google-client")
+    monkeypatch.setenv("AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET", "google-secret")
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "google-oauth@example.com", "name": "Google OAuth", "password": "password123"},
+        )
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+        response = client.get("/api/oauth/google_calendar/start", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    parsed = urlparse(data["authorizeUrl"])
+    params = parse_qs(parsed.query)
+    assert parsed.netloc == "accounts.google.com"
+    assert parsed.path == "/o/oauth2/v2/auth"
+    assert params["client_id"] == ["google-client"]
+    assert params["response_type"] == ["code"]
+    assert params["access_type"] == ["offline"]
+    assert params["include_granted_scopes"] == ["true"]
+    assert params["prompt"] == ["consent"]
+    assert "https://www.googleapis.com/auth/calendar.events" in params["scope"][0]
+    assert data["redirectUri"].endswith("/api/oauth/google_calendar/callback")
+
+
 def test_notion_task_writer_uses_shared_id_parser_for_dashed_ids():
     profile = IntegrationProfile(
         owner_id=1,
@@ -149,6 +213,43 @@ def test_notion_task_writer_uses_shared_id_parser_for_dashed_ids():
     assert write["databaseUrl"] == "https://api.notion.com/v1/databases/1234567890abcdef1234567890abcdef"
     assert write["payload"]["parent"]["database_or_page_id"] == "1234567890abcdef1234567890abcdef"
     assert "plain-notion-token-for-dry-run" not in str(write)
+
+
+def test_calendar_writer_refreshes_google_oauth_token(monkeypatch):
+    calls = []
+
+    class Response:
+        def __init__(self, status_code, data):
+            self.status_code = status_code
+            self._data = data
+            self.headers = {"content-type": "application/json"}
+            self.is_success = 200 <= status_code < 300
+            self.text = json.dumps(data)
+
+        def json(self):
+            return self._data
+
+    def fake_post(url, headers=None, data=None, json=None, timeout=15.0):
+        calls.append((url, headers, data, json))
+        if url == "https://oauth2.googleapis.com/token":
+            return Response(200, {"access_token": "fresh-google-token"})
+        return Response(200, {"id": "event-1", "htmlLink": "https://calendar.google.com/event?eid=1"})
+
+    monkeypatch.setenv("AI_BOARD_GOOGLE_OAUTH_CLIENT_ID", "google-client")
+    monkeypatch.setenv("AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET", "google-secret")
+    monkeypatch.setattr("app.live_writers.httpx.post", fake_post)
+    profile = IntegrationProfile(
+        owner_id=1,
+        name="Google Calendar OAuth",
+        source_kind="google_calendar",
+        base_url="primary",
+        token_value=json.dumps({"access_token": "expired-token", "refresh_token": "refresh-token"}),
+    )
+    write = write_calendar_event(profile, "Review", "Body", dry_run=False)
+    assert write["status"] == "written"
+    assert calls[0][0] == "https://oauth2.googleapis.com/token"
+    assert calls[0][2]["grant_type"] == "refresh_token"
+    assert calls[1][1]["Authorization"] == "Bearer fresh-google-token"
 
 
 def test_notion_task_writer_appends_to_plain_page(monkeypatch):

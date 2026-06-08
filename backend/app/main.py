@@ -320,6 +320,61 @@ def oauth_provider_config(provider: str, request: Request) -> dict:
             "baseUrl": "https://www.notion.so/<workspace>/<page-or-database-id>",
             "setupUrl": "https://www.notion.so/profile/integrations",
         }
+    if normalized == "figma":
+        client_id = os.environ.get("AI_BOARD_FIGMA_OAUTH_CLIENT_ID", "").strip()
+        client_secret = os.environ.get("AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET", "").strip()
+        return {
+            "provider": "figma",
+            "clientId": client_id,
+            "clientSecret": client_secret,
+            "missing": [
+                name
+                for name, value in {
+                    "AI_BOARD_FIGMA_OAUTH_CLIENT_ID": client_id,
+                    "AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET": client_secret,
+                }.items()
+                if not value
+            ],
+            "authorizeUrl": "https://www.figma.com/oauth",
+            "tokenUrl": "https://api.figma.com/v1/oauth/token",
+            "redirectUri": redirect_uri,
+            "scope": "file_read file_write",
+            "mcpServerUrl": "mcp://figma",
+            "apiProvider": "Figma MCP OAuth",
+            "tokenName": "FIGMA_MCP_OAUTH_TOKEN",
+            "ragTargets": ["figma_files", "figma_comments"],
+            "profileName": "Figma MCP OAuth profile",
+            "baseUrl": "https://www.figma.com/design/<fileKey>/<fileName>",
+            "setupUrl": "https://www.figma.com/developers/apps",
+        }
+    if normalized in {"google", "google_calendar"}:
+        client_id = os.environ.get("AI_BOARD_GOOGLE_OAUTH_CLIENT_ID", "").strip()
+        client_secret = os.environ.get("AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
+        return {
+            "provider": "google_calendar",
+            "clientId": client_id,
+            "clientSecret": client_secret,
+            "missing": [
+                name
+                for name, value in {
+                    "AI_BOARD_GOOGLE_OAUTH_CLIENT_ID": client_id,
+                    "AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET": client_secret,
+                }.items()
+                if not value
+            ],
+            "authorizeUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+            "tokenUrl": "https://oauth2.googleapis.com/token",
+            "redirectUri": redirect_uri,
+            "scope": "openid email profile https://www.googleapis.com/auth/calendar.events",
+            "mcpServerUrl": "mcp://google-calendar",
+            "apiProvider": "Google Calendar MCP OAuth",
+            "tokenName": "GOOGLE_CALENDAR_MCP_OAUTH_TOKEN",
+            "ragTargets": ["calendar_events"],
+            "profileName": "Google Calendar MCP OAuth profile",
+            "baseUrl": "primary",
+            "setupUrl": "https://console.cloud.google.com/apis/credentials",
+            "extraAuthorizeParams": {"access_type": "offline", "include_granted_scopes": "true", "prompt": "consent"},
+        }
     raise HTTPException(status_code=404, detail="지원하지 않는 OAuth 제공자입니다.")
 
 
@@ -342,6 +397,31 @@ def exchange_oauth_code(provider_config: dict, code: str) -> dict:
         if payload.get("error"):
             raise HTTPException(status_code=400, detail=f"GitHub OAuth 실패: {payload.get('error_description') or payload['error']}")
         return payload
+    if provider == "figma":
+        basic = base64.b64encode(f"{provider_config['clientId']}:{provider_config['clientSecret']}".encode()).decode()
+        response = httpx.post(
+            provider_config["tokenUrl"],
+            data={"grant_type": "authorization_code", "code": code, "redirect_uri": provider_config["redirectUri"]},
+            headers={"Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded", "Authorization": f"Basic {basic}"},
+            timeout=20.0,
+        )
+        response.raise_for_status()
+        return response.json()
+    if provider == "google_calendar":
+        response = httpx.post(
+            provider_config["tokenUrl"],
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": provider_config["redirectUri"],
+                "client_id": provider_config["clientId"],
+                "client_secret": provider_config["clientSecret"],
+            },
+            headers={"Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"},
+            timeout=20.0,
+        )
+        response.raise_for_status()
+        return response.json()
     basic = base64.b64encode(f"{provider_config['clientId']}:{provider_config['clientSecret']}".encode()).decode()
     response = httpx.post(
         provider_config["tokenUrl"],
@@ -381,6 +461,34 @@ def notion_oauth_subject(payload: dict) -> str:
     )
 
 
+def figma_oauth_subject(access_token: str) -> str:
+    try:
+        response = httpx.get(
+            "https://api.figma.com/v1/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=15.0,
+        )
+        response.raise_for_status()
+        user_info = response.json()
+        return str(user_info.get("email") or user_info.get("handle") or user_info.get("id") or "figma-user")
+    except httpx.HTTPError:
+        return "figma-user"
+
+
+def google_oauth_subject(access_token: str) -> str:
+    try:
+        response = httpx.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=15.0,
+        )
+        response.raise_for_status()
+        user_info = response.json()
+        return str(user_info.get("email") or user_info.get("id") or "google-calendar-user")
+    except httpx.HTTPError:
+        return "google-calendar-user"
+
+
 def upsert_oauth_profile(db: Session, user: User, provider_config: dict, token_payload: dict) -> IntegrationProfile:
     provider = provider_config["provider"]
     access_token = str(token_payload.get("access_token") or "")
@@ -390,7 +498,16 @@ def upsert_oauth_profile(db: Session, user: User, provider_config: dict, token_p
     returned_scope = token_payload.get("scope")
     if isinstance(returned_scope, str) and returned_scope.strip():
         scopes = returned_scope.replace(",", " ").split()
-    subject = github_oauth_subject(access_token) if provider == "github" else notion_oauth_subject(token_payload)
+    if provider == "github":
+        subject = github_oauth_subject(access_token)
+    elif provider == "notion":
+        subject = notion_oauth_subject(token_payload)
+    elif provider == "figma":
+        subject = figma_oauth_subject(access_token)
+    elif provider == "google_calendar":
+        subject = google_oauth_subject(access_token)
+    else:
+        subject = f"{provider}-user"
     profile = db.scalars(
         select(IntegrationProfile)
         .where(
@@ -409,7 +526,10 @@ def upsert_oauth_profile(db: Session, user: User, provider_config: dict, token_p
     profile.base_url = current_base_url
     profile.api_provider = provider_config["apiProvider"]
     profile.token_name = provider_config["tokenName"]
-    profile.token_value = protect_secret(access_token)
+    if provider == "google_calendar":
+        profile.token_value = protect_secret(json.dumps(token_payload, ensure_ascii=False))
+    else:
+        profile.token_value = protect_secret(access_token)
     profile.auth_type = "mcp_oauth"
     profile.mcp_server_url = provider_config["mcpServerUrl"]
     profile.mcp_auth_subject = subject
@@ -816,7 +936,7 @@ def list_integration_profiles(user: User = Depends(current_user), db: Session = 
 @app.get("/api/oauth/status")
 def oauth_status(request: Request, user: User = Depends(current_user)) -> dict:
     providers = []
-    for provider in ("github", "notion"):
+    for provider in ("github", "notion", "figma", "google_calendar"):
         config = oauth_provider_config(provider, request)
         providers.append(
             {
@@ -857,10 +977,11 @@ def start_oauth_login(provider: str, request: Request, user: User = Depends(curr
         "response_type": "code",
         "state": state,
     }
-    if config["provider"] == "github":
+    if config["provider"] in {"github", "figma", "google_calendar"}:
         params["scope"] = config["scope"]
-    else:
+    if config["provider"] == "notion":
         params["owner"] = "user"
+    params.update(config.get("extraAuthorizeParams", {}))
     query = str(httpx.QueryParams(params))
     return {
         "provider": config["provider"],
