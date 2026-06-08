@@ -1461,6 +1461,22 @@ WATCHED_AUTOMATION_FIELDS = [
 ]
 
 
+def is_ai_board_generated_source(item: CollectedItem) -> bool:
+    if item.source_type != "github_issue":
+        return False
+    tags = {tag.lower() for tag in item.tags}
+    text = f"{item.title}\n{item.text}".lower()
+    return (
+        {"ai-board", "automation"} <= tags
+        and ("[ai board]" in text or "automation:" in text or "route:" in text)
+    )
+
+
+def filter_automation_loop_sources(items: list[CollectedItem]) -> tuple[list[CollectedItem], int]:
+    filtered = [item for item in items if not is_ai_board_generated_source(item)]
+    return filtered, len(items) - len(filtered)
+
+
 def execute_automation_task(
     db: Session,
     task: AutomationTask,
@@ -1481,6 +1497,9 @@ def execute_automation_task(
             collection_warnings = []
         else:
             items, collection_warnings = collect_profile_items(task.integration_profile, limit=limit, pages=pages)
+        items, filtered_loop_items = filter_automation_loop_sources(items)
+        if filtered_loop_items:
+            collection_warnings.append(f"AI Board가 생성한 자동화 이슈 {filtered_loop_items}개를 루프 방지용으로 제외했습니다.")
         saved_sources = save_collected_items(db, actor, task.integration_profile, items) if items else []
         report_sources = saved_sources or [
             {
@@ -1509,7 +1528,10 @@ def execute_automation_task(
             task_id=task.id,
             profile_id=task.integration_profile_id,
         )
-    external_change_key = "|".join(sorted([source.file_name for source in saved_sources] + ([external_event_key] if external_event_key else [])))
+    source_change_urls = []
+    if task.integration_profile:
+        source_change_urls = [source.url for source in items if source.url]
+    external_change_key = "|".join(sorted(source_change_urls + ([external_event_key] if external_event_key else [])))
     current_hash = hashlib.sha256(f"{automation_fingerprint(task)}|{external_change_key}".encode("utf-8")).hexdigest()
     if task.last_input_hash == current_hash:
         result = {

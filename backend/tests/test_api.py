@@ -1423,6 +1423,29 @@ def test_watched_automation_commit_summary_is_specific_korean():
     assert "포괄 문장으로 보이지 않도록" in clarified
 
 
+def test_ai_board_generated_issue_is_filtered_from_automation_inputs():
+    items, filtered = main_module.filter_automation_loop_sources(
+        [
+            CollectedItem(
+                title="[AI Board] GitHub 이슈를 Notion 업무로 동기화",
+                source_type="github_issue",
+                url="https://github.com/Wish-Upon-A-Star/ai-board-jungle/issues/6",
+                text="Automation: GitHub 이슈를 Notion 업무로 동기화\nRoute: GitHub -> Notion",
+                tags=["github", "issue", "ai-board", "automation"],
+            ),
+            CollectedItem(
+                title="사용자 요청 이슈",
+                source_type="github_issue",
+                url="https://github.com/Wish-Upon-A-Star/ai-board-jungle/issues/9",
+                text="사용자가 직접 만든 변경 요청",
+                tags=["github", "issue"],
+            ),
+        ]
+    )
+    assert filtered == 1
+    assert [item.title for item in items] == ["사용자 요청 이슈"]
+
+
 def test_custom_connection_validation_rejects_incomplete_entries():
     with TestClient(app) as client:
         register = client.post(
