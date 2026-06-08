@@ -31,6 +31,33 @@ function assertSafeOrder(content, label) {
   }
 }
 
+const validSafeOrderExample = [
+  "Safe local verification order:",
+  "",
+  "```powershell",
+  ...safeLocalVerificationOrder.map((command) => `npm run ${command}`),
+  "```",
+].join("\n");
+const reversedSafeOrderExample = [
+  "Safe local verification order:",
+  "",
+  "```powershell",
+  ...[...safeLocalVerificationOrder].reverse().map((command) => `npm run ${command}`),
+  "```",
+].join("\n");
+const partialSafeOrderExample = [
+  "Safe local verification order:",
+  "",
+  "```powershell",
+  ...safeLocalVerificationOrder.slice(0, -1).map((command) => `npm run ${command}`),
+  "```",
+].join("\n");
+const safeOrderNegativeScenarios = [
+  "missingSafeOrderHeading",
+  "reorderedSafeOrder",
+  "partialSafeOrder",
+];
+
 const serverless = extractList(
   "Serverless checks do not start FastAPI, Vite, or Chrome CDP:",
   "\nServer-required checks start or expect FastAPI, Vite, Chrome CDP, or live API credentials:"
@@ -58,6 +85,25 @@ assert.ok(
   submissionChecklist.includes(serverRequiredConcurrencyNote),
   "submission checklist must warn that server-required checks run sequentially"
 );
+assert.doesNotThrow(
+  () => assertSafeOrder(validSafeOrderExample, "synthetic valid safe order"),
+  "synthetic safe local verification order fixture must pass"
+);
+assert.throws(
+  () => assertSafeOrder("", "synthetic missing safe order heading"),
+  /safe local verification order example/,
+  "synthetic safe order fixture without heading must fail"
+);
+assert.throws(
+  () => assertSafeOrder(reversedSafeOrderExample, "synthetic reordered safe order"),
+  /must list verify:command-scope in order/,
+  "synthetic safe order fixture with reversed commands must fail"
+);
+assert.throws(
+  () => assertSafeOrder(partialSafeOrderExample, "synthetic partial safe order"),
+  /must list verify:full:quick in order/,
+  "synthetic safe order fixture without final server-required command must fail"
+);
 assertSafeOrder(readme, "README");
 assertSafeOrder(submissionChecklist, "submission checklist");
 
@@ -68,4 +114,5 @@ console.log(JSON.stringify({
   serverRequiredExclusivePorts,
   serverRequiredConcurrencyNote,
   safeLocalVerificationOrder,
+  safeOrderNegativeScenarios,
 }, null, 2));
