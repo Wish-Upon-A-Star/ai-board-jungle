@@ -22,7 +22,7 @@ from app.db import SessionLocal, engine, init_db
 import app.main as main_module
 from app.main import app
 from app.models import AutomationRun, AutomationTask, IntegrationProfile, KnowledgeSource
-from app.live_writers import write_github_issue, write_notion_sources_table, write_notion_task
+from app.live_writers import write_github_issue, write_notion_sources_report, write_notion_task
 from app.security import reveal_secret
 
 
@@ -146,7 +146,7 @@ def test_notion_task_writer_appends_to_plain_page(monkeypatch):
     assert table["children"][1]["table_row"]["cells"][0][0]["text"]["content"] == "Title"
 
 
-def test_notion_sources_table_writer_preserves_korean_headers(monkeypatch):
+def test_notion_sources_report_writer_uses_request_template(monkeypatch):
     calls = []
 
     class Response:
@@ -170,9 +170,9 @@ def test_notion_sources_table_writer_preserves_korean_headers(monkeypatch):
         base_url="https://app.notion.com/p/3797051c2f9981b4bad3fe6545622eb8",
         token_value="plain-notion-page-token",
     )
-    write = write_notion_sources_table(
+    write = write_notion_sources_report(
         profile,
-        "GitHub 변경사항 한국어 표",
+        "GitHub 변경사항 요청 템플릿",
         [
             {
                 "title": "Fix OAuth callback",
@@ -181,25 +181,62 @@ def test_notion_sources_table_writer_preserves_korean_headers(monkeypatch):
                 "summary": "OAuth 콜백을 수정했습니다.",
             }
         ],
+        "요청 제목: {title}\n요청 이유: {reason}\n관련 링크: {source_url}",
         dry_run=False,
     )
     assert write["status"] == "written"
-    table = calls[0][1]["children"][2]["table"]
-    header_cells = table["children"][0]["table_row"]["cells"]
-    assert [cell[0]["text"]["content"] for cell in header_cells] == ["번호", "구분", "제목", "요약", "링크"]
-    first_row = table["children"][1]["table_row"]["cells"]
-    assert first_row[1][0]["text"]["content"] == "커밋"
-    assert "OAuth 콜백" in first_row[3][0]["text"]["content"]
+    assert write["format"] == "template-rendered-blocks"
+    blocks = calls[0][1]["children"]
+    rendered_text = "\n".join(
+        "".join(part["text"]["content"] for part in block.get(block["type"], {}).get("rich_text", []))
+        for block in blocks
+        if block["type"] in {"paragraph", "heading_3"}
+    )
+    assert "요청 제목: Fix OAuth callback" in rendered_text
+    assert "요청 이유: OAuth 콜백을 수정했습니다." in rendered_text
+    assert "관련 링크: https://github.com/acme/repo/commit/1" in rendered_text
+
+
+def test_notion_sources_report_writer_chunks_large_template_payload(monkeypatch):
+    calls = []
+
+    class Response:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        is_success = True
+        text = "{}"
+
+        def json(self):
+            return {"results": []}
+
+    def fake_patch(url, headers=None, json=None, timeout=30.0):
+        calls.append(json)
+        return Response()
+
+    monkeypatch.setattr("app.live_writers.httpx.patch", fake_patch)
+    profile = IntegrationProfile(
+        owner_id=1,
+        name="Chunked Notion",
+        source_kind="notion",
+        base_url="https://app.notion.com/p/3797051c2f9981b4bad3fe6545622eb8",
+        token_value="plain-notion-page-token",
+    )
+    sources = [{"title": f"Issue {index}", "sourceType": "github_issue", "url": f"https://example.test/{index}", "summary": "line"} for index in range(43)]
+    write = write_notion_sources_report(profile, "Chunked template", sources, "요청 제목: {title}\n요약: {summary}\n링크: {source_url}", dry_run=False)
+    assert write["status"] == "written"
+    assert len(calls) > 1
+    assert all(len(call["children"]) <= 100 for call in calls)
+    assert sum(len(call["children"]) for call in calls) > 100
 
 
 def test_replay_notion_hydrates_legacy_collected_summary(monkeypatch):
     captured = []
 
-    def fake_write_notion_sources_table(profile, title, sources, dry_run=True, target_url=None):
-        captured.append({"title": title, "sources": sources, "dryRun": dry_run})
-        return {"service": "notion", "status": "written", "format": "korean-summary-table", "count": len(sources), "dryRun": dry_run}
+    def fake_write_notion_sources_report(profile, title, sources, template, dry_run=True, target_url=None):
+        captured.append({"title": title, "sources": sources, "template": template, "dryRun": dry_run})
+        return {"service": "notion", "status": "written", "format": "template-rendered-blocks", "count": len(sources), "dryRun": dry_run}
 
-    monkeypatch.setattr("app.main.write_notion_sources_table", fake_write_notion_sources_table)
+    monkeypatch.setattr("app.main.write_notion_sources_report", fake_write_notion_sources_report)
     with TestClient(app) as client:
         register = client.post(
             "/api/auth/register",
@@ -279,8 +316,9 @@ def test_replay_notion_hydrates_legacy_collected_summary(monkeypatch):
             run_id = run.id
         replay = client.post(f"/api/automations/{task['id']}/runs/{run_id}/replay-notion", headers=headers)
         assert replay.status_code == 200
-        assert replay.json()["run"]["result"]["liveWrites"][0]["format"] == "korean-summary-table"
+        assert replay.json()["run"]["result"]["liveWrites"][0]["format"] == "template-rendered-blocks"
         assert captured[0]["sources"][0]["summary"] == "레거시 실행에는 없던 상세 요약입니다."
+        assert "요청 제목" in captured[0]["template"] or captured[0]["template"] == "table"
 
 
 def test_mcp_auth_profile_is_user_owned_and_redacted():
@@ -722,19 +760,19 @@ def test_full_fastapi_flow(monkeypatch):
             written.append({"service": profile.source_kind, "title": title, "body": body, "dryRun": dry_run})
             return {"service": profile.source_kind, "status": "written", "url": f"https://example.test/{profile.source_kind}", "dryRun": dry_run}
 
-        def fake_write_notion_sources_table(profile, title, sources, dry_run=True, target_url=None):
-            notion_tables.append({"service": profile.source_kind, "title": title, "sources": sources, "dryRun": dry_run, "targetUrl": target_url})
+        def fake_write_notion_sources_report(profile, title, sources, template, dry_run=True, target_url=None):
+            notion_tables.append({"service": profile.source_kind, "title": title, "sources": sources, "template": template, "dryRun": dry_run, "targetUrl": target_url})
             return {
                 "service": "notion",
                 "status": "written",
                 "url": "https://example.test/notion",
                 "dryRun": dry_run,
-                "format": "korean-summary-table",
+                "format": "template-rendered-blocks",
                 "count": len(sources),
             }
 
         monkeypatch.setattr("app.main.execute_profile_write", fake_execute_profile_write)
-        monkeypatch.setattr("app.main.write_notion_sources_table", fake_write_notion_sources_table)
+        monkeypatch.setattr("app.main.write_notion_sources_report", fake_write_notion_sources_report)
         first_run = client.post(f"/api/automations/{task_id}/run", headers=headers)
         assert first_run.status_code == 200
         assert first_run.json()["run"]["result"]["status"] == "changed"
@@ -1228,17 +1266,18 @@ def test_github_webhook_signature_triggers_matching_automation(monkeypatch):
 
     monkeypatch.setattr("app.main.execute_profile_write", fake_write)
 
-    def fake_write_notion_sources_table(profile, title, sources, dry_run=True, target_url=None):
+    def fake_write_notion_sources_report(profile, title, sources, template, dry_run=True, target_url=None):
         notion_tables.append({
             "service": profile.source_kind,
             "title": title,
             "sources": [{"title": source.title, "text": source.extracted_text, "url": source.file_name} for source in sources],
+            "template": template,
             "dryRun": dry_run,
             "targetUrl": target_url,
         })
-        return {"service": "notion", "status": "written", "url": "https://example.test/notion", "dryRun": dry_run, "format": "korean-summary-table", "count": len(sources)}
+        return {"service": "notion", "status": "written", "url": "https://example.test/notion", "dryRun": dry_run, "format": "template-rendered-blocks", "count": len(sources)}
 
-    monkeypatch.setattr("app.main.write_notion_sources_table", fake_write_notion_sources_table)
+    monkeypatch.setattr("app.main.write_notion_sources_report", fake_write_notion_sources_report)
     try:
         with TestClient(app) as client:
             register = client.post(
@@ -1327,7 +1366,7 @@ def test_github_webhook_signature_triggers_matching_automation(monkeypatch):
             assert data["triggered"][0]["status"] == "changed"
             assert notion_tables
             assert notion_tables[0]["service"] == "notion"
-            assert "한국어 표" in notion_tables[0]["title"]
+            assert "요청 템플릿" in notion_tables[0]["title"]
             assert notion_tables[0]["sources"][0]["title"] == "[Hooked GitHub] Webhook commit"
             activities = client.get("/api/integration-activities?event_type=automation.live_write", headers=headers).json()["activities"]
             assert any(item["provider"] == "notion" and item["status"] == "written" for item in activities)
@@ -1359,17 +1398,18 @@ def test_github_webhook_commits_are_written_to_notion_without_collector(monkeypa
     monkeypatch.setattr("app.main.collect_profile_items", no_live_collect)
     monkeypatch.setattr("app.main.execute_profile_write", fake_write)
 
-    def fake_write_notion_sources_table(profile, title, sources, dry_run=True, target_url=None):
+    def fake_write_notion_sources_report(profile, title, sources, template, dry_run=True, target_url=None):
         notion_tables.append({
             "service": profile.source_kind,
             "title": title,
             "sources": [{"title": source.title, "text": source.extracted_text, "url": source.file_name} for source in sources],
+            "template": template,
             "dryRun": dry_run,
             "targetUrl": target_url,
         })
-        return {"service": "notion", "status": "written", "url": "https://example.test/notion", "dryRun": dry_run, "format": "korean-summary-table", "count": len(sources)}
+        return {"service": "notion", "status": "written", "url": "https://example.test/notion", "dryRun": dry_run, "format": "template-rendered-blocks", "count": len(sources)}
 
-    monkeypatch.setattr("app.main.write_notion_sources_table", fake_write_notion_sources_table)
+    monkeypatch.setattr("app.main.write_notion_sources_report", fake_write_notion_sources_report)
     try:
         with TestClient(app) as client:
             register = client.post(
@@ -1459,7 +1499,7 @@ def test_github_webhook_commits_are_written_to_notion_without_collector(monkeypa
             assert data["triggered"][0]["status"] == "changed"
             assert notion_tables
             assert notion_tables[0]["service"] == "notion"
-            assert "한국어 표" in notion_tables[0]["title"]
+            assert "요청 템플릿" in notion_tables[0]["title"]
             assert notion_tables[0]["sources"][0]["title"].startswith("[Webhook Payload GitHub] Webhook commit 7ee9f823ab2a")
             assert "Add guarded live apply command" in notion_tables[0]["sources"][0]["text"]
     finally:
@@ -1496,17 +1536,18 @@ def test_notion_webhook_signature_triggers_matching_automation(monkeypatch):
     monkeypatch.setattr("app.main.collect_profile_items", fake_collect)
     monkeypatch.setattr("app.main.execute_profile_write", fake_write)
 
-    def fake_write_notion_sources_table(profile, title, sources, dry_run=True, target_url=None):
+    def fake_write_notion_sources_report(profile, title, sources, template, dry_run=True, target_url=None):
         notion_tables.append({
             "service": profile.source_kind,
             "title": title,
             "sources": [{"title": source.title, "text": source.extracted_text, "url": source.file_name} for source in sources],
+            "template": template,
             "dryRun": dry_run,
             "targetUrl": target_url,
         })
-        return {"service": "notion", "status": "written", "url": "https://example.test/notion", "dryRun": dry_run, "format": "korean-summary-table", "count": len(sources)}
+        return {"service": "notion", "status": "written", "url": "https://example.test/notion", "dryRun": dry_run, "format": "template-rendered-blocks", "count": len(sources)}
 
-    monkeypatch.setattr("app.main.write_notion_sources_table", fake_write_notion_sources_table)
+    monkeypatch.setattr("app.main.write_notion_sources_report", fake_write_notion_sources_report)
     try:
         with TestClient(app) as client:
             register = client.post(
@@ -1567,7 +1608,7 @@ def test_notion_webhook_signature_triggers_matching_automation(monkeypatch):
             assert data["triggered"][0]["status"] == "changed"
             assert notion_tables
             assert notion_tables[0]["service"] == "notion"
-            assert "한국어 표" in notion_tables[0]["title"]
+            assert "요청 템플릿" in notion_tables[0]["title"]
             assert notion_tables[0]["sources"][0]["title"] == "[Hooked Notion] Webhook task page"
     finally:
         monkeypatch.delenv("AI_BOARD_NOTION_WEBHOOK_SECRET", raising=False)

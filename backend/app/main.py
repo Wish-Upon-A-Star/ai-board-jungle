@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from .collectors import CollectedItem, collect_profile_items, extract_notion_id, parse_github_repo, save_collected_items
 from .db import check_db, database_reachable, get_db, init_db
-from .live_writers import execute_profile_write, write_notion_sources_table
+from .live_writers import execute_profile_write, write_notion_sources_report
 from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, User
 from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LiveWriteIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
 from .security import create_token, current_user, hash_password, protect_secret, reveal_secret, secret_preview, secret_storage_type, verify_password
@@ -545,6 +545,16 @@ def source_write_body(task: AutomationTask, source: KnowledgeSource) -> str:
             source.extracted_text,
         ]
         if part
+    )
+
+
+def task_output_template(task: AutomationTask) -> str:
+    return (
+        task.request_template.strip()
+        or task.notion_template.strip()
+        or task.custom_template.strip()
+        or task.template.strip()
+        or "{title}\n{summary}\n{source_url}"
     )
 
 
@@ -1424,10 +1434,11 @@ def execute_automation_task(
             original_base_url = profile.base_url
             profile.base_url = str(connection.get("url") or profile.base_url)
             if service == "notion" and saved_sources:
-                write = write_notion_sources_table(
+                write = write_notion_sources_report(
                     profile,
-                    f"[AI Board] {task.name} - GitHub 변경사항 한국어 표",
+                    f"[AI Board] {task.name} - 요청 템플릿 렌더링",
                     saved_sources,
+                    task_output_template(task),
                     dry_run=False,
                 )
             else:
@@ -1527,10 +1538,11 @@ def replay_automation_run_to_notion(task_id: int, run_id: int, user: User = Depe
     connection = next((item for item in parse_connections(task.custom_connections) if str(item.get("service", "")).lower() == "notion"), {})
     original_base_url = profile.base_url
     profile.base_url = str(connection.get("url") or task.notion_database_url or profile.base_url)
-    write = write_notion_sources_table(
+    write = write_notion_sources_report(
         profile,
-        f"[AI Board] {task.name} - run {run.id} 재전송 한국어 표",
+        f"[AI Board] {task.name} - run {run.id} 요청 템플릿 재전송",
         collected_items,
+        task_output_template(task),
         dry_run=False,
     )
     profile.base_url = original_base_url
