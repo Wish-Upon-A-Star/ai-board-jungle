@@ -566,6 +566,146 @@ def notion_sources_template_children(title: str, sources: list[object], template
     ]
 
 
+def select_option_names(prop: dict) -> set[str]:
+    if prop.get("type") != "select":
+        return set()
+    return {str(option.get("name", "")) for option in prop.get("select", {}).get("options", [])}
+
+
+def kanban_status_for_source(context: dict[str, str], option_names: set[str]) -> str | None:
+    available = {name.lower(): name for name in option_names}
+    combined = f"{context.get('title', '')} {context.get('summary', '')}".lower()
+    source_type = (context.get("source_type") or "").lower()
+    if any(token in combined for token in ["failed", "failure", "error", "blocked", "실패", "오류", "차단"]):
+        return available.get("blocked") or available.get("in progress") or available.get("not started")
+    if "issue" in source_type and any(token in combined for token in ["state: closed", "closed", "완료", "닫힘"]):
+        return available.get("done") or available.get("complete") or available.get("completed")
+    if "commit" in source_type:
+        return available.get("not started") or available.get("inbox") or available.get("todo")
+    if "issue" in source_type:
+        return available.get("not started") or available.get("in progress") or available.get("todo")
+    return available.get("not started") or available.get("in progress") or available.get("todo")
+
+
+def source_database_properties(database: dict, source: object, index: int) -> dict:
+    context = source_context(source, index)
+    lowered = f"{context['title']} {context['summary']}".lower()
+    risk = "높음" if any(token in lowered for token in ["security", "auth", "token", "secret", "fail", "error", "보안", "실패"]) else "보통"
+    summary = korean_summary_for_source(context)
+    properties: dict = {}
+    rich_text_seen = 0
+    for name, prop in database.get("properties", {}).items():
+        prop_type = prop.get("type")
+        normalized_name = re.sub(r"\s+", "", name).lower()
+        if prop_type == "title":
+            properties[name] = {"title": notion_text(context["title"] or "(제목 없음)", 200)}
+        elif prop_type == "select":
+            option_names = select_option_names(prop)
+            if {"Not started", "In progress", "Done"} & option_names:
+                status = kanban_status_for_source(context, option_names) or "Not started"
+                properties[name] = {"select": {"name": status}}
+            elif context["source_type"] in option_names:
+                properties[name] = {"select": {"name": context["source_type"]}}
+            elif "automation_report" in option_names:
+                properties[name] = {"select": {"name": "automation_report"}}
+        elif prop_type == "multi_select":
+            option_names = {str(option.get("name", "")) for option in prop.get("multi_select", {}).get("options", [])}
+            impact = [name for name in ["BOARD", "PAGES", "GANTT"] if name in option_names]
+            if impact:
+                properties[name] = {"multi_select": [{"name": item} for item in impact]}
+        elif prop_type == "rich_text":
+            if normalized_name in {"한국어요약", "요약", "summary"} or rich_text_seen == 0:
+                properties[name] = {"rich_text": notion_text(summary, 1800)}
+            elif normalized_name in {"다음조치", "nextaction", "action"} or rich_text_seen == 1:
+                properties[name] = {"rich_text": notion_text(context["next_action"], 900)}
+            rich_text_seen += 1
+        elif prop_type == "url":
+            if context["source_url"]:
+                properties[name] = {"url": context["source_url"][:2000]}
+        elif prop_type == "number":
+            properties[name] = {"number": index}
+    return properties
+
+
+def notion_source_database_page_children(source: object, index: int, template: str) -> list[dict]:
+    context = source_context(source, index)
+    rows = [
+        ["필드", "값"],
+        ["유형", context["source_type"]],
+        ["한국어 요약", korean_summary_for_source(context)],
+        ["영향 영역", "BOARD / PAGES / GANTT"],
+        ["다음 조치", context["next_action"]],
+        ["링크", context["source_url"]],
+    ]
+    children = [
+        callout_block("칸반 카드 상세 내용입니다. 상태 속성으로 보드 열을 관리합니다.", "📋"),
+        notion_table_block(rows, header=True),
+    ]
+    if template.strip():
+        children.append(toggle_block("요청 템플릿 렌더링", [paragraph_block(line) for line in render_template(template, context).strip().splitlines()]))
+    return children
+
+
+def write_notion_sources_database_report(
+    token: str,
+    target_id: str,
+    title: str,
+    sources: list[object],
+    template: str,
+    dry_run: bool,
+) -> dict | None:
+    headers = {"Authorization": f"Bearer {token}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"}
+    database_url = f"https://api.notion.com/v1/databases/{target_id}"
+    try:
+        database_response = httpx.get(database_url, headers=headers, timeout=15.0)
+    except httpx.HTTPError as exc:
+        return {"service": "notion", "status": "failed", "reason": str(exc), "dryRun": dry_run, "target": "database"}
+    if not database_response.is_success:
+        return None
+    database = database_response.json()
+    page_url = "https://api.notion.com/v1/pages"
+    if dry_run:
+        return {
+            "service": "notion",
+            "status": "ready",
+            "method": "POST",
+            "url": page_url,
+            "databaseUrl": database_url,
+            "dryRun": True,
+            "target": "database",
+            "format": "kanban-database-cards",
+            "count": len(sources),
+        }
+    written: list[dict] = []
+    for index, source in enumerate(sources, start=1):
+        payload = {
+            "parent": {"database_id": target_id},
+            "properties": source_database_properties(database, source, index),
+            "children": notion_source_database_page_children(source, index, template),
+        }
+        try:
+            response = httpx.post(page_url, headers=headers, json=payload, timeout=20.0)
+        except httpx.HTTPError as exc:
+            return {"service": "notion", "status": "failed", "reason": str(exc), "dryRun": False, "target": "database", "written": written}
+        data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"raw": response.text}
+        if not response.is_success:
+            return {"service": "notion", "status": "failed", "code": response.status_code, "response": data, "dryRun": False, "target": "database", "written": written}
+        written.append({"id": data.get("id", ""), "url": data.get("url", "")})
+    return {
+        "service": "notion",
+        "status": "written",
+        "id": target_id,
+        "url": f"https://www.notion.so/{target_id}",
+        "dryRun": False,
+        "target": "database",
+        "format": "kanban-database-cards",
+        "template": template,
+        "count": len(sources),
+        "cards": written,
+        "reportTitle": title,
+    }
+
+
 def write_notion_sources_report(
     profile: IntegrationProfile,
     title: str,
@@ -578,6 +718,9 @@ def write_notion_sources_report(
     target_id = extract_notion_id(target_url or profile.base_url)
     if not token or not target_id:
         return {"service": "notion", "status": "blocked", "reason": "missing token or Notion page/database URL", "dryRun": dry_run}
+    database_write = write_notion_sources_database_report(token, target_id, title, sources, template, dry_run)
+    if database_write is not None:
+        return database_write
     children = notion_sources_template_children(title, sources, template)
     block_children_url = f"https://api.notion.com/v1/blocks/{target_id}/children"
     if dry_run:

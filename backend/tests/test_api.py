@@ -408,6 +408,98 @@ def test_notion_sources_report_writer_chunks_large_template_payload(monkeypatch)
     assert find_first_block(calls[0]["children"], "table") is not None
 
 
+def test_notion_sources_report_writes_kanban_database_cards(monkeypatch):
+    created_pages = []
+
+    class Response:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        is_success = True
+        text = "{}"
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def json(self):
+            return self.payload
+
+    database_payload = {
+        "id": "3797051c2f9981e882f0e9ed7da544a1",
+        "properties": {
+            "title": {"type": "title", "title": {}},
+            "상태": {
+                "type": "select",
+                "select": {"options": [{"name": "Not started"}, {"name": "In progress"}, {"name": "Done"}, {"name": "Blocked"}]},
+            },
+            "유형": {
+                "type": "select",
+                "select": {"options": [{"name": "github_commit"}, {"name": "github_issue"}, {"name": "notion_change"}, {"name": "automation_report"}]},
+            },
+            "한국어 요약": {"type": "rich_text", "rich_text": {}},
+            "영향 영역": {
+                "type": "multi_select",
+                "multi_select": {"options": [{"name": "BOARD"}, {"name": "PAGES"}, {"name": "GANTT"}]},
+            },
+            "다음 조치": {"type": "rich_text", "rich_text": {}},
+            "링크": {"type": "url", "url": {}},
+            "자동화 실행": {"type": "number", "number": {}},
+        },
+    }
+
+    def fake_get(url, headers=None, timeout=15.0):
+        return Response(database_payload)
+
+    def fake_post(url, headers=None, json=None, timeout=15.0):
+        created_pages.append(json)
+        return Response({"id": f"page-{len(created_pages)}", "url": f"https://notion.test/page-{len(created_pages)}"})
+
+    monkeypatch.setattr("app.live_writers.httpx.get", fake_get)
+    monkeypatch.setattr("app.live_writers.httpx.post", fake_post)
+    profile = IntegrationProfile(
+        owner_id=1,
+        name="Kanban Notion",
+        source_kind="notion",
+        base_url="https://app.notion.com/p/3797051c2f9981e882f0e9ed7da544a1",
+        token_value="plain-notion-database-token",
+    )
+
+    write = write_notion_sources_report(
+        profile,
+        "칸반 보고",
+        [
+            {
+                "title": "Commit abc123: Add OAuth login",
+                "sourceType": "github_commit",
+                "url": "https://github.com/acme/repo/commit/abc123",
+                "summary": "author: User sha: abc123 date: 2026-06-09",
+            },
+            {
+                "title": "Issue #7: failed sync",
+                "sourceType": "github_issue",
+                "url": "https://github.com/acme/repo/issues/7",
+                "summary": "state: open error: Notion write failed",
+            },
+        ],
+        "요청 제목: {title}\n요약: {summary}",
+        dry_run=False,
+    )
+
+    assert write["status"] == "written"
+    assert write["target"] == "database"
+    assert write["format"] == "kanban-database-cards"
+    assert len(created_pages) == 2
+    first = created_pages[0]["properties"]
+    second = created_pages[1]["properties"]
+    assert created_pages[0]["parent"] == {"database_id": "3797051c2f9981e882f0e9ed7da544a1"}
+    assert first["상태"]["select"]["name"] == "Not started"
+    assert first["유형"]["select"]["name"] == "github_commit"
+    assert first["영향 영역"]["multi_select"] == [{"name": "BOARD"}, {"name": "PAGES"}, {"name": "GANTT"}]
+    assert "OAuth login" in first["한국어 요약"]["rich_text"][0]["text"]["content"]
+    assert first["링크"]["url"] == "https://github.com/acme/repo/commit/abc123"
+    assert second["상태"]["select"]["name"] == "Blocked"
+    assert find_first_block(created_pages[0]["children"], "table") is not None
+
+
 def test_notion_sources_report_uses_real_table_for_markdown_table_template():
     blocks = notion_sources_template_children(
         "GitHub 변경사항 자동 요약",
