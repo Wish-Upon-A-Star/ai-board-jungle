@@ -63,6 +63,14 @@ const mainTabs = [
   { id: "api", label: "점검", description: "상태와 도구 호출" },
 ];
 
+const templatePresetOptions = [
+  { value: "github_notion", label: "GitHub 변경사항 -> Notion BOARD" },
+  { value: "team_notion_board_to_github", label: "Notion BOARD 요청 -> GitHub Issue" },
+  { value: "team_notion_gantt_to_calendar", label: "Notion GANTT -> Google Calendar" },
+  { value: "figma_calendar", label: "Figma 검토 -> Google Calendar" },
+  { value: "custom", label: "직접 구성" },
+];
+
 const tabIntro = {
   automations: {
     title: "자동화 작업",
@@ -908,7 +916,11 @@ function App() {
                   <Field label="AI API Base"><input list="ai-api-base-options" value={profileSettings?.aiApiBase || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiApiBase: e.target.value })} placeholder="https://api.openai.com/v1" /></Field>
                 </div>
                 <div className="grid2">
-                  <Field label="템플릿 프리셋"><input value={profileSettings?.templatePreset || ""} onChange={(e) => setProfileSettings({ ...profileSettings, templatePreset: e.target.value })} /></Field>
+                  <Field label="템플릿 프리셋" hint="자동화가 어떤 기본 양식과 연결 흐름을 쓸지 고릅니다.">
+                    <select value={profileSettings?.templatePreset || "github_notion"} onChange={(e) => setProfileSettings({ ...profileSettings, templatePreset: e.target.value })}>
+                      {templatePresetOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </Field>
                   <Field label="API Key 전략"><input value={profileSettings?.apiKeyStrategy || ""} onChange={(e) => setProfileSettings({ ...profileSettings, apiKeyStrategy: e.target.value })} /></Field>
                 </div>
                 <Field label="기본 커스텀 템플릿"><textarea value={profileSettings?.customTemplate || ""} onChange={(e) => setProfileSettings({ ...profileSettings, customTemplate: e.target.value })} /></Field>
