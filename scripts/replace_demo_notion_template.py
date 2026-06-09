@@ -14,7 +14,7 @@ from app.security import reveal_secret
 
 
 DEMO_PAGE_ID = "3797051c2f998094b2a5e5062d353881"
-SOURCE_URL = "https://app.notion.com/p/302-1-4658f48f3d8182a48f4d8150b766747d"
+SOURCE_URL = "https://app.notion.com/p/302-1-2-3797051c2f998088994ee86e76ec7e35"
 DEMO_URL = DEMO_PAGE_ID
 DEMO_PUBLIC_URL = f"https://app.notion.com/p/302-1-1-{DEMO_PAGE_ID}"
 
@@ -27,6 +27,40 @@ def block(kind: str, text: str = "") -> dict:
     if kind == "divider":
         return {"object": "block", "type": "divider", "divider": {}}
     return {"object": "block", "type": kind, kind: {"rich_text": rich(text, 200 if kind.startswith("heading") else 1900)}}
+
+
+def paragraph(text: str = "") -> dict:
+    return block("paragraph", text)
+
+
+def bullet(text: str) -> dict:
+    return block("bulleted_list_item", text)
+
+
+def heading(level: int, text: str) -> dict:
+    return block(f"heading_{level}", text)
+
+
+def callout(text: str, emoji: str = "📌", children: list[dict] | None = None) -> dict:
+    payload = {
+        "rich_text": rich(text, 1900),
+        "icon": {"type": "emoji", "emoji": emoji},
+    }
+    if children:
+        payload["children"] = children
+    return {"object": "block", "type": "callout", "callout": payload}
+
+
+def column(children: list[dict]) -> dict:
+    return {"object": "block", "type": "column", "column": {"children": children}}
+
+
+def column_list(columns: list[list[dict]]) -> dict:
+    return {"object": "block", "type": "column_list", "column_list": {"children": [column(items) for items in columns]}}
+
+
+def toggle(text: str, children: list[dict]) -> dict:
+    return {"object": "block", "type": "toggle", "toggle": {"rich_text": rich(text, 1900), "children": children}}
 
 
 def table(rows: list[list[str]]) -> dict:
@@ -103,6 +137,25 @@ def append_children(headers: dict, children: list[dict]) -> None:
         response.raise_for_status()
 
 
+def update_page_title(headers: dict, title: str) -> None:
+    page = httpx.get(f"https://api.notion.com/v1/pages/{DEMO_PAGE_ID}", headers=headers, timeout=30)
+    page.raise_for_status()
+    title_key = None
+    for key, prop in page.json().get("properties", {}).items():
+        if prop.get("type") == "title":
+            title_key = key
+            break
+    if not title_key:
+        return
+    response = httpx.patch(
+        f"https://api.notion.com/v1/pages/{DEMO_PAGE_ID}",
+        headers=headers,
+        json={"properties": {title_key: {"title": rich(title, 200)}}},
+        timeout=30,
+    )
+    response.raise_for_status()
+
+
 def main() -> None:
     session = SessionLocal()
     try:
@@ -113,40 +166,67 @@ def main() -> None:
         headers = {"Authorization": f"Bearer {token}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"}
 
         archive_result = archive_children(headers)
+        update_page_title(headers, "302호 1팀 나만무 프로젝트 (시범 도입용)")
         children = [
-            block("heading_1", "302호 1팀 나만무 프로젝트 (시범 도입용)"),
-            block("quote", f"원본 템플릿 임시 복사본입니다. 원본 링크: {SOURCE_URL}"),
-            block("heading_2", "기본 링크"),
-            table(
+            block("divider"),
+            column_list(
                 [
-                    ["항목", "내용", "상태"],
-                    ["팀 미팅 일정", "매일 오전 10시 & 오후 8시", "사용"],
-                    ["구글 드라이브 링크", "https://drive.google.com/drive/folders/1mIj_DWr7H0EPCzoIk_XijSm13FdYlQ8q?usp=sharing", "연결"],
-                    ["팀 레포지토리 링크", "아직 없음", "입력 필요"],
-                    ["개인 과제 레포지토리 링크", "개인 과제 레포지토리 링크를 추가해주세요.", "입력 필요"],
-                    ["피그마 링크", "아직 없음", "입력 필요"],
+                    [
+                        callout("팀 미팅 일정", "🗓️"),
+                        bullet("매일 오전 10시 & 오후 8시"),
+                        callout("구글 드라이브 링크", "📁"),
+                        bullet("바로가기: https://drive.google.com/drive/folders/1mIj_DWr7H0EPCzoIk_XijSm13FdYlQ8q?usp=sharing"),
+                    ],
+                    [
+                        callout("팀 레포지토리 링크 ↗️ (아직 없음)", "💻"),
+                        callout("개인 과제 레포지토리 링크를 추가해주세요!", "🔗"),
+                        callout("피그마 링크 ↗️ (아직 없음)", "🎨"),
+                        paragraph(""),
+                    ],
                 ]
             ),
-            block("heading_2", "PAGES"),
-            block("bulleted_list_item", "서비스 소개"),
-            block("bulleted_list_item", "회의록"),
-            block("bulleted_list_item", "멤버"),
-            block("bulleted_list_item", "컨벤션"),
-            block("bulleted_list_item", "팀 규칙"),
-            block("bulleted_list_item", "문서"),
-            block("heading_2", "BOARD"),
-            table([["상태", "개수"], ["Not started", "3"], ["In progress", "0"], ["Done", "0"]]),
-            block("heading_2", "GANTT CHART"),
-            block(
-                "paragraph",
-                "원본 템플릿의 간트차트/캘린더 뷰는 Notion 데이터베이스 뷰라 API 복제가 제한됩니다. 데모에서는 아래 자동화 보고 영역에 GitHub/Notion 변경사항을 계속 누적합니다.",
+            callout("원본 Notion 데이터베이스 뷰는 API로 신규 생성할 수 없어 아래 BOARD/GANTT 표와 자동화 로그로 대체합니다. 기준 템플릿: " + SOURCE_URL, "ℹ️"),
+            heading(2, "PAGES"),
+            column_list(
+                [
+                    [callout("서비스 소개", "🧭"), callout("회의록", "📝")],
+                    [callout("멤버", "👥"), callout("컨벤션", "📐")],
+                    [callout("팀 규칙", "✅"), callout("문서", "📚")],
+                ]
             ),
-            block("heading_2", "AI Board 자동화 영역"),
-            block(
-                "paragraph",
-                "이 영역부터 AI Board 자동화가 GitHub 이슈, 커밋, Notion 변경 요청을 읽고 결과를 한국어 보고서 또는 GitHub 이슈로 생성합니다.",
+            block("divider"),
+            heading(2, "BOARD"),
+            callout("원본의 BOARD 데이터베이스 뷰 대체", "📋"),
+            table([["상태", "업무", "설명"], ["Not started", "3", "원본 템플릿 기본 대기 업무"], ["In progress", "0", "진행 중 업무"], ["Done", "0", "완료 업무"]]),
+            block("divider"),
+            heading(2, "GANTT CHART"),
+            callout("원본의 GANTT 데이터베이스 뷰 대체", "📅"),
+            table([["항목", "시작", "종료", "상태"], ["프로젝트 일정", "미정", "미정", "계획 필요"]]),
+            block("divider"),
+            toggle(
+                "gitHub 연동하기",
+                [
+                    callout("GitHub -> Notion", "🔁"),
+                    paragraph("최신 커밋과 이슈를 읽어 아래 AI Board 자동화 로그에 한국어 표로 작성합니다."),
+                    callout("Notion -> GitHub", "📮"),
+                    paragraph("Notion 변경 요청을 감지하면 GitHub 이슈로 등록하도록 자동화 연결을 유지합니다."),
+                ],
             ),
-            block("heading_3", "GitHub 이슈 생성 템플릿"),
+            toggle(
+                "숨김페이지",
+                [
+                    callout("팀 규칙", "✅", [bullet("돌아가면서 회의록 작성"), bullet("공지 확인 후 12시간 내 답장"), bullet("공부하다 모르는 내용은 공유")]),
+                    callout("서비스 소개", "🧭", [paragraph("서비스 소개 초안과 기획 내용을 정리하는 공간입니다.")]),
+                    callout("회의록", "📝", [paragraph("회의록 작성 순서와 회의 기록을 관리합니다.")]),
+                    callout("멤버", "👥", [paragraph("팀원 정보와 역할을 관리합니다.")]),
+                    callout("문서", "📚", [bullet("API 명세"), bullet("프로젝트 제안서"), bullet("시스템 요구사항 명세서"), bullet("프로젝트 최종 보고서")]),
+                    callout("컨벤션", "📐", [paragraph("코드/커밋/브랜치 컨벤션을 관리합니다.")]),
+                ],
+            ),
+            block("divider"),
+            heading(2, "AI Board 자동화 로그"),
+            paragraph("아래 영역만 자동화가 GitHub/Notion 변경사항을 읽고 씁니다. 위 템플릿 영역은 원본형 구조를 유지합니다."),
+            heading(3, "GitHub 이슈 생성 템플릿"),
             code(
                 "제목: [AI Board] {title}\n"
                 "본문:\n"
@@ -155,14 +235,14 @@ def main() -> None:
                 "- 처리 기준: 이 Notion 데모 템플릿의 BOARD/PAGES/GANTT 맥락에 맞춰 업무 이슈로 정리\n"
                 "라벨: ai-board, automation"
             ),
-            block("heading_3", "GitHub 변경사항 Notion 보고 템플릿"),
+            heading(3, "GitHub 변경사항 Notion 보고 템플릿"),
             table(
                 [
                     ["번호", "유형", "제목", "한국어 요약", "영향 영역", "다음 조치", "링크"],
                     ["{index}", "{source_type}", "{title}", "{summary}", "BOARD/PAGES/GANTT", "요청 템플릿 기준으로 검토", "{source_url}"],
                 ]
             ),
-            block("heading_3", "Notion 변경사항 GitHub 반영 템플릿"),
+            heading(3, "Notion 변경사항 GitHub 반영 템플릿"),
             code(
                 "Notion에서 추가/수정된 요청을 읽고 필요한 경우 GitHub 이슈로 등록합니다.\n"
                 "이슈 제목: [Notion 요청] {title}\n"
@@ -170,7 +250,7 @@ def main() -> None:
                 "링크: {source_url}"
             ),
             block("divider"),
-            block("paragraph", f"교체 시각: {datetime.now().isoformat(timespec='seconds')}"),
+            paragraph(f"템플릿 재구성 시각: {datetime.now().isoformat(timespec='seconds')}"),
         ]
         append_children(headers, children)
 
