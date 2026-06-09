@@ -1717,8 +1717,9 @@ def execute_automation_task(
     for connection in custom_connections:
         service = str(connection.get("service", "")).lower()
         operation = str(connection.get("operation", "")).lower()
+        read_only_operation = any(key in operation for key in ["read_", "rag_collect", "collect_", "query_", "search_"])
         should_write = (
-            service == "notion"
+            (service == "notion" and not read_only_operation)
             or service in {"figma", "google_calendar"}
             or (service == "github" and any(key in operation for key in ["issue_create", "create_issue", "issue_create_or_update"]))
         )

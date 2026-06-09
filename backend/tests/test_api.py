@@ -1467,6 +1467,105 @@ def test_notion_gantt_automation_creates_calendar_events(monkeypatch):
     assert calendar_events[1]["target"] == "primary"
 
 
+def test_notion_read_connection_does_not_write_back_to_notion(monkeypatch):
+    collected = [
+        CollectedItem(
+            title="운영 안정성 보강",
+            source_type="notion_database_page",
+            url="https://notion.test/board/risk",
+            text="DB lock 또는 queue가 필요합니다.",
+            tags=["notion", "board"],
+        )
+    ]
+    writes = []
+
+    def fake_collect(profile, limit=20, pages=2):
+        return collected, []
+
+    def fail_notion_write(*args, **kwargs):
+        raise AssertionError("read-only Notion connection must not be treated as a live write")
+
+    def fake_execute_profile_write(profile, title, body, dry_run=True, start_minutes_from_now=15, duration_minutes=30):
+        writes.append({"service": profile.source_kind, "title": title, "body": body, "dryRun": dry_run})
+        return {"service": profile.source_kind, "status": "written", "url": "https://github.test/issues/1", "dryRun": dry_run}
+
+    monkeypatch.setattr("app.main.collect_profile_items", fake_collect)
+    monkeypatch.setattr("app.main.write_notion_sources_report", fail_notion_write)
+    monkeypatch.setattr("app.main.execute_profile_write", fake_execute_profile_write)
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "notion-read-to-github@example.com", "name": "Notion Read", "password": "password123"},
+        )
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+        notion = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Template BOARD",
+                "source_kind": "notion",
+                "base_url": "4487051c2f9983488ed9018bbe475822",
+                "api_provider": "Notion API",
+                "token_name": "NOTION_TOKEN",
+                "token_value": "notion-token",
+                "rag_targets": ["notion_database"],
+            },
+        ).json()["profile"]
+        client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Team GitHub",
+                "source_kind": "github",
+                "base_url": "https://github.com/Wish-Upon-A-Star/ai-board-jungle",
+                "api_provider": "GitHub REST API",
+                "token_name": "GITHUB_TOKEN",
+                "token_value": "github-token",
+                "rag_targets": [],
+            },
+        )
+        task = client.post(
+            "/api/automations",
+            headers=headers,
+            json={
+                "name": "Notion BOARD to GitHub",
+                "integration_profile_id": notion["id"],
+                "source": "Notion BOARD",
+                "destination": "GitHub Issues",
+                "interval_minutes": 10,
+                "instruction": "Create GitHub issues from Notion BOARD cards.",
+                "template": "Notion 카드: {title}",
+                "api_provider": "Notion API + GitHub API",
+                "ai_agent": "NotionIssueAgent",
+                "custom_connections": [
+                    {
+                        "label": "Notion BOARD read",
+                        "service": "notion",
+                        "url": "4487051c2f9983488ed9018bbe475822",
+                        "api": "Notion API",
+                        "auth_key_name": "NOTION_TOKEN",
+                        "operation": "read_board_cards_since_last_run",
+                        "template": "카드 제목: {title}",
+                    },
+                    {
+                        "label": "GitHub issue",
+                        "service": "github",
+                        "url": "https://github.com/Wish-Upon-A-Star/ai-board-jungle",
+                        "api": "GitHub REST API",
+                        "auth_key_name": "GITHUB_TOKEN",
+                        "operation": "issue_create_or_update",
+                        "template": "제목: [Notion] {title}",
+                    },
+                ],
+            },
+        ).json()["task"]
+        run = client.post(f"/api/automations/{task['id']}/run", headers=headers)
+    assert run.status_code == 200
+    live_writes = run.json()["run"]["result"]["liveWrites"]
+    assert [write["service"] for write in live_writes] == ["github"]
+    assert writes and writes[0]["service"] == "github"
+
+
 def test_regular_user_only_sees_own_automations():
     with TestClient(app) as client:
         admin = client.post("/api/auth/register", json={"email": "admin2@example.com", "name": "Admin", "password": "password123"})
