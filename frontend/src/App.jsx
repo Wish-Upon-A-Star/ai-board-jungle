@@ -59,12 +59,25 @@ function isAutomationPost(post) {
   return Boolean(post?.automationTaskId || tags.includes("automation") || String(post?.title || "").startsWith("[자동화]"));
 }
 
+function automationTemplateToForm(template) {
+  if (!template) return null;
+  return {
+    ...defaultAutomation,
+    ...template,
+    name: `${template.name || defaultAutomation.name} 복사본`,
+    integration_profile_id: "",
+    api_key_strategy: "내 계정의 연동 프로필/API 키로 다시 선택해서 실행합니다.",
+    custom_connections: template.custom_connections || [],
+    status: "ACTIVE",
+  };
+}
+
 const mainTabs = [
   { id: "automations", label: "자동화", description: "만들기, 실행, 공유" },
   { id: "integrations", label: "계정 연결", description: "GitHub, Notion, MCP" },
   { id: "settings", label: "AI 기본값", description: "모델과 출력 양식" },
   { id: "knowledge", label: "지식자료", description: "RAG 검색 자료" },
-  { id: "board", label: "게시판", description: "공유 글과 실행 기록" },
+  { id: "board", label: "게시판", description: "일반 글과 공유 자동화" },
   { id: "api", label: "점검", description: "상태와 도구 호출" },
 ];
 
@@ -95,7 +108,7 @@ const tabIntro = {
   },
   board: {
     title: "게시판",
-    body: "자동화 실행 결과와 사람이 작성한 글을 읽고 공유합니다. 왼쪽에서 글을 고르면 오른쪽에 전체 내용이 표시됩니다.",
+    body: "일반 게시글과 공유 자동화를 분리해서 봅니다. 공유 자동화는 내 자동화 폼으로 복사해 적용할 수 있습니다.",
   },
   api: {
     title: "상태 점검",
@@ -129,7 +142,9 @@ function App() {
   const [authMode, setAuthMode] = useState("login");
   const [authForm, setAuthForm] = useState({ email: "admin@example.com", name: "데모 사용자", password: "password123" });
   const [posts, setPosts] = useState([]);
+  const [automationShares, setAutomationShares] = useState([]);
   const [postPage, setPostPage] = useState({ total: 0, limit: 8, offset: 0, nextOffset: 0, hasMore: false });
+  const [sharePage, setSharePage] = useState({ total: 0, limit: 8, offset: 0, nextOffset: 0, hasMore: false });
   const [tasks, setTasks] = useState([]);
   const [runHistory, setRunHistory] = useState({});
   const [expandedRuns, setExpandedRuns] = useState({});
@@ -160,7 +175,7 @@ function App() {
   const [automationSaveState, setAutomationSaveState] = useState({ status: "idle", message: "" });
 
   const myTasks = useMemo(() => tasks.filter((task) => task.owner?.id === user?.id), [tasks, user]);
-  const sharedCount = posts.filter(isAutomationPost).length;
+  const sharedCount = automationShares.length;
   const systemCards = buildSystemReadinessCards({ providerReadiness, knowledgeSources, tasks, healthStatus });
   const healthFailureMessage = getHealthFailureMessage(healthStatus);
   const readyProviderCount = providerReadiness.filter((provider) => provider.ready).length;
@@ -213,9 +228,10 @@ function App() {
       Object.entries(filters).forEach(([key, value]) => {
         if (value) activityParams.set(key, value);
       });
-      const [me, postData, taskData, knowledgeData, profileData, readinessData, activityData] = await Promise.all([
+      const [me, postData, shareData, taskData, knowledgeData, profileData, readinessData, activityData] = await Promise.all([
         api("/api/auth/me"),
-        api(`/api/posts?q=${encodeURIComponent(search)}&limit=8&offset=0`),
+        api(`/api/posts?q=${encodeURIComponent(search)}&kind=board&limit=8&offset=0`),
+        api(`/api/posts?q=${encodeURIComponent(search)}&kind=automation&limit=8&offset=0`),
         api("/api/automations"),
         api("/api/knowledge"),
         api("/api/integration-profiles"),
@@ -225,23 +241,31 @@ function App() {
       setUser(me.user);
       setProfileSettings(me.profileSettings);
       setPosts(postData.posts);
+      setAutomationShares(shareData.posts);
       setPostPage({ total: postData.total, limit: postData.limit, offset: postData.offset, nextOffset: postData.nextOffset, hasMore: postData.hasMore });
+      setSharePage({ total: shareData.total, limit: shareData.limit, offset: shareData.offset, nextOffset: shareData.nextOffset, hasMore: shareData.hasMore });
       setTasks(taskData.tasks);
       setKnowledgeSources(knowledgeData.sources);
       setIntegrationProfiles(profileData.profiles);
       setProviderReadiness(readinessData.providers);
       setIntegrationActivities(activityData.activities);
       setActivityPage({ total: activityData.total, limit: activityData.limit, offset: activityData.offset, nextOffset: activityData.nextOffset, hasMore: activityData.hasMore });
-      setSelected((current) => current || postData.posts[0] || null);
+      setSelected((current) => postData.posts.find((post) => post.id === current?.id) || postData.posts[0] || null);
     } catch (err) {
       showActionError(err);
     }
   }
 
   async function loadMorePosts() {
-    const data = await api(`/api/posts?q=${encodeURIComponent(q)}&limit=${postPage.limit}&offset=${postPage.nextOffset}`);
+    const data = await api(`/api/posts?q=${encodeURIComponent(q)}&kind=board&limit=${postPage.limit}&offset=${postPage.nextOffset}`);
     setPosts((current) => mergePostsById(current, data.posts));
     setPostPage({ total: data.total, limit: data.limit, offset: data.offset, nextOffset: data.nextOffset, hasMore: data.hasMore });
+  }
+
+  async function loadMoreShares() {
+    const data = await api(`/api/posts?q=${encodeURIComponent(q)}&kind=automation&limit=${sharePage.limit}&offset=${sharePage.nextOffset}`);
+    setAutomationShares((current) => mergePostsById(current, data.posts));
+    setSharePage({ total: data.total, limit: data.limit, offset: data.offset, nextOffset: data.nextOffset, hasMore: data.hasMore });
   }
 
   async function submitAuth(event) {
@@ -311,9 +335,21 @@ function App() {
 
   async function shareTask(task) {
     const data = await api(`/api/automations/${task.id}/share`, { method: "POST" });
-    setSelected(data.post);
+    setAutomationShares((current) => mergePostsById([data.post, ...current], current));
     setApiResult({ called: "automation.share", response: data });
     await loadAll();
+  }
+
+  function applySharedAutomation(post) {
+    const copied = automationTemplateToForm(post.automationTemplate);
+    if (!copied) {
+      setError("공유 자동화 템플릿을 찾을 수 없습니다. 원본 자동화가 삭제되었을 수 있습니다.");
+      return;
+    }
+    setForm(copied);
+    setAutomationSaveState({ status: "idle", message: "공유 자동화를 내 자동화 폼에 복사했습니다. 내 계정 연동 프로필을 선택한 뒤 저장하세요." });
+    setActiveMainTab("automations");
+    window.setTimeout(() => document.getElementById("new-task")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
 
   async function deleteTask(task) {
@@ -757,7 +793,7 @@ function App() {
             <dl>
               <div><dt>내 작업</dt><dd>{myTasks.length}</dd></div>
               <div><dt>전체 작업</dt><dd>{tasks.length}</dd></div>
-              <div><dt>게시판 공유</dt><dd className="green">{sharedCount}</dd></div>
+              <div><dt>공유 자동화</dt><dd className="green">{sharedCount}</dd></div>
               <div><dt>연결 준비</dt><dd className="green">{readyProviderCount}/{providerReadiness.length || 4}</dd></div>
               <div><dt>AI 모델</dt><dd className="green">{form.ai_model}</dd></div>
               <div><dt>연동 프로필</dt><dd className="green">{integrationProfiles.length}</dd></div>
@@ -806,7 +842,7 @@ function App() {
                     </dl>
                     <div className="task-actions">
                       <button onClick={() => runTask(task)}><Play size={14} /> 지금 실행</button>
-                      <button onClick={() => shareTask(task)} className="secondary"><Share2 size={14} /> 게시판에 공유</button>
+                      <button onClick={() => shareTask(task)} className="secondary"><Share2 size={14} /> 공유 자동화로 등록</button>
                       <button onClick={() => loadTaskRuns(task)} className="secondary"><Database size={14} /> 실행 기록</button>
                       {deleteConfirmTaskId === task.id ? (
                         <>
@@ -1155,12 +1191,12 @@ function App() {
               <div className="board-header">
                 <div>
                   <span className="eyebrow">팀 게시판</span>
-                  <h2>공유 글과 자동화 실행 기록</h2>
-                  <p>자동화가 남긴 결과와 사람이 작성한 글을 한 곳에서 읽고 검색합니다.</p>
+                  <h2>공유 자동화와 일반 게시글</h2>
+                  <p>자동화 템플릿 공유와 사람이 작성한 게시글을 분리해서 봅니다.</p>
                 </div>
                 <div className="board-metrics" aria-label="게시판 요약">
-                  <span><b>{postPage.total}</b>전체 글</span>
-                  <span><b>{sharedCount}</b>자동화 공유</span>
+                  <span><b>{postPage.total}</b>일반 글</span>
+                  <span><b>{sharePage.total}</b>공유 자동화</span>
                   <span><b>{posts.length}</b>불러온 글</span>
                 </div>
               </div>
@@ -1168,11 +1204,36 @@ function App() {
                 <div className="search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="제목, 내용, 태그 검색" /><button type="button" onClick={() => loadAll(q)}><Search size={13} /></button></div>
                 <button type="button" onClick={() => document.getElementById("board-write-title")?.focus()}><Plus size={14} /> 새 글 쓰기</button>
               </div>
+              <section className="automation-share-board" aria-label="공유 자동화 목록">
+                <div className="section-head flat">
+                  <div>
+                    <strong>공유 자동화</strong>
+                    <span>다른 사람이 공유한 자동화 템플릿입니다. 적용하면 내 자동화 작성 폼에 복사됩니다.</span>
+                  </div>
+                </div>
+                <div className="share-card-grid">
+                  {automationShares.map((post) => (
+                    <article key={post.id} className="share-card">
+                      <span className="post-kind">자동화</span>
+                      <h3>{post.title.replace(/^\[자동화\]\s*/, "")}</h3>
+                      <p>{post.summary || post.content?.slice(0, 180) || "공유 설명 없음"}</p>
+                      <div className="share-meta">
+                        <span>{post.author?.name || "작성자 없음"}</span>
+                        <span>{post.tags?.map((tag) => `#${tag.tag.name}`).join(" ")}</span>
+                      </div>
+                      <button type="button" onClick={() => applySharedAutomation(post)} disabled={!post.automationTemplate}>
+                        <Plus size={14} /> 내 자동화에 적용
+                      </button>
+                    </article>
+                  ))}
+                  {automationShares.length === 0 ? <p className="empty-state">아직 공유된 자동화가 없습니다. 자동화 탭에서 내 자동화를 공유하면 여기에 표시됩니다.</p> : null}
+                </div>
+                {sharePage.hasMore ? <button type="button" className="load-more" onClick={loadMoreShares}>공유 자동화 더 보기</button> : null}
+              </section>
               <div className="board-reader">
                 <div className="post-list" aria-label="게시글 목록">
                   {posts.map((post) => {
                     const isSelected = selected?.id === post.id;
-                    const automationPost = isAutomationPost(post);
                     const tags = post.tags?.map((tag) => tag.tag.name).join(", ");
                     return (
                       <button
@@ -1180,10 +1241,10 @@ function App() {
                         type="button"
                         data-post-id={post.id}
                         aria-pressed={isSelected}
-                        className={`${automationPost ? "post-link shared" : "post-link"} ${isSelected ? "selected" : ""}`}
+                        className={`post-link ${isSelected ? "selected" : ""}`}
                         onClick={() => setSelected(post)}
                       >
-                        <span className="post-kind">{automationPost ? "자동화" : "게시글"}</span>
+                        <span className="post-kind">게시글</span>
                         <span className="post-title">{post.title}</span>
                         <span className="post-meta">{post.author.name || "작성자 없음"}{tags ? ` · ${tags}` : ""}</span>
                         <span className="post-excerpt">{post.content?.slice(0, 120) || "내용 없음"}</span>
@@ -1200,7 +1261,7 @@ function App() {
                   {selected ? (
                     <>
                       <div className="post-preview-head">
-                        <span>{isAutomationPost(selected) ? "자동화 공유" : "게시글"}</span>
+                        <span>게시글</span>
                         <small>{selected.author?.name || "작성자 없음"} · {selected.tags?.map((tag) => `#${tag.tag.name}`).join(" ") || "태그 없음"}</small>
                       </div>
                       <h2>{selected.title}</h2>

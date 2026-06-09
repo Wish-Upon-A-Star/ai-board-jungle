@@ -171,6 +171,39 @@ def serialize_run(run: AutomationRun) -> dict:
     }
 
 
+def serialize_automation_template(task: AutomationTask | None) -> dict | None:
+    if not task:
+        return None
+    return {
+        "name": task.name,
+        "integration_profile_id": "",
+        "source": task.source,
+        "destination": task.destination,
+        "interval_minutes": task.interval_minutes,
+        "instruction": task.instruction,
+        "template": task.template,
+        "api_provider": task.api_provider,
+        "ai_agent": task.ai_agent,
+        "github_repo_url": task.github_repo_url,
+        "github_project_url": task.github_project_url,
+        "notion_database_url": task.notion_database_url,
+        "figma_file_url": task.figma_file_url,
+        "calendar_id": task.calendar_id,
+        "ai_provider": task.ai_provider,
+        "ai_model": task.ai_model,
+        "ai_api_base": task.ai_api_base,
+        "api_key_strategy": "내 계정의 연동 프로필/API 키로 다시 선택해서 실행합니다.",
+        "request_template": task.request_template,
+        "github_issue_template": task.github_issue_template,
+        "notion_template": task.notion_template,
+        "figma_template": task.figma_template,
+        "template_preset": task.template_preset,
+        "custom_template": task.custom_template,
+        "custom_connections": parse_connections(task.custom_connections),
+        "status": "ACTIVE",
+    }
+
+
 def log_activity(
     db: Session,
     user: User,
@@ -900,6 +933,7 @@ def serialize_post(post: Post) -> dict:
         "summary": post.summary,
         "status": post.status,
         "automationTaskId": post.automation_task_id,
+        "automationTemplate": serialize_automation_template(post.automation_task),
         "author": {"name": post.author.name, "role": post.author.role},
         "tags": [{"tag": {"name": tag.name}} for tag in post.tags],
         "comments": [{"id": c.id, "content": c.content, "author": {"name": c.author.name, "role": c.author.role}} for c in post.comments],
@@ -1309,10 +1343,11 @@ def write_integration_profile(profile_id: int, data: LiveWriteIn, user: User = D
 
 
 @app.get("/api/posts")
-def list_posts(q: str = "", page: int = 1, limit: int = 8, offset: int | None = None, db: Session = Depends(get_db)) -> dict:
+def list_posts(q: str = "", page: int = 1, limit: int = 8, offset: int | None = None, kind: str = "all", db: Session = Depends(get_db)) -> dict:
     safe_limit = max(1, min(limit, 50))
     safe_offset = max(0, offset if offset is not None else (max(page, 1) - 1) * safe_limit)
-    posts, total = search_posts(db, q, safe_offset, safe_limit)
+    safe_kind = kind if kind in {"all", "board", "automation"} else "all"
+    posts, total = search_posts(db, q, safe_offset, safe_limit, safe_kind)
     next_offset = safe_offset + len(posts)
     return {
         "posts": [serialize_post(post) for post in posts],

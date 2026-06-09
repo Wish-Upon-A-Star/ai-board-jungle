@@ -284,15 +284,30 @@ async def instruction_hub(instruction: str) -> dict:
     }
 
 
-def search_posts(db: Session, q: str, offset: int, take: int) -> tuple[list[Post], int]:
+def automation_post_filter():
+    return or_(
+        Post.automation_task_id.is_not(None),
+        Post.title.ilike("[자동화]%"),
+        Post.tags.any(Tag.name == "automation"),
+    )
+
+
+def search_posts(db: Session, q: str, offset: int, take: int, kind: str = "all") -> tuple[list[Post], int]:
     stmt = select(Post).order_by(Post.created_at.desc())
+    count_stmt = select(func.count()).select_from(Post)
+    if kind == "automation":
+        predicate = automation_post_filter()
+        stmt = stmt.where(predicate)
+        count_stmt = count_stmt.where(predicate)
+    elif kind == "board":
+        predicate = ~automation_post_filter()
+        stmt = stmt.where(predicate)
+        count_stmt = count_stmt.where(predicate)
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(Post.title.ilike(like), Post.content.ilike(like)))
-    posts = db.scalars(stmt.offset(offset).limit(take)).all()
-    count_stmt = select(func.count()).select_from(Post)
-    if q:
         count_stmt = count_stmt.where(or_(Post.title.ilike(like), Post.content.ilike(like)))
+    posts = db.scalars(stmt.offset(offset).limit(take)).all()
     all_count = db.scalar(count_stmt) or 0
     return list(posts), all_count
 
