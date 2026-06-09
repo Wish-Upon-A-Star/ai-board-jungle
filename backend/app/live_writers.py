@@ -746,12 +746,16 @@ def find_notion_child_database_id(token: str, page_id: str, preferred_titles: tu
             if not response.is_success:
                 break
             data = response.json()
+            current_section = ""
             for block in data.get("results", []):
                 block_type = block.get("type")
+                if block_type in {"heading_1", "heading_2", "heading_3"}:
+                    heading_payload = block.get(block_type, {})
+                    current_section = "".join(part.get("plain_text", "") for part in heading_payload.get("rich_text", []))
                 if block_type == "child_database":
                     child_title = str(block.get("child_database", {}).get("title") or "")
                     child_id = str(block.get("id") or "").replace("-", "")
-                    candidates.append({"id": child_id, "title": child_title})
+                    candidates.append({"id": child_id, "title": child_title, "section": current_section})
                 if block.get("has_children") and block_type in {"column_list", "column", "toggle", "callout", "synced_block"}:
                     queue.append(str(block.get("id") or ""))
             if not data.get("has_more"):
@@ -762,7 +766,11 @@ def find_notion_child_database_id(token: str, page_id: str, preferred_titles: tu
     for candidate in candidates:
         database_id = candidate["id"]
         normalized_title = re.sub(r"\s+", "", candidate["title"] or "").lower()
-        title_is_preferred = any(re.sub(r"\s+", "", title).lower() in normalized_title for title in preferred_titles)
+        normalized_section = re.sub(r"\s+", "", candidate.get("section") or "").lower()
+        title_is_preferred = any(
+            re.sub(r"\s+", "", title).lower() in normalized_title or re.sub(r"\s+", "", title).lower() in normalized_section
+            for title in preferred_titles
+        )
         try:
             response = httpx.get(f"https://api.notion.com/v1/databases/{database_id}", headers=headers, timeout=15.0)
         except httpx.HTTPError:
