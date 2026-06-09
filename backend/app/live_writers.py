@@ -589,8 +589,6 @@ def kanban_status_for_source(context: dict[str, str], option_names: set[str]) ->
 
 def source_database_properties(database: dict, source: object, index: int) -> dict:
     context = source_context(source, index)
-    lowered = f"{context['title']} {context['summary']}".lower()
-    risk = "높음" if any(token in lowered for token in ["security", "auth", "token", "secret", "fail", "error", "보안", "실패"]) else "보통"
     summary = korean_summary_for_source(context)
     properties: dict = {}
     rich_text_seen = 0
