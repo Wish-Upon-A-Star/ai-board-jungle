@@ -200,6 +200,31 @@ def source_context(source: object, index: int) -> dict[str, str]:
     }
 
 
+def compact_text(value: str, limit: int = 80) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "…"
+
+
+def display_title_for_source(context: dict[str, str]) -> str:
+    title = re.sub(r"^\[[^\]]+\]\s*", "", context.get("title") or "").strip()
+    title = re.sub(r"^\[[^\]]+\]\s*", "", title).strip()
+    combined = f"{title} {context.get('summary', '')}".lower()
+    source_type = (context.get("source_type") or "").lower()
+    if "risk" in source_type or "위험" in title or "문제" in combined:
+        prefix = "[위험]"
+    elif "implementation" in source_type or "구현" in title:
+        prefix = "[구현]"
+    elif "issue" in source_type:
+        prefix = "[이슈]"
+    elif "commit" in source_type:
+        prefix = "[커밋]"
+    else:
+        prefix = "[자동화]"
+    return compact_text(f"{prefix} {title or '제목 없음'}", 95)
+
+
 def render_template(template: str, context: dict[str, str]) -> str:
     output = template or "{title}\n{summary}\n{source_url}"
     for key, value in context.items():
@@ -605,13 +630,14 @@ def kanban_status_for_source(context: dict[str, str], option_names: set[str]) ->
 def source_database_properties(database: dict, source: object, index: int) -> dict:
     context = source_context(source, index)
     summary = korean_summary_for_source(context)
+    display_title = display_title_for_source(context)
     properties: dict = {}
     rich_text_seen = 0
     for name, prop in database.get("properties", {}).items():
         prop_type = prop.get("type")
         normalized_name = re.sub(r"\s+", "", name).lower()
         if prop_type == "title":
-            properties[name] = {"title": notion_text(context["title"] or "(제목 없음)", 200)}
+            properties[name] = {"title": notion_text(display_title or "(제목 없음)", 200)}
         elif prop_type == "select":
             option_names = select_option_names(prop)
             status = kanban_status_for_source(context, option_names)
@@ -633,9 +659,9 @@ def source_database_properties(database: dict, source: object, index: int) -> di
                 properties[name] = {"multi_select": [{"name": item} for item in impact]}
         elif prop_type == "rich_text":
             if normalized_name in {"한국어요약", "요약", "summary"} or rich_text_seen == 0:
-                properties[name] = {"rich_text": notion_text(summary, 1800)}
+                properties[name] = {"rich_text": notion_text(compact_text(summary, 160), 1800)}
             elif normalized_name in {"다음조치", "nextaction", "action"} or rich_text_seen == 1:
-                properties[name] = {"rich_text": notion_text(context["next_action"], 900)}
+                properties[name] = {"rich_text": notion_text(compact_text(context["next_action"], 120), 900)}
             rich_text_seen += 1
         elif prop_type == "url":
             if context["source_url"]:
@@ -647,18 +673,29 @@ def source_database_properties(database: dict, source: object, index: int) -> di
 
 def notion_source_database_page_children(source: object, index: int, template: str) -> list[dict]:
     context = source_context(source, index)
+    full_title = context["title"] or "(제목 없음)"
+    full_summary = korean_summary_for_source(context)
+    raw_summary = context["summary"]
     rows = [
         ["필드", "값"],
+        ["카드 제목", display_title_for_source(context)],
+        ["전체 제목", full_title],
         ["유형", context["source_type"]],
-        ["한국어 요약", korean_summary_for_source(context)],
+        ["한국어 요약", full_summary],
         ["영향 영역", "BOARD / PAGES / GANTT"],
         ["다음 조치", context["next_action"]],
         ["링크", context["source_url"]],
     ]
     children = [
         callout_block("칸반 카드 상세 내용입니다. 상태 속성으로 보드 열을 관리합니다.", "📋"),
+        heading_3_block("전체 제목"),
+        paragraph_block(full_title),
+        heading_3_block("한국어 요약"),
+        paragraph_block(full_summary),
         notion_table_block(rows, header=True),
     ]
+    if raw_summary and raw_summary != full_summary:
+        children.append(toggle_block("원본 수집 내용 전체", [paragraph_block(line) for line in raw_summary.splitlines() if line.strip()]))
     if template.strip():
         children.append(toggle_block("요청 템플릿 렌더링", [paragraph_block(line) for line in render_template(template, context).strip().splitlines()]))
     return children

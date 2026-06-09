@@ -480,6 +480,22 @@ pre {
 .mcp-setup-actions { margin: 14px 14px 4px; }
 .mcp-setup-actions button { min-width: 168px; border-color: #a8d0ca; color: var(--accent-strong); }
 .inline-help { margin: 0 14px 2px; color: var(--muted); font-size: 13px; }
+.credential-guide {
+  margin: 14px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(260px, .7fr);
+  gap: 14px;
+  border: 1px solid #bad9d4;
+  border-radius: 8px;
+  background: #fbfffd;
+}
+.credential-guide strong { display: block; margin-bottom: 6px; color: var(--text); }
+.credential-guide p,
+.credential-guide ol { margin: 0; color: var(--muted); }
+.credential-guide b { color: var(--accent-strong); }
+.credential-guide ol { padding-left: 20px; }
+.credential-guide li + li { margin-top: 4px; }
 .oauth-setup-card {
   margin: 14px;
   padding: 14px;

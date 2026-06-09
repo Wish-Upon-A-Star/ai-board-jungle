@@ -20,6 +20,8 @@ BAD_NOTION_PAGE_IDS = [
     "37a7051c2f9981c88ac1d02f7523020b",
     "37a7051c2f9981c68870f942e2cc0df0",
     "37a7051c2f9981cb9394caa493a73ca3",
+    "37a7051c2f9981259f76cf5756a833dc",
+    "37a7051c2f9981fc8432c891606d549a",
 ]
 
 TEAM_GITHUB_REPO = "https://github.com/Wish-Upon-A-Star/ai-board-jungle"
@@ -130,6 +132,24 @@ def archive_bad_notion_cards(token: str) -> list[dict]:
     return results
 
 
+def repair_notion_board_database(token: str) -> dict:
+    if not token:
+        return {"status": "skipped", "reason": "missing Notion token"}
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json",
+    }
+    response = httpx.patch(
+        f"https://api.notion.com/v1/databases/{notion_uuid(TEAM_NOTION_BOARD_DB)}",
+        headers=headers,
+        json={"title": [{"type": "text", "text": {"content": "AI Board 자동화"}}]},
+        timeout=20.0,
+    )
+    data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"raw": response.text}
+    return {"status": response.status_code, "ok": response.is_success, "title": "AI Board 자동화", "response": data if not response.is_success else {}}
+
+
 def close_bad_issues(token: str) -> list[dict]:
     if not token:
         return [{"status": "skipped", "reason": "missing GitHub token"}]
@@ -177,6 +197,7 @@ def main() -> None:
         repair_team_templates(db, owner.id)
         db.commit()
         cleanup = {
+            "repairedNotionBoard": repair_notion_board_database(reveal_secret(notion_profile.token_value) if notion_profile else ""),
             "archivedNotionCards": archive_bad_notion_cards(reveal_secret(notion_profile.token_value) if notion_profile else ""),
             "closedBadIssues": close_bad_issues(reveal_secret(github_profile.token_value) if github_profile else ""),
         }

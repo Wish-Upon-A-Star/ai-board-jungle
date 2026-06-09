@@ -902,6 +902,17 @@ function App() {
 
             <article id="integrations-panel" className={`panel ${activeMainTab === "integrations" ? "" : "tab-hidden"}`}>
               <div className="panel-title row-title"><span>연동 프로필 목록</span><span className="subtle">사용자별 토큰, API, AI 모델, RAG 범위를 저장합니다.</span></div>
+              <section className="credential-guide">
+                <div>
+                  <strong>각 사용자는 여기서 자기 계정을 연결합니다</strong>
+                  <p>GitHub/Notion/Figma/Google Calendar 버튼으로 OAuth 로그인하거나, 아래 수동 프로필 폼의 <b>토큰/API Key</b> 칸에 본인 키를 넣습니다. 자동화는 선택된 사용자 프로필의 토큰만 사용하고 다른 사람 토큰을 공유하지 않습니다.</p>
+                </div>
+                <ol>
+                  <li>OAuth 가능: 위 로그인 버튼 클릭</li>
+                  <li>수동 키: 종류, Base URL, 토큰/API Key 입력</li>
+                  <li>AI 모델 키: AI 제공자, AI 모델, AI API Base와 함께 프로필에 저장</li>
+                </ol>
+              </section>
               <div className="mcp-setup-actions">
                 <button type="button" onClick={() => startMcpLogin("github")}><GitBranch size={14} /> GitHub MCP 로그인</button>
                 <button type="button" onClick={() => startMcpLogin("notion")}><Link2 size={14} /> Notion MCP 로그인</button>

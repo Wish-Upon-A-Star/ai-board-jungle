@@ -495,9 +495,15 @@ def test_notion_sources_report_writes_kanban_database_cards(monkeypatch):
     assert first["유형"]["select"]["name"] == "github_commit"
     assert first["영향 영역"]["multi_select"] == [{"name": "BOARD"}, {"name": "PAGES"}, {"name": "GANTT"}]
     assert "OAuth login" in first["한국어 요약"]["rich_text"][0]["text"]["content"]
+    assert len(first["title"]["title"][0]["text"]["content"]) <= 95
     assert first["링크"]["url"] == "https://github.com/acme/repo/commit/abc123"
     assert second["상태"]["select"]["name"] == "Blocked"
     assert find_first_block(created_pages[0]["children"], "table") is not None
+    full_text = collect_block_text(created_pages[0]["children"])
+    assert "전체 제목" in full_text
+    assert "Commit abc123: Add OAuth login" in full_text
+    assert "한국어 요약" in full_text
+    assert "??" not in full_text
 
 
 def test_notion_sources_report_resolves_existing_board_database_inside_page(monkeypatch):
