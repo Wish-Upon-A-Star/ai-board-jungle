@@ -572,19 +572,34 @@ def select_option_names(prop: dict) -> set[str]:
     return {str(option.get("name", "")) for option in prop.get("select", {}).get("options", [])}
 
 
+def status_option_names(prop: dict) -> set[str]:
+    if prop.get("type") != "status":
+        return set()
+    return {str(option.get("name", "")) for option in prop.get("status", {}).get("options", [])}
+
+
+def option_by_meaning(option_names: set[str], meanings: tuple[str, ...]) -> str | None:
+    lowered = [(name.lower(), name) for name in option_names]
+    for meaning in meanings:
+        meaning_lower = meaning.lower()
+        for lowered_name, original in lowered:
+            if meaning_lower == lowered_name or meaning_lower in lowered_name:
+                return original
+    return None
+
+
 def kanban_status_for_source(context: dict[str, str], option_names: set[str]) -> str | None:
-    available = {name.lower(): name for name in option_names}
     combined = f"{context.get('title', '')} {context.get('summary', '')}".lower()
     source_type = (context.get("source_type") or "").lower()
     if any(token in combined for token in ["failed", "failure", "error", "blocked", "실패", "오류", "차단"]):
-        return available.get("blocked") or available.get("in progress") or available.get("not started")
+        return option_by_meaning(option_names, ("blocked", "차단", "막힘", "in progress", "진행", "not started", "시작 전"))
     if "issue" in source_type and any(token in combined for token in ["state: closed", "closed", "완료", "닫힘"]):
-        return available.get("done") or available.get("complete") or available.get("completed")
+        return option_by_meaning(option_names, ("done", "complete", "completed", "완료"))
     if "commit" in source_type:
-        return available.get("not started") or available.get("inbox") or available.get("todo")
+        return option_by_meaning(option_names, ("not started", "시작 전", "inbox", "todo", "to-do"))
     if "issue" in source_type:
-        return available.get("not started") or available.get("in progress") or available.get("todo")
-    return available.get("not started") or available.get("in progress") or available.get("todo")
+        return option_by_meaning(option_names, ("not started", "시작 전", "in progress", "진행", "todo", "to-do"))
+    return option_by_meaning(option_names, ("not started", "시작 전", "in progress", "진행", "todo", "to-do"))
 
 
 def source_database_properties(database: dict, source: object, index: int) -> dict:
@@ -599,13 +614,18 @@ def source_database_properties(database: dict, source: object, index: int) -> di
             properties[name] = {"title": notion_text(context["title"] or "(제목 없음)", 200)}
         elif prop_type == "select":
             option_names = select_option_names(prop)
-            if {"Not started", "In progress", "Done"} & option_names:
-                status = kanban_status_for_source(context, option_names) or "Not started"
+            status = kanban_status_for_source(context, option_names)
+            if status:
                 properties[name] = {"select": {"name": status}}
             elif context["source_type"] in option_names:
                 properties[name] = {"select": {"name": context["source_type"]}}
             elif "automation_report" in option_names:
                 properties[name] = {"select": {"name": "automation_report"}}
+        elif prop_type == "status":
+            option_names = status_option_names(prop)
+            status = kanban_status_for_source(context, option_names)
+            if status:
+                properties[name] = {"status": {"name": status}}
         elif prop_type == "multi_select":
             option_names = {str(option.get("name", "")) for option in prop.get("multi_select", {}).get("options", [])}
             impact = [name for name in ["BOARD", "PAGES", "GANTT"] if name in option_names]
@@ -704,6 +724,75 @@ def write_notion_sources_database_report(
     }
 
 
+def find_notion_child_database_id(token: str, page_id: str, preferred_titles: tuple[str, ...] = ("BOARD", "보드", "칸반")) -> tuple[str, str]:
+    headers = {"Authorization": f"Bearer {token}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"}
+    queue: list[str] = [page_id]
+    seen: set[str] = set()
+    candidates: list[dict[str, str]] = []
+    while queue and len(seen) < 40:
+        block_id = queue.pop(0)
+        if block_id in seen:
+            continue
+        seen.add(block_id)
+        cursor = None
+        while True:
+            params = {"page_size": 100}
+            if cursor:
+                params["start_cursor"] = cursor
+            try:
+                response = httpx.get(f"https://api.notion.com/v1/blocks/{block_id}/children", headers=headers, params=params, timeout=15.0)
+            except httpx.HTTPError:
+                return "", "failed_to_read_children"
+            if not response.is_success:
+                break
+            data = response.json()
+            for block in data.get("results", []):
+                block_type = block.get("type")
+                if block_type == "child_database":
+                    child_title = str(block.get("child_database", {}).get("title") or "")
+                    child_id = str(block.get("id") or "").replace("-", "")
+                    candidates.append({"id": child_id, "title": child_title})
+                if block.get("has_children") and block_type in {"column_list", "column", "toggle", "callout", "synced_block"}:
+                    queue.append(str(block.get("id") or ""))
+            if not data.get("has_more"):
+                break
+            cursor = data.get("next_cursor")
+    preferred: list[tuple[int, str]] = []
+    inaccessible_preferred = False
+    for candidate in candidates:
+        database_id = candidate["id"]
+        normalized_title = re.sub(r"\s+", "", candidate["title"] or "").lower()
+        title_is_preferred = any(re.sub(r"\s+", "", title).lower() in normalized_title for title in preferred_titles)
+        try:
+            response = httpx.get(f"https://api.notion.com/v1/databases/{database_id}", headers=headers, timeout=15.0)
+        except httpx.HTTPError:
+            continue
+        if not response.is_success:
+            inaccessible_preferred = inaccessible_preferred or title_is_preferred
+            continue
+        database = response.json()
+        properties = database.get("properties", {})
+        prop_names = {re.sub(r"\s+", "", name).lower() for name in properties}
+        prop_types = {str(prop.get("type", "")) for prop in properties.values()}
+        score = 0
+        if title_is_preferred:
+            score += 100
+        if "상태" in prop_names or "status" in prop_names or "status" in prop_types:
+            score += 40
+        if "gantt" in normalized_title:
+            score -= 100
+        if any(prop.get("type") == "title" for prop in properties.values()):
+            score += 5
+        if score >= 100:
+            preferred.append((score, database_id))
+    if preferred:
+        preferred.sort(reverse=True)
+        return preferred[0][1], "matched_existing_board_database"
+    if candidates:
+        return "", "board_database_not_accessible" if inaccessible_preferred else "board_database_not_found"
+    return "", "no_child_database"
+
+
 def write_notion_sources_report(
     profile: IntegrationProfile,
     title: str,
@@ -719,6 +808,23 @@ def write_notion_sources_report(
     database_write = write_notion_sources_database_report(token, target_id, title, sources, template, dry_run)
     if database_write is not None:
         return database_write
+    child_database_id, child_database_reason = find_notion_child_database_id(token, target_id)
+    if child_database_id:
+        child_database_write = write_notion_sources_database_report(token, child_database_id, title, sources, template, dry_run)
+        if child_database_write is not None:
+            child_database_write["sourcePageId"] = target_id
+            child_database_write["resolvedFrom"] = "page_child_database"
+            return child_database_write
+    if child_database_reason in {"board_database_not_accessible", "board_database_not_found"}:
+        return {
+            "service": "notion",
+            "status": "blocked",
+            "reason": f"existing Notion page design is preserved, but an accessible BOARD/보드/칸반 child database was not found: {child_database_reason}",
+            "dryRun": dry_run,
+            "target": "page_child_database",
+            "id": target_id,
+            "url": f"https://www.notion.so/{target_id}",
+        }
     children = notion_sources_template_children(title, sources, template)
     block_children_url = f"https://api.notion.com/v1/blocks/{target_id}/children"
     if dry_run:

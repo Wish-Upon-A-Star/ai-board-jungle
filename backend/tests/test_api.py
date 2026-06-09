@@ -500,6 +500,84 @@ def test_notion_sources_report_writes_kanban_database_cards(monkeypatch):
     assert find_first_block(created_pages[0]["children"], "table") is not None
 
 
+def test_notion_sources_report_resolves_existing_board_database_inside_page(monkeypatch):
+    created_pages = []
+    calls = []
+    page_id = "3797051c2f998088994ee86e76ec7e35"
+    board_id = "37a7051c2f9981e882f0e9ed7da544a1"
+
+    class Response:
+        headers = {"content-type": "application/json"}
+        text = "{}"
+
+        def __init__(self, status_code, payload):
+            self.status_code = status_code
+            self.payload = payload
+            self.is_success = 200 <= status_code < 300
+            self.text = json.dumps(payload)
+
+        def json(self):
+            return self.payload
+
+    database_payload = {
+        "id": board_id,
+        "properties": {
+            "title": {"type": "title", "title": {}},
+            "상태": {"type": "status", "status": {"options": [{"name": "Not started 🧱"}, {"name": "In progress 🛠"}, {"name": "Done🏠"}]}},
+            "유형": {"type": "select", "select": {"options": [{"name": "github_commit"}, {"name": "github_issue"}]}},
+            "한국어 요약": {"type": "rich_text", "rich_text": {}},
+        },
+    }
+
+    def fake_get(url, headers=None, params=None, timeout=15.0):
+        calls.append(("GET", url, params))
+        if f"/v1/databases/{page_id}" in url:
+            return Response(404, {"object": "error", "message": "page, not database"})
+        if f"/v1/blocks/{page_id}/children" in url:
+            return Response(
+                200,
+                {
+                    "results": [
+                        {"id": "column-list-1", "type": "column_list", "has_children": True, "column_list": {}},
+                        {"id": board_id, "type": "child_database", "has_children": False, "child_database": {"title": "BOARD"}},
+                    ],
+                    "has_more": False,
+                },
+            )
+        if f"/v1/databases/{board_id}" in url:
+            return Response(200, database_payload)
+        return Response(404, {"object": "error"})
+
+    def fake_post(url, headers=None, json=None, timeout=15.0):
+        created_pages.append(json)
+        return Response(200, {"id": "created-card", "url": "https://notion.test/created-card"})
+
+    monkeypatch.setattr("app.live_writers.httpx.get", fake_get)
+    monkeypatch.setattr("app.live_writers.httpx.post", fake_post)
+    profile = IntegrationProfile(
+        owner_id=1,
+        name="Original Template Page",
+        source_kind="notion",
+        base_url=f"https://app.notion.com/p/302-1-2-{page_id}",
+        token_value="plain-notion-page-token",
+    )
+
+    write = write_notion_sources_report(
+        profile,
+        "원본 템플릿 보드 보고",
+        [{"title": "Commit abc123: Preserve board", "sourceType": "github_commit", "url": "https://github.com/acme/repo/commit/abc123", "summary": ""}],
+        "요청 제목: {title}",
+        dry_run=False,
+    )
+
+    assert write["status"] == "written"
+    assert write["target"] == "database"
+    assert write["resolvedFrom"] == "page_child_database"
+    assert write["sourcePageId"] == page_id
+    assert created_pages[0]["parent"] == {"database_id": board_id}
+    assert created_pages[0]["properties"]["상태"]["status"]["name"] == "Not started 🧱"
+
+
 def test_notion_sources_report_uses_real_table_for_markdown_table_template():
     blocks = notion_sources_template_children(
         "GitHub 변경사항 자동 요약",
