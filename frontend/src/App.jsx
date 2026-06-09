@@ -1130,14 +1130,14 @@ function App() {
               <form className="knowledge-form" onSubmit={saveKnowledge}>
                 <div className="grid3 wide">
                   <Field label="자료명"><input value={knowledgeForm.title} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, title: e.target.value })} /></Field>
-                  <Field label="자료 종류"><select value={knowledgeForm.source_type} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, source_type: e.target.value })}><option value="document">문서</option><option value="audio">음성</option><option value="image">이미지</option><option value="spreadsheet">스프레드시트</option><option value="custom">기타</option></select></Field>
+                  <Field label="자료 종류" hint="자동화가 이 자료를 어떤 유형으로 참고할지 고릅니다."><select value={knowledgeForm.source_type} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, source_type: e.target.value })}><option value="document">문서</option><option value="audio">음성</option><option value="image">이미지</option><option value="spreadsheet">스프레드시트</option><option value="custom">기타</option></select></Field>
                   <Field label="태그"><input value={knowledgeForm.tags} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, tags: e.target.value })} /></Field>
                 </div>
                 <Field label="작성/사용 지침"><textarea value={knowledgeForm.instruction} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, instruction: e.target.value })} /></Field>
-                <Field label="추출 텍스트"><textarea value={knowledgeForm.extracted_text} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, extracted_text: e.target.value })} /></Field>
+                <Field label="본문/추출 텍스트" hint="문서 내용, 음성 녹취, 이미지 설명, 스프레드시트 요약처럼 AI가 검색할 내용을 넣습니다."><textarea value={knowledgeForm.extracted_text} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, extracted_text: e.target.value })} /></Field>
                 <div className="file-row">
                   <label className="file-picker"><Upload size={14} /> 파일<input type="file" onChange={(e) => setKnowledgeForm({ ...knowledgeForm, file: e.target.files?.[0] || null })} /></label>
-                  <span>{knowledgeForm.file ? knowledgeForm.file.name : "파일 없이 텍스트만 저장할 수 있습니다."}</span>
+                  <span>{knowledgeForm.file ? `첨부 파일: ${knowledgeForm.file.name}` : "파일 첨부는 선택입니다. 선택한 자료 종류에 맞춰 본문/추출 텍스트만으로도 저장할 수 있습니다."}</span>
                   <button><FileText size={14} /> 저장</button>
                 </div>
               </form>
