@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Bot, CalendarClock, Database, FileText, GitBranch, KeyRound, Link2, LogOut, Play, Plus, Search, Share2, Trash2, Upload, UserPlus } from "lucide-react";
 import { api, apiStatus } from "./api";
-import { customPreset, defaultAutomation, defaultIntegration, defaultKnowledge, figmaCalendarPreset, integrationConnectionPresets, mcpGithubToNotionPreset, mcpNotionToGithubPreset } from "./presets";
+import { customPreset, defaultAutomation, defaultIntegration, defaultKnowledge, figmaCalendarPreset, integrationConnectionPresets, mcpGithubToNotionPreset, mcpNotionToGithubPreset, teamNotionGanttToCalendarPreset } from "./presets";
 import { buildSystemReadinessCards, getHealthFailureMessage, getRunStatus, mergePostsById, parseRunResult, summarizeRunResult } from "./viewModel";
 import "./style.css";
 
@@ -794,9 +794,10 @@ function App() {
               <div className="panel-title row-title"><span>자동화 등록</span><span className="subtle">프로필 또는 커스텀 설정을 자동화마다 선택합니다.</span></div>
               <form className="automation-form" onSubmit={createAutomation}>
                 <div className="preset-actions">
-                  <button type="button" onClick={() => applyMcpAutomationPreset(mcpGithubToNotionPreset, "github")}>MCP GitHub → Notion</button>
-                  <button type="button" onClick={() => applyMcpAutomationPreset(mcpNotionToGithubPreset, "notion")}>MCP Notion → GitHub</button>
+                  <button type="button" onClick={() => applyMcpAutomationPreset(mcpGithubToNotionPreset, "github")}>GitHub -&gt; Notion BOARD</button>
+                  <button type="button" onClick={() => applyMcpAutomationPreset(mcpNotionToGithubPreset, "notion")}>Notion BOARD -&gt; GitHub Issue</button>
                   <button type="button" onClick={() => setForm(defaultAutomation)}>GitHub + Notion</button>
+                  <button type="button" onClick={() => setForm(teamNotionGanttToCalendarPreset)}>Notion GANTT -&gt; Calendar</button>
                   <button type="button" onClick={() => setForm(figmaCalendarPreset)}>Figma + Google Calendar</button>
                   <button type="button" onClick={() => setForm(customPreset)}>Custom API</button>
                   <button type="button" onClick={applyProfileDefaultsToAutomation}>사용자 기본값 적용</button>

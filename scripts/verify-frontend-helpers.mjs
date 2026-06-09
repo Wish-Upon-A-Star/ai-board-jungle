@@ -76,7 +76,7 @@ assert.equal(defaultAutomation.template_preset, "github_notion");
 assert.equal(figmaCalendarPreset.figma_file_url.includes("figma.com/design"), true);
 assert.equal(customPreset.api_provider, "사용자 지정 API");
 assert.equal(defaultKnowledge.source_type, "document");
-assert.ok(defaultKnowledge.extracted_text.includes("GitHub 이슈"));
+assert.ok(defaultKnowledge.extracted_text.includes("GitHub 변경사항"));
 assert.equal(defaultIntegration.source_kind, "github");
 assert.ok(defaultIntegration.rag_targets.includes("pull_requests"));
 assert.deepEqual(defaultIntegration.custom_connections.map((connection) => connection.service), ["github"]);

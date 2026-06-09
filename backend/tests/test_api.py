@@ -1344,6 +1344,129 @@ def test_full_fastapi_flow(monkeypatch):
         assert {"github", "google_calendar", "figma"} <= targets
 
 
+def test_notion_gantt_automation_creates_calendar_events(monkeypatch):
+    collected = [
+        CollectedItem(
+            title="로그인 화면 구현",
+            source_type="notion_database_page",
+            url="https://notion.test/gantt/login",
+            text=json.dumps(
+                {
+                    "이름": {"type": "title", "title": [{"plain_text": "로그인 화면 구현"}]},
+                    "날짜": {"type": "date", "date": {"start": "2026-06-10", "end": "2026-06-12", "time_zone": None}},
+                    "상태": {"type": "status", "status": {"name": "Not started"}},
+                },
+                ensure_ascii=False,
+            ),
+            tags=["notion", "database"],
+        ),
+        CollectedItem(
+            title="디자인 작업",
+            source_type="notion_database_page",
+            url="https://notion.test/gantt/design",
+            text=json.dumps(
+                {
+                    "이름": {"type": "title", "title": [{"plain_text": "디자인 작업"}]},
+                    "날짜": {"type": "date", "date": {"start": "2026-06-13", "end": None, "time_zone": None}},
+                    "상태": {"type": "status", "status": {"name": "In progress"}},
+                },
+                ensure_ascii=False,
+            ),
+            tags=["notion", "database"],
+        ),
+    ]
+    calendar_events = []
+
+    def fake_collect(profile, limit=20, pages=2):
+        return collected, []
+
+    def fake_write_calendar_event_at(profile, title, body, start_date, end_date="", dry_run=True, target_url=None):
+        calendar_events.append(
+            {
+                "profile": profile.name,
+                "title": title,
+                "body": body,
+                "start": start_date,
+                "end": end_date,
+                "target": target_url,
+                "dryRun": dry_run,
+            }
+        )
+        return {"service": "google_calendar", "status": "written", "id": f"event-{len(calendar_events)}", "url": "https://calendar.test/event", "dryRun": dry_run}
+
+    monkeypatch.setattr("app.main.collect_profile_items", fake_collect)
+    monkeypatch.setattr("app.main.write_calendar_event_at", fake_write_calendar_event_at)
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "gantt-calendar@example.com", "name": "Gantt Calendar", "password": "password123"},
+        )
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+        notion = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Template GANTT",
+                "source_kind": "notion",
+                "base_url": "35f7051c2f9982d6a3bf813799fc400b",
+                "api_provider": "Notion API",
+                "token_name": "NOTION_TOKEN",
+                "token_value": "notion-token",
+                "rag_targets": ["notion_database"],
+            },
+        ).json()["profile"]
+        client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Team Calendar",
+                "source_kind": "google_calendar",
+                "base_url": "primary",
+                "api_provider": "Google Calendar API",
+                "token_name": "GOOGLE_CALENDAR_TOKEN",
+                "token_value": "calendar-token",
+                "rag_targets": [],
+            },
+        )
+        task = client.post(
+            "/api/automations",
+            headers=headers,
+            json={
+                "name": "Notion GANTT to Calendar",
+                "integration_profile_id": notion["id"],
+                "source": "Notion GANTT",
+                "destination": "Google Calendar",
+                "interval_minutes": 10,
+                "instruction": "Create calendar events from GANTT rows with dates.",
+                "template": "GANTT 날짜를 Calendar 일정으로 생성",
+                "api_provider": "Notion API + Google Calendar API",
+                "ai_agent": "GanttCalendarAgent",
+                "custom_connections": [
+                    {
+                        "label": "Google Calendar",
+                        "service": "google_calendar",
+                        "url": "primary",
+                        "api": "Google Calendar API",
+                        "auth_key_name": "GOOGLE_CALENDAR_TOKEN",
+                        "operation": "create_events_from_notion_gantt",
+                        "template": "일정 제목: {title}\n날짜: {date}\n상태: {status}",
+                    }
+                ],
+            },
+        ).json()["task"]
+        run = client.post(f"/api/automations/{task['id']}/run", headers=headers)
+    assert run.status_code == 200
+    write = run.json()["run"]["result"]["liveWrites"][0]
+    assert write["service"] == "google_calendar"
+    assert write["operation"] == "create_events_from_notion_gantt"
+    assert write["count"] == 2
+    assert [event["title"] for event in calendar_events] == ["로그인 화면 구현", "디자인 작업"]
+    assert calendar_events[0]["start"] == "2026-06-10"
+    assert calendar_events[0]["end"] == "2026-06-12"
+    assert calendar_events[1]["start"] == "2026-06-13"
+    assert calendar_events[1]["target"] == "primary"
+
+
 def test_regular_user_only_sees_own_automations():
     with TestClient(app) as client:
         admin = client.post("/api/auth/register", json={"email": "admin2@example.com", "name": "Admin", "password": "password123"})

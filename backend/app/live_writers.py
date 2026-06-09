@@ -986,6 +986,48 @@ def write_calendar_event(
     return {"service": "google_calendar", "status": "written", "id": data.get("id", ""), "url": data.get("htmlLink", ""), "dryRun": False}
 
 
+def write_calendar_event_at(
+    profile: IntegrationProfile,
+    title: str,
+    body: str,
+    start_date: str,
+    end_date: str = "",
+    dry_run: bool = True,
+    target_url: str | None = None,
+) -> dict:
+    token = google_calendar_access_token(profile)
+    calendar_id = safe_calendar_id(target_url or profile.base_url)
+    start_value = str(start_date or "").strip()
+    end_value = str(end_date or "").strip()
+    if not token or not calendar_id:
+        return {"service": "google_calendar", "status": "blocked", "reason": "missing token or calendar id", "dryRun": dry_run}
+    if not start_value:
+        return {"service": "google_calendar", "status": "blocked", "reason": "missing Notion date start", "dryRun": dry_run}
+
+    def date_payload(value: str) -> dict:
+        if "T" in value:
+            return {"dateTime": value}
+        return {"date": value}
+
+    payload = {
+        "summary": title,
+        "description": body,
+        "start": date_payload(start_value),
+        "end": date_payload(end_value or start_value),
+    }
+    url = f"https://www.googleapis.com/calendar/v3/calendars/{quote(calendar_id, safe='')}/events"
+    if dry_run:
+        return {"service": "google_calendar", "status": "ready", "method": "POST", "url": url, "payload": payload, "dryRun": True}
+    try:
+        response = httpx.post(url, headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}, json=payload, timeout=15.0)
+    except httpx.HTTPError as exc:
+        return {"service": "google_calendar", "status": "failed", "reason": str(exc), "dryRun": False}
+    data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"raw": response.text}
+    if not response.is_success:
+        return {"service": "google_calendar", "status": "failed", "code": response.status_code, "response": data, "dryRun": False}
+    return {"service": "google_calendar", "status": "written", "id": data.get("id", ""), "url": data.get("htmlLink", ""), "dryRun": False}
+
+
 def execute_profile_write(
     profile: IntegrationProfile,
     title: str,

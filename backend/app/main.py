@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from .collectors import CollectedItem, collect_profile_items, extract_notion_id, parse_github_repo, save_collected_items
 from .db import check_db, database_reachable, get_db, init_db
-from .live_writers import execute_profile_write, write_notion_sources_report
+from .live_writers import execute_profile_write, write_calendar_event_at, write_notion_sources_report
 from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, User
 from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LiveWriteIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
 from .security import create_token, current_user, hash_password, protect_secret, reveal_secret, secret_preview, secret_storage_type, verify_password
@@ -33,6 +33,14 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIST = Path(os.environ.get("AI_BOARD_FRONTEND_DIST", PROJECT_ROOT / "frontend" / "dist")).resolve()
 FRONTEND_INDEX = FRONTEND_DIST / "index.html"
+
+
+class ReportSource(dict):
+    def __getattr__(self, name: str):
+        try:
+            return self[name]
+        except KeyError as exc:
+            raise AttributeError(name) from exc
 FRONTEND_ASSETS = FRONTEND_DIST / "assets"
 STARTUP_DB_ERROR = ""
 OAUTH_STATE_TTL_SECONDS = 10 * 60
@@ -676,6 +684,93 @@ def task_output_template(task: AutomationTask) -> str:
         or task.template.strip()
         or "{title}\n{summary}\n{source_url}"
     )
+
+
+def notion_property_title(properties: dict) -> str:
+    for prop in properties.values():
+        if not isinstance(prop, dict):
+            continue
+        if prop.get("type") == "title":
+            return "".join(part.get("plain_text", "") for part in prop.get("title", [])).strip()
+    return ""
+
+
+def notion_property_text(properties: dict, name: str) -> str:
+    prop = properties.get(name) or {}
+    if not isinstance(prop, dict):
+        return ""
+    prop_type = prop.get("type")
+    if prop_type == "rich_text":
+        return "".join(part.get("plain_text", "") for part in prop.get("rich_text", [])).strip()
+    if prop_type == "select":
+        return str((prop.get("select") or {}).get("name") or "")
+    if prop_type == "status":
+        return str((prop.get("status") or {}).get("name") or "")
+    if prop_type == "url":
+        return str(prop.get("url") or "")
+    if prop_type == "number":
+        return str(prop.get("number") or "")
+    return ""
+
+
+def source_raw_text(source: object) -> str:
+    if isinstance(source, dict):
+        return str(source.get("summary") or source.get("text") or "")
+    return str(getattr(source, "extracted_text", "") or getattr(source, "text", "") or "")
+
+
+def parse_notion_properties_from_source(source: object) -> dict:
+    text = source_raw_text(source)
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(text):
+        if char != "{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(text[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def write_notion_gantt_sources_to_calendar(profile: IntegrationProfile, sources: list[object], connection: dict, dry_run: bool = False) -> dict:
+    calendar_id = str(connection.get("url") or profile.base_url or "primary")
+    events: list[dict] = []
+    skipped: list[dict] = []
+    for source in sources:
+        properties = parse_notion_properties_from_source(source)
+        date_prop = properties.get("날짜") or properties.get("Date") or properties.get("date") or {}
+        date_value = date_prop.get("date") if date_prop.get("type") == "date" else None
+        title = notion_property_title(properties) or (source.get("title", "") if isinstance(source, dict) else getattr(source, "title", "")) or "Notion 일정"
+        title = re.sub(r"^\[[^\]]+\]\s+", "", title).strip() or title
+        if not date_value or not date_value.get("start"):
+            skipped.append({"title": title, "reason": "missing Notion 날짜 property"})
+            continue
+        status = notion_property_text(properties, "상태")
+        notion_url = source.get("url", "") if isinstance(source, dict) else getattr(source, "file_name", "")
+        body = "\n".join(part for part in [f"Notion GANTT 상태: {status}" if status else "Notion GANTT 일정", f"Notion 링크: {notion_url}" if notion_url else ""] if part)
+        write = write_calendar_event_at(
+            profile,
+            title,
+            body,
+            date_value.get("start", ""),
+            date_value.get("end") or date_value.get("start", ""),
+            dry_run=dry_run,
+            target_url=calendar_id,
+        )
+        write["sourceTitle"] = title
+        events.append(write)
+    return {
+        "service": "google_calendar",
+        "status": "written" if any(item.get("status") == "written" for item in events) else "ready" if dry_run and events else "skipped",
+        "operation": "create_events_from_notion_gantt",
+        "calendarId": calendar_id,
+        "count": len(events),
+        "events": events,
+        "skipped": skipped,
+        "dryRun": dry_run,
+    }
 
 
 def verify_hmac_signature(secret: str, body: bytes, signature: str, prefix: str = "sha256=") -> bool:
@@ -1501,15 +1596,24 @@ def execute_automation_task(
         if filtered_loop_items:
             collection_warnings.append(f"AI Board가 생성한 자동화 이슈 {filtered_loop_items}개를 루프 방지용으로 제외했습니다.")
         saved_sources = save_collected_items(db, actor, task.integration_profile, items) if items else []
-        report_sources = saved_sources or [
-            {
-                "title": item.title,
-                "sourceType": item.source_type,
-                "url": item.url,
-                "summary": item.text,
-            }
+        raw_report_sources = [
+            ReportSource(
+                title=f"[{task.integration_profile.name}] {item.title}" if external_items or external_event_key else item.title,
+                source_type=item.source_type,
+                sourceType=item.source_type,
+                url=item.url,
+                file_name=item.url,
+                extracted_text=item.text,
+                summary=item.text,
+            )
             for item in items
         ]
+        needs_raw_report_sources = any(
+            str(connection.get("service", "")).lower() == "google_calendar"
+            and "gantt" in str(connection.get("operation", "")).lower()
+            for connection in parse_connections(task.custom_connections)
+        )
+        report_sources = raw_report_sources if needs_raw_report_sources or not saved_sources else saved_sources
         collected = [serialize_collected_source(source) for source in saved_sources]
         task.integration_profile.last_collect_status = "collected" if saved_sources else "unchanged" if items else "no-data"
         task.integration_profile.last_collect_count = len(items)
@@ -1636,6 +1740,8 @@ def execute_automation_task(
                 )
             elif service == "notion":
                 write = {"service": "notion", "status": "skipped", "reason": "No new GitHub or Notion source items were collected for the template report.", "dryRun": False}
+            elif service == "google_calendar" and "gantt" in operation:
+                write = write_notion_gantt_sources_to_calendar(profile, report_sources, connection, dry_run=False)
             else:
                 write = execute_profile_write(profile, f"[AI Board] {task.name}", write_body, dry_run=False)
             profile.base_url = original_base_url
