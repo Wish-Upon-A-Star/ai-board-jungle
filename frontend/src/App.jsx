@@ -11,8 +11,8 @@ function Badge({ role }) {
   return <span className={admin ? "role admin" : "role user"}>{admin ? "관리자" : "사용자"}</span>;
 }
 
-function Field({ label, children }) {
-  return <label className="field"><span>{label}</span>{children}</label>;
+function Field({ label, hint, children }) {
+  return <label className="field"><span>{label}</span>{children}{hint ? <small>{hint}</small> : null}</label>;
 }
 
 function providerLabel(kind) {
@@ -863,13 +863,13 @@ function App() {
                   </div>
                 </section>
                 <div className="grid3 wide">
-                  <Field label="작업명"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-                  <Field label="주기"><input type="number" value={form.interval_minutes} onChange={(e) => setForm({ ...form, interval_minutes: Number(e.target.value) })} /></Field>
-                  <Field label="Agent"><input value={form.ai_agent} onChange={(e) => setForm({ ...form, ai_agent: e.target.value })} /></Field>
+                  <Field label="작업명" hint="목록과 실행 기록에 표시되는 이름입니다."><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="예: GitHub 변경사항을 Notion 업무 보드에 정리" /></Field>
+                  <Field label="실행 주기(분)" hint="몇 분마다 변경사항을 확인할지 정합니다."><input type="number" min="1" value={form.interval_minutes} onChange={(e) => setForm({ ...form, interval_minutes: Number(e.target.value) })} /></Field>
+                  <Field label="처리 방식" hint="자동화가 어떤 수집/작성 도구 조합을 쓸지 나타냅니다. 보통 템플릿을 누르면 자동 입력됩니다."><input value={form.ai_agent} onChange={(e) => setForm({ ...form, ai_agent: e.target.value })} placeholder="예: github_notion_agent" /></Field>
                 </div>
                 <div className="grid2">
-                  <Field label="출발지"><input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} /></Field>
-                  <Field label="목적지"><input value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} /></Field>
+                  <Field label="읽어올 곳" hint="자동화가 변경사항을 가져올 서비스나 페이지입니다."><input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="예: GitHub 저장소, Notion BOARD, Figma 파일" /></Field>
+                  <Field label="결과 저장 위치" hint="AI가 정리한 결과를 쓸 대상입니다. 이 칸이 방금 물어본 목적지 입력칸입니다."><input value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="예: Notion 업무 보드, GitHub 이슈, Google Calendar" /></Field>
                 </div>
                 <div className="grid3 wide">
                   <Field label="AI 제공자"><input list="ai-provider-options" value={form.ai_provider} onChange={(e) => setForm({ ...form, ai_provider: e.target.value })} placeholder="OpenAI 또는 OpenAI-compatible" /></Field>
