@@ -222,6 +222,7 @@ pre {
   align-items: stretch;
   margin-bottom: 16px;
 }
+.workspace-intro.single { grid-template-columns: minmax(0, 1fr); }
 .intro-copy,
 .next-steps {
   border: 1px solid var(--line);
@@ -305,11 +306,13 @@ pre {
 
 .layout {
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr) 310px;
   gap: 18px;
   align-items: start;
   min-width: 0;
 }
+.layout.with-stats { grid-template-columns: 210px minmax(0, 1fr); }
+.layout.with-result { grid-template-columns: minmax(0, 1fr) 310px; }
+.layout.focus-layout { grid-template-columns: minmax(0, 1fr); }
 .stats,
 .result-panel {
   position: sticky;
@@ -522,7 +525,8 @@ pre {
 .connection-builder,
 .connection-preview,
 .profile-settings-box,
-.integration-profile-box {
+.integration-profile-box,
+.advanced-panel {
   display: grid;
   gap: 10px;
   border: 1px solid var(--line);
@@ -530,6 +534,15 @@ pre {
   padding: 12px;
   background: var(--surface-soft);
 }
+.advanced-panel summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 850;
+}
+.advanced-panel[open] { background: #fbfcfa; }
+.advanced-panel > .field,
+.advanced-panel > .provider-grid,
+.advanced-panel > .activity-log { margin-top: 10px; }
 .connection-preview { border-color: #cfe1ef; background: var(--blue-soft); color: var(--muted); }
 .connection-preview strong { color: var(--text); }
 .connection-preview span { color: var(--blue); overflow-wrap: anywhere; }

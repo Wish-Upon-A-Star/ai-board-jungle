@@ -74,8 +74,8 @@ function automationTemplateToForm(template) {
 
 const mainTabs = [
   { id: "automations", label: "자동화", description: "만들기, 실행, 공유" },
-  { id: "integrations", label: "계정 연결", description: "GitHub, Notion, MCP" },
-  { id: "settings", label: "AI 기본값", description: "모델과 출력 양식" },
+  { id: "integrations", label: "프로필", description: "계정, 토큰, 연동" },
+  { id: "settings", label: "기본 설정", description: "AI 모델, 템플릿" },
   { id: "knowledge", label: "지식자료", description: "RAG 검색 자료" },
   { id: "board", label: "게시판", description: "일반 글과 공유 자동화" },
   { id: "api", label: "점검", description: "상태와 도구 호출" },
@@ -95,12 +95,12 @@ const tabIntro = {
     body: "연결된 계정을 선택하고 템플릿을 고른 뒤 저장합니다. 저장된 작업은 직접 실행하거나 주기 실행으로 돌릴 수 있습니다.",
   },
   integrations: {
-    title: "계정 연결",
-    body: "각 사용자가 자기 GitHub, Notion, Figma, Google Calendar와 AI API 키를 연결합니다. 자동화는 선택한 사용자 프로필만 사용합니다.",
+    title: "프로필",
+    body: "GitHub, Notion, Figma, Google Calendar와 API 키를 한 곳에서 연결합니다. 자동화는 여기 저장된 내 프로필을 선택해서 사용합니다.",
   },
   settings: {
-    title: "AI 기본값",
-    body: "새 자동화에 기본으로 들어갈 AI 제공자, 모델, API Base, 요청 템플릿을 정합니다.",
+    title: "기본 설정",
+    body: "새 자동화에 기본으로 들어갈 AI 모델, 템플릿, 출력 양식을 정합니다. 계정 토큰은 프로필 탭에서 관리합니다.",
   },
   knowledge: {
     title: "RAG 지식자료",
@@ -755,16 +755,16 @@ function App() {
           </div>
         </section>
 
-        <section className="workspace-intro" aria-label="처음 사용 순서">
+        <section className={`workspace-intro ${activeMainTab === "automations" ? "" : "single"}`} aria-label="현재 탭 안내">
           <div className="intro-copy">
             <span className="eyebrow">현재 탭</span>
             <h2>{tabIntro[activeMainTab].title}</h2>
             <p>{tabIntro[activeMainTab].body}</p>
           </div>
-          <div className="next-steps" aria-label="기본 사용 순서">
+          {activeMainTab === "automations" ? <div className="next-steps" aria-label="기본 사용 순서">
             <button type="button" onClick={() => setActiveMainTab("integrations")} className={activeMainTab === "integrations" ? "active" : ""}>
               <KeyRound size={15} />
-              <span><b>1. 계정 연결</b><small>각자 OAuth 또는 토큰 등록</small></span>
+              <span><b>1. 프로필 연결</b><small>계정과 API 키 등록</small></span>
             </button>
             <button type="button" onClick={() => setActiveMainTab("automations")} className={activeMainTab === "automations" ? "active" : ""}>
               <CalendarClock size={15} />
@@ -772,9 +772,9 @@ function App() {
             </button>
             <button type="button" onClick={() => setActiveMainTab("board")} className={activeMainTab === "board" ? "active" : ""}>
               <Share2 size={15} />
-              <span><b>3. 결과 확인</b><small>게시판과 실행 기록 읽기</small></span>
+              <span><b>3. 결과 확인</b><small>공유 자동화와 글 확인</small></span>
             </button>
-          </div>
+          </div> : null}
         </section>
 
         {error && (
@@ -788,8 +788,8 @@ function App() {
           </div>
         )}
 
-        <div className="layout">
-          <aside className="stats" aria-label="내 작업 요약">
+        <div className={`layout ${activeMainTab === "automations" ? "with-stats" : "focus-layout"} ${activeMainTab === "api" ? "with-result" : ""}`}>
+          {activeMainTab === "automations" ? <aside className="stats" aria-label="내 작업 요약">
             <dl>
               <div><dt>내 작업</dt><dd>{myTasks.length}</dd></div>
               <div><dt>전체 작업</dt><dd>{tasks.length}</dd></div>
@@ -799,7 +799,7 @@ function App() {
               <div><dt>연동 프로필</dt><dd className="green">{integrationProfiles.length}</dd></div>
               <div><dt>지식자료</dt><dd className="green">{knowledgeSources.length}</dd></div>
             </dl>
-          </aside>
+          </aside> : null}
 
           <section className="main-column">
             <article className={`panel ${activeMainTab === "api" ? "" : "tab-hidden"}`}>
@@ -942,7 +942,7 @@ function App() {
                   <span>{(form.custom_connections || []).length ? `${form.custom_connections.length}개 연결: ${form.custom_connections.map((connection) => `${connection.service}:${connection.operation}`).join(" / ")}` : "자동화 텍스트와 선택 프로필에서 연결을 추론합니다."}</span>
                 </div>
                 <div className={`form-status ${automationSaveState.status}`}>
-                  {automationSaveState.message || "저장 버튼을 누르면 자동화가 생성되고 오른쪽 AI 결과 패널에 응답이 표시됩니다."}
+                  {automationSaveState.message || "저장 버튼을 누르면 자동화가 생성되고 저장된 자동화 목록에 표시됩니다."}
                 </div>
                 <button disabled={automationSaveState.status === "saving"}><CalendarClock size={14} /> {automationSaveState.status === "saving" ? "저장 중" : "자동화 저장"}</button>
               </form>
@@ -1003,16 +1003,16 @@ function App() {
             </article>
 
             <article id="integrations-panel" className={`panel ${activeMainTab === "integrations" ? "" : "tab-hidden"}`}>
-              <div className="panel-title row-title"><span>연동 프로필 목록</span><span className="subtle">사용자별 토큰, API, AI 모델, RAG 범위를 저장합니다.</span></div>
+              <div className="panel-title row-title"><span>내 프로필</span><span className="subtle">계정 로그인, 토큰, API 키를 여기서 한 번에 관리합니다.</span></div>
               <section className="credential-guide">
                 <div>
-                  <strong>각 사용자는 여기서 자기 계정을 연결합니다</strong>
-                  <p>GitHub/Notion/Figma/Google Calendar 버튼으로 OAuth 로그인하거나, 아래 수동 프로필 폼의 <b>토큰/API Key</b> 칸에 본인 키를 넣습니다. 자동화는 선택된 사용자 프로필의 토큰만 사용하고 다른 사람 토큰을 공유하지 않습니다.</p>
+                  <strong>내 계정 연결</strong>
+                  <p>먼저 로그인 버튼을 누릅니다. 안 되면 수동 프로필에서 URL과 토큰/API Key를 넣습니다. 자동화는 여기 저장한 내 프로필만 사용합니다.</p>
                 </div>
                 <ol>
-                  <li>OAuth 가능: 위 로그인 버튼 클릭</li>
-                  <li>수동 키: 종류, Base URL, 토큰/API Key 입력</li>
-                  <li>AI 모델 키: AI 제공자, AI 모델, AI API Base와 함께 프로필에 저장</li>
+                  <li>GitHub/Notion/Figma/Calendar 로그인</li>
+                  <li>필요하면 수동 토큰 저장</li>
+                  <li>자동화 탭에서 이 프로필 선택</li>
                 </ol>
               </section>
               <div className="mcp-setup-actions">
@@ -1044,7 +1044,7 @@ function App() {
                   </div>
                 </section>
               ) : null}
-              <p className="inline-help">기본 흐름은 MCP 로그인입니다. 아래 토큰 입력 폼은 OAuth 앱 설정이 없거나 운영자가 직접 자격증명을 넣어야 할 때만 쓰는 fallback입니다.</p>
+              <p className="inline-help">대부분은 위 로그인 버튼만 쓰면 됩니다. 수동 입력은 로그인 앱 설정이 없을 때만 사용합니다.</p>
               <form className="knowledge-form" onSubmit={saveIntegrationProfile}>
                 <div className="grid3 wide">
                   <Field label="프로필명"><input value={integrationForm.name} onChange={(e) => setIntegrationForm({ ...integrationForm, name: e.target.value })} /></Field>
@@ -1079,9 +1079,12 @@ function App() {
                   <Field label="MCP Server"><input value={integrationForm.mcp_server_url} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_server_url: e.target.value })} placeholder="mcp://notion or https://mcp.example.com" /></Field>
                   <Field label="MCP User"><input value={integrationForm.mcp_auth_subject} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_auth_subject: e.target.value })} placeholder="user@example.com" /></Field>
                 </div>
-                <Field label="MCP Scopes"><input value={integrationForm.mcp_scopes} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_scopes: e.target.value })} placeholder="page.read, page.write, comment.write" /></Field>
-                <Field label="RAG 대상"><input value={integrationForm.rag_targets} onChange={(e) => setIntegrationForm({ ...integrationForm, rag_targets: e.target.value })} /></Field>
-                <Field label="프로필 템플릿"><textarea value={integrationForm.custom_template} onChange={(e) => setIntegrationForm({ ...integrationForm, custom_template: e.target.value })} /></Field>
+                <details className="advanced-panel">
+                  <summary>고급 프로필 설정</summary>
+                  <Field label="MCP Scopes"><input value={integrationForm.mcp_scopes} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_scopes: e.target.value })} placeholder="page.read, page.write, comment.write" /></Field>
+                  <Field label="RAG 대상"><input value={integrationForm.rag_targets} onChange={(e) => setIntegrationForm({ ...integrationForm, rag_targets: e.target.value })} /></Field>
+                  <Field label="프로필 템플릿"><textarea value={integrationForm.custom_template} onChange={(e) => setIntegrationForm({ ...integrationForm, custom_template: e.target.value })} /></Field>
+                </details>
                 <section className="connection-builder">
                   <div className="section-head flat">
                     <div>
@@ -1118,32 +1121,7 @@ function App() {
                 <button><KeyRound size={14} /> 연동 프로필 저장</button>
               </form>
               <div className="knowledge-list">
-                <div className="provider-grid">
-                  {providerReadiness.map((provider) => (
-                    <div key={provider.key} className={provider.ready ? "provider-card ready" : "provider-card missing"}>
-                      <strong>{provider.name}</strong>
-                      <span>Live Write Readiness: {provider.ready ? "ready" : "setup required"} / {provider.readyCount}/{provider.profileCount}</span>
-                      <p>{provider.requiredUrl} / {provider.requiredToken} / {provider.operation}</p>
-                      <small>{provider.nextAction}</small>
-                    </div>
-                  ))}
-                </div>
-                <div className="activity-log">
-                  <div className="activity-head">
-                    <strong>Integration Activity Log</strong>
-                    <span>{integrationActivities.length} / {activityPage.total} shown</span>
-                    <div className="activity-actions">
-                      <button type="button" onClick={() => updateActivityFilters({ provider: "", status: "", event_type: "integration_profile.write", automation_task_id: "", integration_profile_id: "", dry_run: "false" })}>Real-write audit</button>
-                      <button type="button" onClick={() => updateActivityFilters({ provider: "", status: "", event_type: "", automation_task_id: "", integration_profile_id: "", dry_run: "" })}>Reset filters</button>
-                    </div>
-                  </div>
-                  {integrationActivities.map((activity) => (
-                    <div key={activity.id} className={`activity-row ${activity.status}`}>
-                      <span>{activity.eventType}</span><span>{activity.provider || "board"}</span><span>{activity.status}</span><p>{activity.summary}</p>
-                    </div>
-                  ))}
-                  {activityPage.hasMore ? <button type="button" className="load-more" onClick={() => loadActivities(activityFilters, activityPage.nextOffset, true)}>Load more activity</button> : null}
-                </div>
+                <div className="panel-title compact">저장된 내 프로필</div>
                 {integrationProfiles.map((profile) => (
                   <div key={profile.id} className="knowledge-item">
                     <strong>{profile.name}</strong>
@@ -1163,6 +1141,32 @@ function App() {
                     ) : null}
                   </div>
                 ))}
+                {integrationProfiles.length === 0 ? <p className="empty-state">저장된 프로필이 없습니다. 위 로그인 버튼 또는 수동 프로필 저장을 사용하세요.</p> : null}
+                <details className="advanced-panel">
+                  <summary>고급 진단 보기</summary>
+                  <div className="provider-grid">
+                    {providerReadiness.map((provider) => (
+                      <div key={provider.key} className={provider.ready ? "provider-card ready" : "provider-card missing"}>
+                        <strong>{provider.name}</strong>
+                        <span>{provider.ready ? "ready" : "setup required"} / {provider.readyCount}/{provider.profileCount}</span>
+                        <p>{provider.requiredUrl} / {provider.requiredToken} / {provider.operation}</p>
+                        <small>{provider.nextAction}</small>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="activity-log">
+                    <div className="activity-head">
+                      <strong>연동 활동 로그</strong>
+                      <span>{integrationActivities.length} / {activityPage.total} shown</span>
+                    </div>
+                    {integrationActivities.map((activity) => (
+                      <div key={activity.id} className={`activity-row ${activity.status}`}>
+                        <span>{activity.eventType}</span><span>{activity.provider || "board"}</span><span>{activity.status}</span><p>{activity.summary}</p>
+                      </div>
+                    ))}
+                    {activityPage.hasMore ? <button type="button" className="load-more" onClick={() => loadActivities(activityFilters, activityPage.nextOffset, true)}>활동 더 보기</button> : null}
+                  </div>
+                </details>
               </div>
             </article>
 
@@ -1299,7 +1303,7 @@ function App() {
             </article>
           </section>
 
-          <aside className="result-panel" aria-label="선택 항목과 API 결과">
+          {activeMainTab === "api" ? <aside className="result-panel" aria-label="선택 항목과 API 결과">
             <div className="tabs" role="tablist" aria-label="결과 패널">
               <button type="button" role="tab" aria-label="선택 글 보기" aria-selected={sideTab === "selected"} className={sideTab === "selected" ? "active" : ""} onClick={() => setSideTab("selected")}>선택 글</button>
               <button type="button" role="tab" aria-label="AI 결과 보기" aria-selected={sideTab === "api"} className={sideTab === "api" ? "active" : ""} onClick={() => setSideTab("api")}>AI 결과</button>
@@ -1309,7 +1313,7 @@ function App() {
             ) : (
               <pre>{JSON.stringify(apiResult || result || { status: "AI 도구를 실행하면 결과가 표시됩니다." }, null, 2)}</pre>
             )}
-          </aside>
+          </aside> : null}
         </div>
       </main>
     </div>
