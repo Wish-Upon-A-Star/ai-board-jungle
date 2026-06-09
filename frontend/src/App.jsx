@@ -55,13 +55,40 @@ function renderPostContent(content) {
 }
 
 const mainTabs = [
-  { id: "automations", label: "Automation", description: "작업 실행, 예약, 생성" },
-  { id: "integrations", label: "MCP / Profiles", description: "GitHub, Notion 로그인과 프로필" },
-  { id: "settings", label: "Defaults", description: "사용자 기본 AI 설정" },
-  { id: "knowledge", label: "RAG", description: "검색 지식자료" },
-  { id: "board", label: "Board", description: "공유 기록과 게시글" },
-  { id: "api", label: "API", description: "상태 점검과 도구 호출" },
+  { id: "automations", label: "자동화", description: "만들기, 실행, 공유" },
+  { id: "integrations", label: "계정 연결", description: "GitHub, Notion, MCP" },
+  { id: "settings", label: "AI 기본값", description: "모델과 출력 양식" },
+  { id: "knowledge", label: "지식자료", description: "RAG 검색 자료" },
+  { id: "board", label: "게시판", description: "공유 글과 실행 기록" },
+  { id: "api", label: "점검", description: "상태와 도구 호출" },
 ];
+
+const tabIntro = {
+  automations: {
+    title: "자동화 작업",
+    body: "연결된 계정을 선택하고 템플릿을 고른 뒤 저장합니다. 저장된 작업은 직접 실행하거나 주기 실행으로 돌릴 수 있습니다.",
+  },
+  integrations: {
+    title: "계정 연결",
+    body: "각 사용자가 자기 GitHub, Notion, Figma, Google Calendar와 AI API 키를 연결합니다. 자동화는 선택한 사용자 프로필만 사용합니다.",
+  },
+  settings: {
+    title: "AI 기본값",
+    body: "새 자동화에 기본으로 들어갈 AI 제공자, 모델, API Base, 요청 템플릿을 정합니다.",
+  },
+  knowledge: {
+    title: "RAG 지식자료",
+    body: "자동화가 참고할 문서와 텍스트를 사용자별로 저장합니다.",
+  },
+  board: {
+    title: "게시판",
+    body: "자동화 실행 결과와 사람이 작성한 글을 읽고 공유합니다. 왼쪽에서 글을 고르면 오른쪽에 전체 내용이 표시됩니다.",
+  },
+  api: {
+    title: "상태 점검",
+    body: "서버, RAG, MCP, Agent Hub 호출 결과를 확인합니다. 일반 사용자는 보통 이 탭을 건드릴 필요가 없습니다.",
+  },
+};
 
 const aiProviderOptions = ["OpenAI", "OpenAI-compatible", "Anthropic", "Google Gemini", "Local"];
 const aiModelOptions = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "o4-mini", "claude-sonnet-4", "gemini-1.5-pro", "local-model"];
@@ -123,6 +150,7 @@ function App() {
   const sharedCount = posts.filter((post) => post.automationTaskId).length;
   const systemCards = buildSystemReadinessCards({ providerReadiness, knowledgeSources, tasks, healthStatus });
   const healthFailureMessage = getHealthFailureMessage(healthStatus);
+  const readyProviderCount = providerReadiness.filter((provider) => provider.ready).length;
 
   useEffect(() => {
     loadHealth();
@@ -645,7 +673,7 @@ function App() {
       <header className="site-header">
         <div className="brand-block">
           <div className="wordmark">AI<span>/</span>BOARD<span>&gt;</span></div>
-          <span>Automation command center</span>
+          <span>팀 자동화 작업대</span>
         </div>
         <nav aria-label="주요 작업 탭" role="tablist">
           {mainTabs.map((tab) => (
@@ -678,6 +706,28 @@ function App() {
           </div>
         </section>
 
+        <section className="workspace-intro" aria-label="처음 사용 순서">
+          <div className="intro-copy">
+            <span className="eyebrow">현재 탭</span>
+            <h2>{tabIntro[activeMainTab].title}</h2>
+            <p>{tabIntro[activeMainTab].body}</p>
+          </div>
+          <div className="next-steps" aria-label="기본 사용 순서">
+            <button type="button" onClick={() => setActiveMainTab("integrations")} className={activeMainTab === "integrations" ? "active" : ""}>
+              <KeyRound size={15} />
+              <span><b>1. 계정 연결</b><small>각자 OAuth 또는 토큰 등록</small></span>
+            </button>
+            <button type="button" onClick={() => setActiveMainTab("automations")} className={activeMainTab === "automations" ? "active" : ""}>
+              <CalendarClock size={15} />
+              <span><b>2. 자동화 만들기</b><small>템플릿 선택 후 저장</small></span>
+            </button>
+            <button type="button" onClick={() => setActiveMainTab("board")} className={activeMainTab === "board" ? "active" : ""}>
+              <Share2 size={15} />
+              <span><b>3. 결과 확인</b><small>게시판과 실행 기록 읽기</small></span>
+            </button>
+          </div>
+        </section>
+
         {error && (
           <div className="top-error">
             <strong>{error}</strong>
@@ -690,26 +740,22 @@ function App() {
         )}
 
         <div className="layout">
-          <aside className="stats">
+          <aside className="stats" aria-label="내 작업 요약">
             <dl>
               <div><dt>내 작업</dt><dd>{myTasks.length}</dd></div>
               <div><dt>전체 작업</dt><dd>{tasks.length}</dd></div>
               <div><dt>게시판 공유</dt><dd className="green">{sharedCount}</dd></div>
-              <div><dt>Redis</dt><dd className="green">RAG 캐시</dd></div>
+              <div><dt>연결 준비</dt><dd className="green">{readyProviderCount}/{providerReadiness.length || 4}</dd></div>
               <div><dt>AI 모델</dt><dd className="green">{form.ai_model}</dd></div>
               <div><dt>연동 프로필</dt><dd className="green">{integrationProfiles.length}</dd></div>
               <div><dt>지식자료</dt><dd className="green">{knowledgeSources.length}</dd></div>
-              <div><dt>RAG</dt><dd className="green">검색 요약</dd></div>
-              <div><dt>MCP</dt><dd>JSON-RPC</dd></div>
-              <div><dt>Agent</dt><dd>도구 선택</dd></div>
-              <div><dt>PostgreSQL</dt><dd>준비됨</dd></div>
             </dl>
           </aside>
 
           <section className="main-column">
-            <article className="panel">
+            <article className={`panel ${activeMainTab === "api" ? "" : "tab-hidden"}`}>
               <div className="panel-title row-title">
-                <span>System Readiness</span>
+                <span>시스템 준비 상태</span>
                 <span className="subtle">검증 항목과 실제 연동 준비 상태를 한눈에 확인합니다.</span>
               </div>
               <div className="system-readiness">
@@ -723,10 +769,13 @@ function App() {
             </article>
 
             <article id="automations-panel" className={`panel ${activeMainTab === "automations" ? "" : "tab-hidden"}`}>
-              <div className="panel-title">사용자별 자동화 작업</div>
+              <div className="panel-title row-title">
+                <span>저장된 자동화</span>
+                <span className="subtle">실행, 공유, 기록 확인을 여기서 처리합니다.</span>
+              </div>
               <div className="task-list">
                 <div className="scheduler-bar">
-                  <button type="button" onClick={schedulerTick}><CalendarClock size={14} /> Scheduler tick</button>
+                  <button type="button" onClick={schedulerTick}><CalendarClock size={14} /> 예약 작업 확인</button>
                   <span>활성 자동화를 확인하고 입력 변경이 없으면 실행을 건너뜁니다.</span>
                 </div>
                 {tasks.map((task) => (
@@ -743,21 +792,21 @@ function App() {
                       <div><dt>템플릿</dt><dd>{task.templatePreset || "github_notion"}</dd></div>
                     </dl>
                     <div className="task-actions">
-                      <button onClick={() => runTask(task)}><Play size={14} /> Run</button>
-                      <button onClick={() => shareTask(task)} className="secondary"><Share2 size={14} /> Share</button>
-                      <button onClick={() => loadTaskRuns(task)} className="secondary"><Database size={14} /> Run history</button>
+                      <button onClick={() => runTask(task)}><Play size={14} /> 지금 실행</button>
+                      <button onClick={() => shareTask(task)} className="secondary"><Share2 size={14} /> 게시판에 공유</button>
+                      <button onClick={() => loadTaskRuns(task)} className="secondary"><Database size={14} /> 실행 기록</button>
                       {deleteConfirmTaskId === task.id ? (
                         <>
-                          <button onClick={() => deleteTask(task)} className="danger confirm-delete"><Trash2 size={14} /> Confirm delete</button>
-                          <button onClick={() => setDeleteConfirmTaskId(null)} className="secondary">Cancel</button>
+                          <button onClick={() => deleteTask(task)} className="danger confirm-delete"><Trash2 size={14} /> 삭제 확정</button>
+                          <button onClick={() => setDeleteConfirmTaskId(null)} className="secondary">취소</button>
                         </>
                       ) : (
-                        <button onClick={() => setDeleteConfirmTaskId(task.id)} className="danger"><Trash2 size={14} /> Delete</button>
+                        <button onClick={() => setDeleteConfirmTaskId(task.id)} className="danger"><Trash2 size={14} /> 삭제</button>
                       )}
                     </div>
                     {runHistory[task.id] ? (
                       <div className="run-history">
-                        <div className="run-history-head"><strong>Run history</strong><span>{runHistory[task.id].runs.length} / {runHistory[task.id].total} · Updated {runHistory[task.id].loadedAt}</span></div>
+                        <div className="run-history-head"><strong>실행 기록</strong><span>{runHistory[task.id].runs.length} / {runHistory[task.id].total} · {runHistory[task.id].loadedAt} 갱신</span></div>
                         {runHistory[task.id].runs.map((run) => {
                           const key = `${task.id}:${run.id}`;
                           const expanded = expandedRuns[key];
@@ -771,10 +820,10 @@ function App() {
                                 <span className={`run-status ${status}`}>{status}</span>
                                 <p>{summarizeRunResult(run.result)}</p>
                                 <button type="button" className="inline-link retry" disabled={retryState?.status === "running"} onClick={() => retryTaskFromRun(task, run)}>
-                                  {retryState?.status === "running" ? "Retrying" : "Retry"}
+                                  {retryState?.status === "running" ? "재실행 중" : "재실행"}
                                 </button>
                                 <button type="button" className="inline-link" onClick={() => setExpandedRuns((current) => ({ ...current, [key]: !current[key] }))}>
-                                  {expanded ? "Hide details" : "Details"}
+                                  {expanded ? "접기" : "상세"}
                                 </button>
                               </div>
                               {retryState?.message ? <div className={`run-retry-message ${retryState.status}`}>{retryState.message}</div> : null}
@@ -782,7 +831,7 @@ function App() {
                             </div>
                           );
                         })}
-                        {runHistory[task.id].hasMore ? <button className="load-more" onClick={() => loadTaskRuns(task, runHistory[task.id].nextOffset, true)}>Load more runs</button> : null}
+                        {runHistory[task.id].hasMore ? <button className="load-more" onClick={() => loadTaskRuns(task, runHistory[task.id].nextOffset, true)}>실행 기록 더 보기</button> : null}
                       </div>
                     ) : null}
                   </section>
@@ -1170,4 +1219,7 @@ function App() {
   );
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+const rootElement = document.getElementById("root");
+const root = window.__aiBoardRoot || createRoot(rootElement);
+window.__aiBoardRoot = root;
+root.render(<App />);
