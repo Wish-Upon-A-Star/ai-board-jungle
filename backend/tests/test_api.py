@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import json
@@ -24,6 +24,28 @@ from app.main import app
 from app.models import AutomationRun, AutomationTask, IntegrationProfile, KnowledgeSource
 from app.live_writers import korean_summary_for_source, notion_sources_template_children, write_calendar_event, write_github_issue, write_notion_sources_report, write_notion_task
 from app.security import reveal_secret
+
+
+def find_first_block(blocks, block_type):
+    for block in blocks:
+        if block.get("type") == block_type:
+            return block
+        payload = block.get(block.get("type"), {})
+        for child_key in ("children",):
+            found = find_first_block(payload.get(child_key, []), block_type)
+            if found:
+                return found
+    return None
+
+
+def collect_block_text(blocks):
+    parts = []
+    for block in blocks:
+        payload = block.get(block.get("type"), {})
+        rich_text = payload.get("rich_text", [])
+        parts.append("".join(part["text"]["content"] for part in rich_text if "text" in part))
+        parts.append(collect_block_text(payload.get("children", [])))
+    return "\n".join(part for part in parts if part)
 
 
 def test_health_recovers_after_startup_database_error(monkeypatch):
@@ -346,11 +368,7 @@ def test_notion_sources_report_writer_uses_request_template(monkeypatch):
     assert write["status"] == "written"
     assert write["format"] == "template-rendered-blocks"
     blocks = calls[0][1]["children"]
-    rendered_text = "\n".join(
-        "".join(part["text"]["content"] for part in block.get(block["type"], {}).get("rich_text", []))
-        for block in blocks
-        if block["type"] in {"paragraph", "heading_3"}
-    )
+    rendered_text = collect_block_text(blocks)
     assert "요청 제목: Fix OAuth callback" in rendered_text
     assert "요청 이유: OAuth 콜백을 수정했습니다." in rendered_text
     assert "관련 링크: https://github.com/acme/repo/commit/1" in rendered_text
@@ -383,9 +401,10 @@ def test_notion_sources_report_writer_chunks_large_template_payload(monkeypatch)
     sources = [{"title": f"Issue {index}", "sourceType": "github_issue", "url": f"https://example.test/{index}", "summary": "line"} for index in range(43)]
     write = write_notion_sources_report(profile, "Chunked template", sources, "요청 제목: {title}\n요약: {summary}\n링크: {source_url}", dry_run=False)
     assert write["status"] == "written"
-    assert len(calls) > 1
+    assert len(calls) == 1
     assert all(len(call["children"]) <= 100 for call in calls)
-    assert sum(len(call["children"]) for call in calls) > 100
+    assert calls[0]["children"][0]["type"] == "toggle"
+    assert find_first_block(calls[0]["children"], "table") is not None
 
 
 def test_notion_sources_report_uses_real_table_for_markdown_table_template():
@@ -401,7 +420,7 @@ def test_notion_sources_report_uses_real_table_for_markdown_table_template():
         ],
         "| 번호 | 유형 | 제목 | 한국어 요약 | 위험도 | 다음 조치 | 링크 |\n|---|---|---|---|---|---|---|",
     )
-    table = next(block for block in blocks if block["type"] == "table")
+    table = find_first_block(blocks, "table")
     rows = table["table"]["children"]
     assert table["table"]["table_width"] == 7
     assert table["table"]["has_column_header"] is True
@@ -423,7 +442,7 @@ def test_notion_sources_report_commit_summary_keeps_author_clean():
         ],
         "| 번호 | 유형 | 제목 | 한국어 요약 | 위험도 | 다음 조치 | 링크 |\n|---|---|---|---|---|---|---|",
     )
-    table = next(block for block in blocks if block["type"] == "table")
+    table = find_first_block(blocks, "table")
     summary = table["table"]["children"][1]["table_row"]["cells"][3][0]["text"]["content"]
     assert "Notion 표의 커밋 요약에서 작성자명에 URL이 섞이던 문제를 수정했습니다." in summary
     assert "Wish-Upon-A-Star url:" not in summary
@@ -445,7 +464,7 @@ def test_notion_sources_report_commit_summary_describes_oauth_login_change():
         ],
         "| 번호 | 유형 | 제목 | 한국어 요약 | 위험도 | 다음 조치 | 링크 |\n|---|---|---|---|---|---|---|",
     )
-    table = next(block for block in blocks if block["type"] == "table")
+    table = find_first_block(blocks, "table")
     summary = table["table"]["children"][1]["table_row"]["cells"][3][0]["text"]["content"]
     assert "Figma와 Google Calendar를 OAuth 로그인으로 연결" in summary
     assert "확인해야 합니다" not in summary
@@ -464,7 +483,7 @@ def test_notion_sources_report_commit_summary_describes_cleanup_change():
         ],
         "| 번호 | 유형 | 제목 | 한국어 요약 | 위험도 | 다음 조치 | 링크 |\n|---|---|---|---|---|---|---|",
     )
-    table = next(block for block in blocks if block["type"] == "table")
+    table = find_first_block(blocks, "table")
     summary = table["table"]["children"][1]["table_row"]["cells"][3][0]["text"]["content"]
     assert "요약 테스트에 남아 있던 이전 assertion과 죽은 코드를 제거" in summary
     assert "커밋 메시지 '" not in summary
@@ -484,7 +503,7 @@ def test_notion_sources_report_maps_table_values_by_header_name():
         ],
         "| 번호 | 유형 | 제목 | 한국어 요약 | 영향 영역 | 다음 조치 | 링크 |\n|---|---|---|---|---|---|---|",
     )
-    table = next(block for block in blocks if block["type"] == "table")
+    table = find_first_block(blocks, "table")
     row = table["table"]["children"][1]["table_row"]["cells"]
     values = [cell[0]["text"]["content"] for cell in row]
     assert values[3].startswith("라이브 서버 재시작 시 바탕화면의 GitHub, Notion, Figma, Google OAuth 설정")
@@ -506,7 +525,7 @@ def test_notion_sources_report_describes_demo_template_page_change():
         ],
         "| 번호 | 유형 | 제목 | 한국어 요약 | 영향 영역 | 다음 조치 | 링크 |\n|---|---|---|---|---|---|---|",
     )
-    table = next(block for block in blocks if block["type"] == "table")
+    table = find_first_block(blocks, "table")
     summary = table["table"]["children"][1]["table_row"]["cells"][3][0]["text"]["content"]
     assert "302호 1팀 Notion 데모 페이지를 자동화 보고서 목적지로 사용" in summary
     assert "커밋 메시지 '" not in summary

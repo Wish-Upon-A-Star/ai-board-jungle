@@ -264,6 +264,28 @@ def divider_block() -> dict:
     return {"object": "block", "type": "divider", "divider": {}}
 
 
+def callout_block(text: str, emoji: str = "📌", children: list[dict] | None = None) -> dict:
+    payload = {
+        "rich_text": notion_text(text, 1800),
+        "icon": {"type": "emoji", "emoji": emoji},
+    }
+    if children:
+        payload["children"] = children
+    return {"object": "block", "type": "callout", "callout": payload}
+
+
+def column_block(children: list[dict]) -> dict:
+    return {"object": "block", "type": "column", "column": {"children": children}}
+
+
+def column_list_block(columns: list[list[dict]]) -> dict:
+    return {"object": "block", "type": "column_list", "column_list": {"children": [column_block(column) for column in columns]}}
+
+
+def toggle_block(text: str, children: list[dict]) -> dict:
+    return {"object": "block", "type": "toggle", "toggle": {"rich_text": notion_text(text, 1800), "children": children}}
+
+
 def markdown_table_rows(text: str) -> list[list[str]]:
     lines = [line.strip() for line in str(text or "").splitlines() if line.strip()]
     table_lines = [line for line in lines if line.startswith("|") and line.endswith("|")]
@@ -495,10 +517,8 @@ def source_table_row_for_header(header: list[str], context: dict[str, str], risk
 
 
 def notion_sources_template_children(title: str, sources: list[object], template: str) -> list[dict]:
-    children = [
-        heading_2_block(title),
-        paragraph_block(f"총 {len(sources)}개 GitHub 변경사항을 자동화가 수집해 한국어로 정리했습니다."),
-    ]
+    summary_text = f"총 {len(sources)}개 GitHub/Notion 변경사항을 자동화가 수집해 한국어로 정리했습니다."
+    table_block: dict
     template_rows = markdown_table_rows(template)
     if template_rows:
         header = clean_table_header(template_rows[0])
@@ -508,20 +528,44 @@ def notion_sources_template_children(title: str, sources: list[object], template
             lowered = f"{context['title']} {context['summary']}".lower()
             risk = "높음" if any(token in lowered for token in ["security", "auth", "token", "secret", "fail", "error", "보안", "실패"]) else "보통"
             rows.append(source_table_row_for_header(header, context, risk))
-        children.append(notion_table_block(rows, header=True))
-        return children
-    children.append(notion_table_block(default_sources_table_rows(sources), header=True))
-    if not template.strip():
-        return children
-    children.append(paragraph_block("아래는 자동화 요청 템플릿을 각 항목에 적용한 상세 내용입니다."))
-    for index, source in enumerate(sources, start=1):
-        context = source_context(source, index)
-        children.append(heading_3_block(f"{index}. {context['title']}"))
-        for line in render_template(template, context).strip().splitlines():
-            children.append(paragraph_block(line))
-        if index < len(sources):
-            children.append(divider_block())
-    return children
+        table_block = notion_table_block(rows, header=True)
+    else:
+        table_block = notion_table_block(default_sources_table_rows(sources), header=True)
+
+    detail_children: list[dict] = [
+        callout_block("요청 템플릿 기준으로 생성된 자동화 보고입니다.", "🤖"),
+        table_block,
+    ]
+    if template.strip() and not template_rows:
+        detail_children.append(callout_block("자동화 요청 템플릿 상세 렌더링", "🧾"))
+        for index, source in enumerate(sources, start=1):
+            context = source_context(source, index)
+            detail_children.append(callout_block(f"{index}. {context['title']}", "🔎"))
+            for line in render_template(template, context).strip().splitlines():
+                detail_children.append(paragraph_block(line))
+            if index < len(sources):
+                detail_children.append(divider_block())
+
+    return [
+        toggle_block(
+            title,
+            [
+                column_list_block(
+                    [
+                        [
+                            callout_block("자동화 보고", "🤖"),
+                            paragraph_block(summary_text),
+                        ],
+                        [
+                            callout_block("영향 영역", "📋"),
+                            paragraph_block("BOARD / PAGES / GANTT CHART"),
+                        ],
+                    ]
+                ),
+                toggle_block("보고 표 / 요청 템플릿 렌더링", detail_children),
+            ],
+        )
+    ]
 
 
 def write_notion_sources_report(
