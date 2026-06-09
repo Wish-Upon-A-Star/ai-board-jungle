@@ -518,10 +518,39 @@ pre {
 .grid3.wide { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .preset-actions,
 .mcp-setup-actions,
+.ai-key-actions,
 .api-buttons,
 .profile-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .preset-actions button,
+.ai-key-actions button,
 .profile-actions button { width: auto; }
+.ai-key-guide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #bddbd6;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfffd;
+}
+.ai-key-guide strong {
+  display: block;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.ai-key-guide p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.ai-key-actions {
+  justify-content: flex-end;
+}
+.ai-key-actions button {
+  border-color: #a8d0ca;
+  color: var(--accent-strong);
+}
 .connection-builder,
 .connection-preview,
 .profile-settings-box,
@@ -1046,6 +1075,7 @@ pre {
   .system-readiness,
   .next-steps,
   .provider-grid,
+  .ai-key-guide,
   .grid2,
   .grid3,
   .grid3.wide,
@@ -1060,6 +1090,7 @@ pre {
   .next-steps button:last-child { border-bottom: 0; }
   .task-meta div { grid-template-columns: 104px minmax(0, 1fr); }
   .inline-link { justify-self: start; }
+  .ai-key-actions { justify-content: flex-start; }
   .row-title { align-items: flex-start; flex-direction: column; }
   .search { width: 100%; }
 }

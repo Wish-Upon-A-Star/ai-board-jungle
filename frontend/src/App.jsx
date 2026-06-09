@@ -167,6 +167,7 @@ function App() {
   const [form, setForm] = useState(defaultAutomation);
   const [knowledgeForm, setKnowledgeForm] = useState(defaultKnowledge);
   const [integrationForm, setIntegrationForm] = useState(defaultIntegration);
+  const [integrationSaveState, setIntegrationSaveState] = useState({ status: "idle", message: "프로필을 저장하면 자동화에서 선택할 수 있습니다." });
   const [liveWriteConfirmations, setLiveWriteConfirmations] = useState({});
   const [profileSettings, setProfileSettings] = useState(null);
   const [error, setError] = useState("");
@@ -446,6 +447,7 @@ function App() {
   async function saveIntegrationProfile(event) {
     event.preventDefault();
     clearErrorState();
+    setIntegrationSaveState({ status: "saving", message: "프로필을 저장하는 중입니다." });
     try {
       const body = {
         ...integrationForm,
@@ -458,8 +460,10 @@ function App() {
       const data = await api("/api/integration-profiles", { method: "POST", body: JSON.stringify(body) });
       setApiResult({ called: "integration-profile.save", response: data });
       setIntegrationForm({ ...defaultIntegration, token_value: "" });
+      setIntegrationSaveState({ status: "saved", message: "프로필을 저장했습니다. 자동화 탭에서 이 프로필을 선택해 실행하세요." });
       await loadAll();
     } catch (err) {
+      setIntegrationSaveState({ status: "error", message: err.message || "프로필 저장에 실패했습니다." });
       showActionError(err);
     }
   }
@@ -630,6 +634,70 @@ function App() {
       rag_targets: config.rag_targets,
     });
     setAutomationSaveState({ status: "error", message: `Create a ${providerLabel(kind)} MCP profile first, then return to the Automation tab.` });
+  }
+
+  function openAiKeyProfileSetup(provider = "openai") {
+    const defaults = {
+      openai: {
+        name: "OpenAI API 키",
+        ai_provider: "OpenAI",
+        ai_model: "gpt-4o-mini",
+        ai_api_base: "https://api.openai.com/v1",
+        token_name: "OPENAI_API_KEY",
+        api_provider: "OpenAI API",
+      },
+      anthropic: {
+        name: "Anthropic API 키",
+        ai_provider: "Anthropic",
+        ai_model: "claude-sonnet-4",
+        ai_api_base: "https://api.anthropic.com",
+        token_name: "ANTHROPIC_API_KEY",
+        api_provider: "Anthropic API",
+      },
+      gemini: {
+        name: "Google Gemini API 키",
+        ai_provider: "Google Gemini",
+        ai_model: "gemini-1.5-pro",
+        ai_api_base: "https://generativelanguage.googleapis.com/v1beta",
+        token_name: "GEMINI_API_KEY",
+        api_provider: "Google Gemini API",
+      },
+      compatible: {
+        name: "OpenAI 호환 API 키",
+        ai_provider: "OpenAI-compatible",
+        ai_model: "gpt-4o-mini",
+        ai_api_base: "https://api.openai.com/v1",
+        token_name: "AI_API_KEY",
+        api_provider: "OpenAI-compatible API",
+      },
+    };
+    const selected = defaults[provider] || defaults.openai;
+    setActiveMainTab("integrations");
+    setIntegrationForm({
+      ...defaultIntegration,
+      name: selected.name,
+      source_kind: "custom",
+      base_url: selected.ai_api_base,
+      api_provider: selected.api_provider,
+      token_name: selected.token_name,
+      token_value: "",
+      auth_type: "api_key",
+      mcp_server_url: "",
+      mcp_auth_subject: "",
+      mcp_scopes: "",
+      ai_provider: selected.ai_provider,
+      ai_model: selected.ai_model,
+      ai_api_base: selected.ai_api_base,
+      rag_targets: "ai",
+      collect_limit: 20,
+      collect_pages: 1,
+      custom_template: "AI 응답 템플릿",
+      custom_connections: [],
+    });
+    setIntegrationSaveState({ status: "saved", message: `${selected.name} 프로필을 채웠습니다. 토큰/API Key 칸에 본인 키를 직접 넣고 저장하세요.` });
+    window.setTimeout(() => {
+      document.getElementById("profile-manual-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   }
 
   async function startMcpLogin(kind = "github") {
@@ -1025,6 +1093,18 @@ function App() {
                 <button type="button" onClick={() => openMcpProfileSetup("figma")}>수동 Figma 프로필</button>
                 <button type="button" onClick={() => openMcpProfileSetup("google_calendar")}>수동 Google Calendar 프로필</button>
               </div>
+              <section className="ai-key-guide">
+                <div>
+                  <strong>AI API 키 저장</strong>
+                  <p>OpenAI, Gemini, Anthropic 키는 우리에게 보내지 말고 본인 계정으로 직접 저장합니다. 자동화는 선택한 사용자 프로필의 키만 사용합니다.</p>
+                </div>
+                <div className="ai-key-actions" aria-label="AI API 키 프로필 만들기">
+                  <button type="button" onClick={() => openAiKeyProfileSetup("openai")}>OpenAI 키 입력</button>
+                  <button type="button" onClick={() => openAiKeyProfileSetup("anthropic")}>Anthropic 키 입력</button>
+                  <button type="button" onClick={() => openAiKeyProfileSetup("gemini")}>Gemini 키 입력</button>
+                  <button type="button" onClick={() => openAiKeyProfileSetup("compatible")}>호환 API 키</button>
+                </div>
+              </section>
               {oauthSetup ? (
                 <section className="oauth-setup-card">
                   <div>
@@ -1044,8 +1124,8 @@ function App() {
                   </div>
                 </section>
               ) : null}
-              <p className="inline-help">대부분은 위 로그인 버튼만 쓰면 됩니다. 수동 입력은 로그인 앱 설정이 없을 때만 사용합니다.</p>
-              <form className="knowledge-form" onSubmit={saveIntegrationProfile}>
+              <p className="inline-help">대부분은 위 로그인 버튼만 쓰면 됩니다. AI API 키는 위 AI 키 버튼을 누른 뒤 토큰/API Key 칸에 붙여 넣고 저장합니다.</p>
+              <form id="profile-manual-form" className="knowledge-form" onSubmit={saveIntegrationProfile}>
                 <div className="grid3 wide">
                   <Field label="프로필명"><input value={integrationForm.name} onChange={(e) => setIntegrationForm({ ...integrationForm, name: e.target.value })} /></Field>
                   <Field label="종류">
@@ -1118,6 +1198,7 @@ function App() {
                   ))}
                   {(integrationForm.custom_connections || []).length === 0 ? <p className="empty-state">연결이 없으면 source kind와 base URL만 사용합니다.</p> : null}
                 </section>
+                <div className={`form-status ${integrationSaveState.status}`}>{integrationSaveState.message}</div>
                 <button><KeyRound size={14} /> 연동 프로필 저장</button>
               </form>
               <div className="knowledge-list">
