@@ -54,6 +54,11 @@ function renderPostContent(content) {
   });
 }
 
+function isAutomationPost(post) {
+  const tags = post?.tags?.map((tag) => tag.tag.name.toLowerCase()) || [];
+  return Boolean(post?.automationTaskId || tags.includes("automation") || String(post?.title || "").startsWith("[자동화]"));
+}
+
 const mainTabs = [
   { id: "automations", label: "자동화", description: "만들기, 실행, 공유" },
   { id: "integrations", label: "계정 연결", description: "GitHub, Notion, MCP" },
@@ -155,7 +160,7 @@ function App() {
   const [automationSaveState, setAutomationSaveState] = useState({ status: "idle", message: "" });
 
   const myTasks = useMemo(() => tasks.filter((task) => task.owner?.id === user?.id), [tasks, user]);
-  const sharedCount = posts.filter((post) => post.automationTaskId).length;
+  const sharedCount = posts.filter(isAutomationPost).length;
   const systemCards = buildSystemReadinessCards({ providerReadiness, knowledgeSources, tasks, healthStatus });
   const healthFailureMessage = getHealthFailureMessage(healthStatus);
   const readyProviderCount = providerReadiness.filter((provider) => provider.ready).length;
@@ -1147,14 +1152,27 @@ function App() {
             </article>
 
             <article id="board-panel" className={`panel ${activeMainTab === "board" ? "" : "tab-hidden"}`}>
-              <div className="panel-title row-title">
-                <span>게시판 / 자동화 기록</span>
-                <div className="search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="검색" /><button onClick={() => loadAll(q)}><Search size={13} /></button></div>
+              <div className="board-header">
+                <div>
+                  <span className="eyebrow">팀 게시판</span>
+                  <h2>공유 글과 자동화 실행 기록</h2>
+                  <p>자동화가 남긴 결과와 사람이 작성한 글을 한 곳에서 읽고 검색합니다.</p>
+                </div>
+                <div className="board-metrics" aria-label="게시판 요약">
+                  <span><b>{postPage.total}</b>전체 글</span>
+                  <span><b>{sharedCount}</b>자동화 공유</span>
+                  <span><b>{posts.length}</b>불러온 글</span>
+                </div>
+              </div>
+              <div className="board-toolbar">
+                <div className="search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="제목, 내용, 태그 검색" /><button type="button" onClick={() => loadAll(q)}><Search size={13} /></button></div>
+                <button type="button" onClick={() => document.getElementById("board-write-title")?.focus()}><Plus size={14} /> 새 글 쓰기</button>
               </div>
               <div className="board-reader">
                 <div className="post-list" aria-label="게시글 목록">
                   {posts.map((post) => {
                     const isSelected = selected?.id === post.id;
+                    const automationPost = isAutomationPost(post);
                     const tags = post.tags?.map((tag) => tag.tag.name).join(", ");
                     return (
                       <button
@@ -1162,15 +1180,17 @@ function App() {
                         type="button"
                         data-post-id={post.id}
                         aria-pressed={isSelected}
-                        className={`${post.automationTaskId ? "post-link shared" : "post-link"} ${isSelected ? "selected" : ""}`}
+                        className={`${automationPost ? "post-link shared" : "post-link"} ${isSelected ? "selected" : ""}`}
                         onClick={() => setSelected(post)}
                       >
+                        <span className="post-kind">{automationPost ? "자동화" : "게시글"}</span>
                         <span className="post-title">{post.title}</span>
-                        <span className="post-meta">{post.author.name}{tags ? ` · ${tags}` : ""}</span>
+                        <span className="post-meta">{post.author.name || "작성자 없음"}{tags ? ` · ${tags}` : ""}</span>
                         <span className="post-excerpt">{post.content?.slice(0, 120) || "내용 없음"}</span>
                       </button>
                     );
                   })}
+                  {posts.length === 0 ? <p className="empty-state">검색 결과가 없습니다. 새 글을 작성하거나 검색어를 지우세요.</p> : null}
                   <div className="post-page-row">
                     <span>{posts.length} / {postPage.total}</span>
                     {postPage.hasMore ? <button type="button" onClick={loadMorePosts}>더 불러오기</button> : null}
@@ -1180,8 +1200,8 @@ function App() {
                   {selected ? (
                     <>
                       <div className="post-preview-head">
-                        <span>{selected.automationTaskId ? "자동화 공유" : "게시글"}</span>
-                        <small>{selected.author?.name || "작성자 없음"}</small>
+                        <span>{isAutomationPost(selected) ? "자동화 공유" : "게시글"}</span>
+                        <small>{selected.author?.name || "작성자 없음"} · {selected.tags?.map((tag) => `#${tag.tag.name}`).join(" ") || "태그 없음"}</small>
                       </div>
                       <h2>{selected.title}</h2>
                       <div className="post-content">{renderPostContent(selected.content)}</div>
@@ -1193,10 +1213,14 @@ function App() {
                 </div>
               </div>
               <form className="write-form" onSubmit={createPost}>
-                <input name="title" placeholder="제목" aria-label="게시글 제목" />
-                <textarea name="content" placeholder="내용" aria-label="게시글 내용" />
-                <input name="tags" placeholder="github,notion,rag" />
-                <button>게시글 작성</button>
+                <div className="write-head">
+                  <strong>게시글 작성</strong>
+                  <span>팀원이 볼 공지, 요청, 자동화 보정 내용을 남깁니다.</span>
+                </div>
+                <input id="board-write-title" name="title" placeholder="제목" aria-label="게시글 제목" />
+                <textarea name="content" placeholder="내용을 입력하세요" aria-label="게시글 내용" />
+                <input name="tags" placeholder="태그 예: github, notion, rag" />
+                <button><Plus size={14} /> 게시글 작성</button>
               </form>
             </article>
 
