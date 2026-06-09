@@ -403,7 +403,8 @@ def test_notion_sources_report_writer_chunks_large_template_payload(monkeypatch)
     assert write["status"] == "written"
     assert len(calls) == 1
     assert all(len(call["children"]) <= 100 for call in calls)
-    assert calls[0]["children"][0]["type"] == "toggle"
+    assert find_first_block(calls[0]["children"], "column_list") is not None
+    assert find_first_block(calls[0]["children"], "toggle") is not None
     assert find_first_block(calls[0]["children"], "table") is not None
 
 

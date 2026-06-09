@@ -547,24 +547,22 @@ def notion_sources_template_children(title: str, sources: list[object], template
                 detail_children.append(divider_block())
 
     return [
-        toggle_block(
-            title,
+        divider_block(),
+        heading_2_block("AI Board 자동화 보고"),
+        column_list_block(
             [
-                column_list_block(
-                    [
-                        [
-                            callout_block("자동화 보고", "🤖"),
-                            paragraph_block(summary_text),
-                        ],
-                        [
-                            callout_block("영향 영역", "📋"),
-                            paragraph_block("BOARD / PAGES / GANTT CHART"),
-                        ],
-                    ]
-                ),
-                toggle_block("보고 표 / 요청 템플릿 렌더링", detail_children),
-            ],
+                [
+                    callout_block("자동화 보고", "🤖"),
+                    paragraph_block(summary_text),
+                ],
+                [
+                    callout_block("영향 영역", "📋"),
+                    paragraph_block("BOARD / PAGES / GANTT CHART"),
+                ],
+            ]
         )
+        ,
+        toggle_block(title, detail_children),
     ]
 
 
