@@ -2020,6 +2020,123 @@ def test_automation_no_data_skips_ai_policy_and_live_writes(monkeypatch):
         assert "no collected source items" in result["aiCallPolicy"]
 
 
+def test_scheduler_unchanged_input_skips_summary_and_live_writes(monkeypatch):
+    counters = {"collect": 0, "summary": 0, "notion_write": 0, "generic_write": 0}
+
+    def fake_collect(profile, limit=20, pages=2):
+        counters["collect"] += 1
+        return [
+            CollectedItem(
+                title="Commit abc123: Scheduler skip guard",
+                source_type="github_commit",
+                url="https://github.com/example/repo/commit/abc123",
+                text="동일 커밋은 두 번째 스케줄 실행에서 다시 쓰지 않아야 합니다.",
+                tags=["github", "commit"],
+            )
+        ], []
+
+    def fake_summarize(title, content):
+        counters["summary"] += 1
+        return f"요약: {title}"
+
+    def fake_write_notion_sources_report(profile, title, sources, template, dry_run=True, target_url=None):
+        counters["notion_write"] += 1
+        return {"service": "notion", "status": "written", "count": len(sources), "dryRun": dry_run}
+
+    def fake_execute_profile_write(profile, title, body, dry_run=True, start_minutes_from_now=15, duration_minutes=30):
+        counters["generic_write"] += 1
+        return {"service": profile.source_kind, "status": "written", "dryRun": dry_run}
+
+    monkeypatch.setattr("app.main.collect_profile_items", fake_collect)
+    monkeypatch.setattr("app.main.summarize", fake_summarize)
+    monkeypatch.setattr("app.main.write_notion_sources_report", fake_write_notion_sources_report)
+    monkeypatch.setattr("app.main.execute_profile_write", fake_execute_profile_write)
+
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "scheduler-skip@example.com", "name": "Scheduler Skip", "password": "password123"},
+        )
+        assert register.status_code == 200
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+
+        github = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Scheduler GitHub",
+                "source_kind": "github",
+                "base_url": "https://github.com/example/repo",
+                "api_provider": "GitHub API",
+                "token_name": "GITHUB_TOKEN",
+                "token_value": "github-secret",
+                "rag_targets": ["commits"],
+            },
+        ).json()["profile"]
+        client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "Scheduler Notion",
+                "source_kind": "notion",
+                "base_url": "3797051c2f998094b2a5e5062d353881",
+                "api_provider": "Notion API",
+                "token_name": "NOTION_TOKEN",
+                "token_value": "notion-secret",
+                "rag_targets": [],
+            },
+        )
+        automation = client.post(
+            "/api/automations",
+            headers=headers,
+            json={
+                "name": "Scheduler unchanged skip guard",
+                "integration_profile_id": github["id"],
+                "source": "GitHub",
+                "destination": "Notion",
+                "interval_minutes": 1,
+                "instruction": "Only write when collected GitHub input changes.",
+                "template": "요청 템플릿에 맞춰 정리",
+                "api_provider": "GitHub + Notion",
+                "ai_agent": "TemplateAgent",
+                "custom_connections": [
+                    {
+                        "label": "Notion report",
+                        "service": "notion",
+                        "url": "3797051c2f998094b2a5e5062d353881",
+                        "api": "Notion API",
+                        "auth_key_name": "NOTION_TOKEN",
+                        "operation": "append_template_report",
+                        "template": "요청 템플릿 유지",
+                    }
+                ],
+            },
+        )
+        assert automation.status_code == 200
+        task_id = automation.json()["task"]["id"]
+
+        first_tick = client.post("/api/automations/scheduler/tick", headers=headers)
+        assert first_tick.status_code == 200
+        assert first_tick.json()["results"][0]["status"] == "changed"
+        assert counters == {"collect": 1, "summary": 1, "notion_write": 1, "generic_write": 0}
+
+        with SessionLocal() as db:
+            stored_task = db.get(AutomationTask, task_id)
+            assert stored_task is not None
+            stored_task.last_run_at = datetime.now(timezone.utc) - timedelta(minutes=2)
+            db.commit()
+
+        second_tick = client.post("/api/automations/scheduler/tick", headers=headers)
+        assert second_tick.status_code == 200
+        assert second_tick.json()["results"][0]["status"] == "skipped"
+        assert second_tick.json()["results"][0]["runId"] is None
+        assert counters == {"collect": 2, "summary": 1, "notion_write": 1, "generic_write": 0}
+
+        skipped_activities = client.get("/api/integration-activities?event_type=automation.run&status=skipped", headers=headers).json()["activities"]
+        assert skipped_activities
+        assert "no watched input changes" in skipped_activities[0]["summary"]
+
+
 def test_watched_automation_commit_summary_is_specific_korean():
     summary = korean_summary_for_source(
         {
