@@ -48,6 +48,8 @@ function desktopOAuthEnv() {
   const notion = readKvFile(join(desktop, "ai-board-demo-notion-api-token.txt"));
   const figma = readRawPair(join(desktop, "figma.txt"));
   const google = readRawPair(join(desktop, "google.txt"));
+  const tunnelUrl = readFirstLine(join(root, ".cloudflare-url.txt"));
+  const publicBaseUrl = tunnelUrl || process.env.AI_BOARD_PUBLIC_BASE_URL || "";
   return {
     AI_BOARD_GITHUB_OAUTH_CLIENT_ID: github.GITHUB_CLIENT_ID || process.env.AI_BOARD_GITHUB_OAUTH_CLIENT_ID || "",
     AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET:
@@ -58,7 +60,7 @@ function desktopOAuthEnv() {
     AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET: figma[1] || process.env.AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET || "",
     AI_BOARD_GOOGLE_OAUTH_CLIENT_ID: google[0] || process.env.AI_BOARD_GOOGLE_OAUTH_CLIENT_ID || "",
     AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET: google[1] || process.env.AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET || "",
-    AI_BOARD_PUBLIC_BASE_URL: process.env.AI_BOARD_PUBLIC_BASE_URL || readFirstLine(join(root, ".cloudflare-url.txt")),
+    AI_BOARD_PUBLIC_BASE_URL: publicBaseUrl,
   };
 }
 
