@@ -2482,7 +2482,15 @@ async def github_webhook(
         "repos": repo_urls,
         "commits": len(webhook_items),
         "matched": len(tasks),
-        "triggered": [{"taskId": item["task"]["id"], "status": item["run"]["result"]["status"]} for item in results],
+        "triggered": [
+            {
+                "taskId": item["task"]["id"],
+                "runId": item["run"]["id"],
+                "status": item["run"]["result"]["status"],
+                "reason": item["run"]["result"].get("reason", ""),
+            }
+            for item in results
+        ],
         "signatureRequired": bool(settings().github_webhook_secret),
     }
 
@@ -2498,6 +2506,11 @@ async def notion_webhook(
         raise HTTPException(status_code=401, detail="Invalid Notion webhook signature.")
     payload = json.loads(body.decode("utf-8") or "{}")
     targets = notion_webhook_targets(payload)
+    event_key = hashlib.sha256(
+        "|".join(sorted(targets)).encode("utf-8")
+        + b"|"
+        + body
+    ).hexdigest()
     stmt = select(AutomationTask).where(AutomationTask.status == "ACTIVE")
     tasks = []
     for task in db.scalars(stmt).all():
@@ -2508,14 +2521,31 @@ async def notion_webhook(
             for target in targets
         ):
             tasks.append(task)
-    results = [execute_automation_task(db, task, task.owner, scheduled=True) for task in tasks[:20]]
+    results = [
+        execute_automation_task(
+            db,
+            task,
+            task.owner,
+            scheduled=True,
+            external_event_key=f"notion:{event_key}",
+        )
+        for task in tasks[:20]
+    ]
     return {
         "ok": True,
         "provider": "notion",
         "target": targets[0] if targets else "",
         "targets": targets,
         "matched": len(tasks),
-        "triggered": [{"taskId": item["task"]["id"], "status": item["run"]["result"]["status"]} for item in results],
+        "triggered": [
+            {
+                "taskId": item["task"]["id"],
+                "runId": item["run"]["id"],
+                "status": item["run"]["result"]["status"],
+                "reason": item["run"]["result"].get("reason", ""),
+            }
+            for item in results
+        ],
         "signatureRequired": bool(settings().notion_webhook_secret),
     }
 

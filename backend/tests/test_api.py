@@ -3398,18 +3398,34 @@ def test_repeated_notion_webhook_payload_skips_duplicate_github_issue_write(monk
             signature = "sha256=" + hmac.new(b"notion-hook-secret", payload, hashlib.sha256).hexdigest()
             first = client.post("/api/webhooks/notion", content=payload, headers={"X-AI-Board-Signature": signature})
             second = client.post("/api/webhooks/notion", content=payload, headers={"X-AI-Board-Signature": signature})
+            changed_payload = json.dumps({
+                "data": {
+                    "parent": {"id": notion_database_uuid},
+                    "page": {"id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"},
+                    "last_edited_time": "2026-06-12T03:00:00.000Z",
+                }
+            }).encode()
+            changed_signature = "sha256=" + hmac.new(b"notion-hook-secret", changed_payload, hashlib.sha256).hexdigest()
+            third = client.post("/api/webhooks/notion", content=changed_payload, headers={"X-AI-Board-Signature": changed_signature})
 
             assert first.status_code == 200
             assert second.status_code == 200
+            assert third.status_code == 200
             first_result = next(item for item in first.json()["triggered"] if item["taskId"] == task["id"])
             second_result = next(item for item in second.json()["triggered"] if item["taskId"] == task["id"])
+            third_result = next(item for item in third.json()["triggered"] if item["taskId"] == task["id"])
             assert first_result["status"] == "changed"
+            assert first_result["runId"]
             assert second_result["status"] == "skipped"
-            assert len(writes) == 1
+            assert second_result["runId"] is None
+            assert "did not change" in second_result["reason"]
+            assert third_result["status"] == "changed"
+            assert third_result["runId"]
+            assert len(writes) == 2
             assert writes[0]["service"] == "github"
             assert "Repeat Notion webhook to GitHub" in writes[0]["title"]
             activities = client.get("/api/integration-activities?event_type=automation.live_write", headers=headers).json()["activities"]
-            assert len([item for item in activities if item["automationTaskId"] == task["id"] and item["provider"] == "github"]) == 1
+            assert len([item for item in activities if item["automationTaskId"] == task["id"] and item["provider"] == "github"]) == 2
     finally:
         monkeypatch.delenv("AI_BOARD_NOTION_WEBHOOK_SECRET", raising=False)
         settings.cache_clear()
