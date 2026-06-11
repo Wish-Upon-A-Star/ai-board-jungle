@@ -48,6 +48,19 @@ function activityDetailBadges(activity) {
   return badges;
 }
 
+function runOverviewItems(result) {
+  const data = parseRunResult(result);
+  const items = [];
+  if (data.route) items.push({ label: "경로", value: data.route });
+  if (data.agent) items.push({ label: "에이전트", value: data.agent });
+  if (Array.isArray(data.targets)) items.push({ label: "대상", value: `${data.targets.length}개` });
+  if (Array.isArray(data.externalRagSources)) items.push({ label: "RAG", value: `${data.externalRagSources.length}개` });
+  if (Array.isArray(data.liveWrites)) items.push({ label: "쓰기", value: `${data.liveWrites.length}건` });
+  if (data.aiCallPolicy) items.push({ label: "AI 호출", value: data.aiCallPolicy });
+  if (data.reason) items.push({ label: "사유", value: data.reason });
+  return items.slice(0, 5);
+}
+
 function renderPostContent(content) {
   const text = String(content || "");
   if (!text.trim()) return <p className="post-paragraph">본문이 비어 있습니다.</p>;
@@ -1323,18 +1336,40 @@ function App() {
                                   const expanded = expandedRuns[key];
                                   const retryState = retryRunState[key];
                                   const status = getRunStatus(run.result);
+                                  const overviewItems = runOverviewItems(run.result);
                                   return (
                                     <div key={run.id} className={`run-row ${status}`}>
                                       <div className="run-row-main">
-                                        <span>#{run.id}</span>
-                                        <span>{run.createdAt}</span>
-                                        <span className={`run-status ${status}`}>{status}</span>
-                                        <p>{summarizeRunResult(run.result)}</p>
-                                        <button type="button" className="inline-link retry" disabled={retryState?.status === "running"} onClick={() => retryTaskFromRun(task, run)}>{retryState?.status === "running" ? "재실행 중" : "재실행"}</button>
-                                        <button type="button" className="inline-link" onClick={() => setExpandedRuns((c) => ({ ...c, [key]: !c[key] }))}>{expanded ? "접기" : "상세"}</button>
+                                        <div className="run-row-top">
+                                          <span className={`run-status ${status}`}>{status}</span>
+                                          <span className="run-row-id">#{run.id}</span>
+                                          <time>{run.createdAt}</time>
+                                        </div>
+                                        <div className="run-row-summary">
+                                          <p>{summarizeRunResult(run.result)}</p>
+                                          {overviewItems.length ? (
+                                            <dl className="run-overview">
+                                              {overviewItems.map((item) => (
+                                                <div key={`${run.id}:${item.label}`}>
+                                                  <dt>{item.label}</dt>
+                                                  <dd>{item.value}</dd>
+                                                </div>
+                                              ))}
+                                            </dl>
+                                          ) : null}
+                                        </div>
+                                        <div className="run-row-actions">
+                                          <button type="button" className="inline-link retry" disabled={retryState?.status === "running"} onClick={() => retryTaskFromRun(task, run)}>{retryState?.status === "running" ? "재실행 중" : "재실행"}</button>
+                                          <button type="button" className="inline-link" onClick={() => setExpandedRuns((c) => ({ ...c, [key]: !c[key] }))}>{expanded ? "기술 상세 접기" : "기술 상세"}</button>
+                                        </div>
                                       </div>
                                       {retryState?.message ? <div className={`run-retry-message ${retryState.status}`}>{retryState.message}</div> : null}
-                                      {expanded ? <pre className="run-json">{JSON.stringify(parseRunResult(run.result), null, 2)}</pre> : null}
+                                      {expanded ? (
+                                        <div className="run-technical-detail">
+                                          <div className="run-technical-head"><strong>기술 상세</strong><span>원본 실행 결과 JSON</span></div>
+                                          <pre className="run-json">{JSON.stringify(parseRunResult(run.result), null, 2)}</pre>
+                                        </div>
+                                      ) : null}
                                     </div>
                                   );
                                 })}

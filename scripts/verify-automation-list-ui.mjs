@@ -76,6 +76,15 @@ async function main() {
       if (!runBox || runBox.width < 560 || runBox.height < 42) throw new Error(`Run row layout is too compressed: ${JSON.stringify(runBox)}`);
       const summary = await runRow.locator("p").first().innerText();
       if (summary.trim().length < 8) throw new Error(`Run summary is not readable: ${summary}`);
+      await runRow.locator(".run-overview").waitFor({ state: "visible", timeout: 5000 });
+      const overviewCount = await runRow.locator(".run-overview div").count();
+      if (overviewCount < 2) throw new Error(`Run overview should show readable key facts, got ${overviewCount}`);
+      const technicalVisibleBefore = await runRow.locator(".run-technical-detail:visible").count();
+      if (technicalVisibleBefore !== 0) throw new Error("Technical JSON detail should be collapsed by default");
+      await runRow.getByRole("button", { name: "기술 상세" }).click();
+      await runRow.locator(".run-technical-detail").waitFor({ state: "visible", timeout: 5000 });
+      const jsonText = await runRow.locator(".run-json").innerText();
+      if (!jsonText.includes("targets")) throw new Error("Expanded technical detail does not expose run JSON");
 
       console.log(JSON.stringify({
         ok: true,
@@ -90,6 +99,9 @@ async function main() {
           "detail_metadata_visible",
           "run_history_visible",
           "run_row_readable",
+          "run_overview_key_facts_visible",
+          "technical_detail_collapsed_by_default",
+          "technical_detail_expands_json",
         ],
         cardBox,
         runBox,
