@@ -384,6 +384,16 @@ Cloudflare quick tunnel 주의:
 - 고정 도메인을 쓰면 `.env` 또는 실행 환경의 `AI_BOARD_PUBLIC_BASE_URL`을 `https://your-domain.example`로 맞춥니다.
 - `AI_BOARD_PUBLIC_BASE_URL`을 설정하면 라이브 재시작 시 이전 `.cloudflare-url.txt` quick tunnel 주소보다 이 고정 도메인이 우선됩니다.
 
+앱 안에서 OAuth 기준 주소를 고치는 방법:
+
+1. 관리자 계정으로 로그인합니다.
+2. `AI 기본값` 탭의 **외부 접속 도메인** 카드로 이동합니다.
+3. 카드에서 `현재 접속`과 `OAuth 기준`이 같은지 확인합니다.
+4. 다르면 **현재 주소로 채우기**를 누른 뒤 **외부 도메인 저장**을 누릅니다.
+5. `프로필 > 진단`에서 GitHub/Notion/Figma/Google Calendar callback URL을 복사해 각 provider 개발자 콘솔에 등록합니다.
+
+이 관리자 설정은 DB의 `system_settings.public_base_url`에 저장됩니다. 저장된 값은 provider별 `AI_BOARD_*_OAUTH_REDIRECT_URI` 환경변수보다 우선하므로, 서버에 예전 Figma redirect URI가 남아 있어도 앱에서 저장한 Public Base URL이 OAuth callback 생성 기준이 됩니다.
+
 Cloudflare named tunnel 준비:
 
 ```powershell

@@ -27,6 +27,10 @@ assert.ok(readme.includes("AI_BOARD_PUBLIC_HOST"), "README must explain public h
 assert.ok(readme.includes("Open the printed AI Board browser URL"), "README must tell users which URL to open");
 assert.ok(readme.includes("Cloudflare quick tunnel"), "README must explain Cloudflare quick tunnel external access");
 assert.ok(readme.includes("OAuth callback 진단"), "README must point users to the in-app OAuth callback diagnostics");
+assert.ok(readme.includes("외부 접속 도메인"), "README must document the admin Public Base URL card");
+assert.ok(readme.includes("현재 주소로 채우기"), "README must document the current-origin fill action");
+assert.ok(readme.includes("system_settings.public_base_url"), "README must document persisted public base URL storage");
+assert.ok(readme.includes("AI_BOARD_*_OAUTH_REDIRECT_URI"), "README must document persisted public base URL precedence over provider redirect overrides");
 assert.ok(readme.includes("Cloudflare named tunnel"), "README must recommend a stable domain for repeated external use");
 assert.ok(readme.includes("/api/oauth/figma/callback"), "README must document Figma OAuth callback");
 assert.ok(readme.includes("/api/oauth/google_calendar/callback"), "README must document Google Calendar OAuth callback");
