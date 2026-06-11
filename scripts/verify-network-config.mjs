@@ -24,6 +24,11 @@ assert.ok(readme.includes("## LAN / Other Device Access"), "README must document
 assert.ok(readme.includes("npm run dev:lan"), "README must include the LAN dev command");
 assert.ok(readme.includes("AI_BOARD_PUBLIC_HOST"), "README must explain public host override");
 assert.ok(readme.includes("Open the printed AI Board browser URL"), "README must tell users which URL to open");
+assert.ok(readme.includes("Cloudflare quick tunnel"), "README must explain Cloudflare quick tunnel external access");
+assert.ok(readme.includes("OAuth callback 진단"), "README must point users to the in-app OAuth callback diagnostics");
+assert.ok(readme.includes("Cloudflare named tunnel"), "README must recommend a stable domain for repeated external use");
+assert.ok(readme.includes("/api/oauth/figma/callback"), "README must document Figma OAuth callback");
+assert.ok(readme.includes("/api/oauth/google_calendar/callback"), "README must document Google Calendar OAuth callback");
 assert.equal(packageJson.scripts["serve:external"], "node scripts/serve-external.mjs", "package.json must expose serve:external");
 assert.equal(packageJson.scripts["verify:external-serve"], "node scripts/verify-external-serve.mjs", "package.json must expose verify:external-serve");
 assert.ok(serveExternal.includes("AI_BOARD_EXTERNAL_PORT"), "external serve must use a configurable non-dev port");

@@ -15,6 +15,7 @@ AI Board는 팀원이 각자 로그인해서 GitHub, Notion, Figma, Google Calen
 ## 목차
 
 - [프로젝트 개요](#프로젝트-개요)
+- [과제 제출물 매핑](#과제-제출물-매핑)
 - [주요 구현 기능](#주요-구현-기능)
 - [전체 아키텍처 구조](#전체-아키텍처-구조)
 - [AI 활용 기능과 구조](#ai-활용-기능과-구조)
@@ -39,6 +40,30 @@ AI Board는 게시판 사용자가 GitHub, Notion, Figma, Google Calendar 같은
 4. 자동화는 저장된 프로필 또는 커스텀 설정을 선택해 주기, 지침, 템플릿, AI Agent를 저장합니다.
 5. GitHub/Notion 프로필은 지식자료 수집과 live write에 사용할 수 있고, Figma/Google Calendar 프로필은 dry-run 또는 확인 문구 기반 live write 흐름을 검증합니다.
 6. 자동화 실행 결과는 게시판에 공유할 수 있고, 실행 이력과 활동 로그가 사용자별로 분리됩니다.
+
+## 과제 제출물 매핑
+
+| 제출 요구 | README 위치 | 구현/검증 근거 |
+| --- | --- | --- |
+| React/FastAPI/PostgreSQL 앱 | 프로젝트 개요, 전체 아키텍처 구조 | `frontend`, `backend`, `backend/app/models.py`, `backend/app/db.py` |
+| PostgreSQL-first SQLAlchemy | 전체 아키텍처 구조, 실행 방법 | `scripts/postgres-env.mjs`, `npm run verify:postgres` |
+| GitHub issues/commits/pull requests | AI 활용 기능과 구조, 실제 외부 연동 검증 기록 | `backend/app/collectors.py`, `scripts/run_team_automation_check.py` |
+| Notion database/pages | AI 활용 기능과 구조, 실제 외부 연동 검증 기록 | `backend/app/live_writers.py`, `backend/app/collectors.py` |
+| Retrieval-Augmented Generation | AI 활용 기능과 구조 | `similar_posts()`, `similar_knowledge()`, `rag_answer()` |
+| 사용자별 토큰/API 키 저장 | 사용자별 연동과 자동화, AI API 키 저장 방식 | `integration_profiles`, `enc:v1:`, Vault/KMS command provider |
+| 자동화 실행/공유/상태 정책 | 설정 우선순위와 사용 흐름, 자동화 실행 상태 정책 | `automation_fingerprint()`, run history, activity log |
+| 데모와 검증 증거 | 검증과 데모, `docs/evaluation-reports` | `docs/demo-screenshot.png`, `docs/submission-checklist.md` |
+
+운영 화면에서 확인할 수 있는 항목:
+
+- 사용자 기본값 적용: `기본 설정` 탭에서 AI 모델, 템플릿, 기본 연결을 저장한 뒤 자동화 폼으로 복사합니다.
+- 자동화 연결 미리보기: `자동화` 탭에서 선택한 프로필과 custom connection이 실행 전 표시됩니다.
+- Integration Activity Log: `점검` 탭에서 provider, 상태, 자동화, dry-run 여부로 실행 기록을 필터링합니다.
+- System Readiness: `점검` 탭과 `/api/provider-readiness`가 GitHub/Notion/Figma/Google/OpenAI 준비 상태를 보여줍니다.
+- Automation Run Status Policy: `changed`와 `skipped` 실행 상태를 구분하고 run-history snapshot을 저장합니다.
+- Evaluation Report Verification: `docs/evaluation-reports`와 `npm run verify:evaluation-reports`로 라운드 리포트 존재를 확인합니다.
+- Readiness Summary: `npm run verify:readiness`, `npm run verify:readiness:compact`, `npm run verify:readiness-output`으로 readiness 출력 형식을 확인합니다.
+- Verification Command Scope: `npm run verify:command-scope`가 README 명령과 `package.json` 스크립트 범위를 맞춥니다.
 
 ## 주요 구현 기능
 
@@ -143,12 +168,20 @@ $env:AI_BOARD_GITHUB_OAUTH_CLIENT_ID="..."
 $env:AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET="..."
 $env:AI_BOARD_NOTION_OAUTH_CLIENT_ID="..."
 $env:AI_BOARD_NOTION_OAUTH_CLIENT_SECRET="..."
+$env:AI_BOARD_FIGMA_OAUTH_CLIENT_ID="..."
+$env:AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET="..."
+$env:AI_BOARD_GOOGLE_OAUTH_CLIENT_ID="..."
+$env:AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET="..."
 ```
 
 콜백 URL:
 
 - GitHub: `https://your-domain.example/api/oauth/github/callback`
 - Notion: `https://your-domain.example/api/oauth/notion/callback`
+- Figma: `https://your-domain.example/api/oauth/figma/callback`
+- Google Calendar: `https://your-domain.example/api/oauth/google_calendar/callback`
+
+실제 앱에서는 `프로필` 탭의 **OAuth callback 진단** 영역에 현재 접속 주소 기준 콜백 URL이 그대로 표시됩니다. Figma나 Google에서 `Invalid redirect URI`가 뜨면 그 값을 복사해서 각 provider 개발자 콘솔의 callback/redirect URI allowlist에 등록합니다.
 
 ### AI Agent
 
@@ -181,6 +214,7 @@ Agent는 자동화 지침을 분석해 다음 정보를 계획합니다.
 **토큰 보안:**
 
 - API 응답은 원문 토큰/API key를 반환하지 않습니다.
+- API responses never expose raw tokens.
 - 응답에는 `hasToken`, `tokenPreview`, `tokenStorage`만 표시됩니다.
 - 신규 저장 토큰은 `enc:v1:` 형식으로 암호화됩니다.
 - 사용자가 프로필을 삭제하면 해당 저장 키도 함께 삭제됩니다.
@@ -251,6 +285,8 @@ Webhook 기반 변경 감지:
 - `changed`: 실행 내용이 변경된 경우. 실행 이력 스냅샷을 저장하고 `Run history`에 표시됩니다.
 - `skipped`: 감시 중인 입력이 변경되지 않은 경우. 자동화 카드의 `마지막 실행` 배지를 업데이트하고 활동 로그에 기록됩니다.
 - `Retry`와 `Scheduler tick` 모두 같은 fingerprint 가드를 사용하므로 사용자/프로필/API/템플릿/custom connection 설정이 변경되지 않으면 일관되게 skip됩니다.
+- `changed` executions create persisted run-history snapshots.
+- `skipped` executions mean watched inputs did not change.
 
 ## 실행 방법
 
@@ -313,6 +349,10 @@ $env:AI_BOARD_PUBLIC_HOST="192.168.0.25"
 npm run dev:lan
 ```
 
+## LAN / Other Device Access
+
+Open the printed AI Board browser URL after `npm run dev:lan`. 같은 와이파이에 있는 다른 기기는 `http://<LAN-IP>:3000` 형태로 접속합니다. 이 방식은 집/사무실 내부 테스트용이며, 외부 인터넷 사용자는 아래 Cloudflare 또는 고정 도메인 방식이 필요합니다.
+
 ### 5. 단일 프로세스 배포 (API + React 빌드 한 번에)
 
 ```powershell
@@ -326,9 +366,33 @@ npm run start:lan
 npm run apply:live
 ```
 
-### 6. 외부 인터넷 접속 (ngrok 고정 도메인)
+### 6. 외부 인터넷 접속 (Cloudflare quick tunnel 또는 고정 도메인)
 
-현재 프로젝트는 ngrok 고정 도메인을 사용합니다. `.env`의 `AI_BOARD_EXTERNAL_URL`과 `AI_BOARD_PUBLIC_BASE_URL`에 ngrok 도메인이 설정되어 있습니다. OAuth 콜백 URL도 이 도메인 기준입니다.
+현재 라이브 데모는 Cloudflare quick tunnel 또는 고정 도메인으로 외부에 열 수 있습니다. quick tunnel 주소는 `https://railway-mediterranean-snap-populations.trycloudflare.com`처럼 보이며, 터널을 다시 열면 주소가 바뀔 수 있습니다.
+
+유치원생도 할 수 있는 접속 순서:
+
+1. 서버 담당자가 알려준 `https://...trycloudflare.com` 또는 고정 도메인 주소를 브라우저 주소창에 붙여 넣습니다.
+2. 로그인 또는 회원가입을 합니다. 같은 URL을 써도 계정은 각자 분리됩니다.
+3. `프로필` 탭에서 GitHub, Notion, Figma, Google Calendar, AI API 키를 본인 계정으로 연결합니다.
+4. Figma/Google 로그인에서 `Invalid redirect URI`가 뜨면 `프로필` 탭의 **OAuth callback 진단**에서 해당 provider의 Callback URL을 복사해 개발자 콘솔에 등록합니다.
+
+Cloudflare quick tunnel 주의:
+
+- quick tunnel 주소가 바뀌면 GitHub/Notion/Figma/Google OAuth 앱의 callback URL도 모두 새 주소로 다시 등록해야 합니다.
+- 6~10명이 계속 쓰는 팀 데모라면 Cloudflare named tunnel, ngrok reserved domain, Vercel/Render/Railway 같은 hosted deployment 중 하나로 고정 도메인을 쓰는 것이 낫습니다.
+- 고정 도메인을 쓰면 `.env` 또는 실행 환경의 `AI_BOARD_PUBLIC_BASE_URL`을 `https://your-domain.example`로 맞춥니다.
+
+OAuth callback 등록 예시:
+
+| Provider | Callback URL |
+| --- | --- |
+| GitHub | `https://your-domain.example/api/oauth/github/callback` |
+| Notion | `https://your-domain.example/api/oauth/notion/callback` |
+| Figma | `https://your-domain.example/api/oauth/figma/callback` |
+| Google Calendar | `https://your-domain.example/api/oauth/google_calendar/callback` |
+
+현재 서버에서 정확한 값을 확인하려면 `프로필` 탭의 **OAuth callback 진단**을 봅니다. 앱은 브라우저가 접속한 public origin을 백엔드에 전달하므로 Cloudflare/Vite proxy 뒤에서도 현재 외부 URL 기준으로 callback을 계산합니다.
 
 ## 검증과 데모
 
@@ -343,11 +407,17 @@ npm run verify:full:quick
 ```powershell
 npm run verify:hygiene        # dist/, DB, .env 추적 방지, 실토큰 패턴 스캔
 npm run verify:text           # 한글/문자열 회귀 검사
+npm run verify:text-output    # 한글 검사 출력 계약 확인
 npm run verify:frontend-helpers  # React 순수 함수 검사
+npm run verify:template-presets  # 자동화 템플릿 preset 구조 확인
 npm run verify:network-config    # LAN dev-server host, .env.example 검사
+npm run verify:evaluation-reports # docs/evaluation-reports 라운드 리포트 확인
 npm run verify:readme            # README 구조, 체크리스트, PNG 무결성
+npm run verify:readme-output     # README 검증 출력 계약 확인
 npm run verify:readiness         # 서버리스 준비 상태 JSON 요약 출력
 npm run verify:readiness:compact # CI 친화적 한 줄 출력
+npm run verify:readiness-output  # readiness 출력 스키마 확인
+npm run verify:readiness-output-fixture # readiness fixture 출력 확인
 npm run verify:command-scope     # README 명령 목록과 package.json 동기화 확인
 ```
 
@@ -358,10 +428,44 @@ npm run verify:contract          # FastAPI 응답 계약 확인
 npm run verify:postgres          # PostgreSQL 연결 및 프로필 저장 검증
 npm run verify:fastapi           # 백엔드 테스트 및 통합 검증
 npm run verify:production-serve  # 단일 프로세스 서빙 검증
+npm run verify:external-serve    # 외부 포트 단일 서버 검증
 npm run smoke:http               # HTTP smoke check
 npm run smoke:ui                 # Chrome CDP UI smoke check
 npm run verify:full:quick        # 전체 검증 (권장)
+npm run verify:full              # 설치 포함 전체 검증
+npm run test:live-integrations   # 실제 외부 API 토큰이 있는 경우 live integration 검사
 ```
+
+검증 명령 설명:
+
+| 명령 | 범위 |
+| --- | --- |
+| `verify:hygiene` | dist, DB, `.env`, 실토큰 패턴을 검사합니다. |
+| `verify:text` | 한글/문자열 깨짐을 검사합니다. |
+| `verify:text-output` | `verify:text` 출력 계약을 검사합니다. |
+| `verify:frontend-helpers` | frontend helper 순수 함수 동작을 검사합니다. |
+| `verify:template-presets` | 자동화 template preset 구조와 필수 연결을 검사합니다. |
+| `verify:network-config` | LAN, 외부 접속, PostgreSQL-first runtime 설정을 검사합니다. |
+| `verify:evaluation-reports` | `docs/evaluation-reports` 리포트 존재와 형식을 검사합니다. |
+| `verify:readiness` | readiness summary JSON을 출력합니다. |
+| `verify:readiness:compact` | readiness summary를 CI용 한 줄 형식으로 출력합니다. |
+| `verify:readiness-output` | readiness 출력 계약을 검사합니다. |
+| `verify:readiness-output-fixture` | readiness fixture 출력 계약을 검사합니다. |
+| `verify:command-scope` | README와 `package.json` 검증 명령 범위를 비교합니다. |
+| `verify:readme` | README 구조, 제출 증거, 스크린샷 PNG 무결성을 검사합니다. |
+| `verify:readme-output` | README 검증 출력 계약을 검사합니다. |
+| `verify:contract` | FastAPI API 응답 계약을 검사합니다. |
+| `verify:postgres` | PostgreSQL 연결과 저장 동작을 검사합니다. |
+| `verify:production-serve` | 단일 프로세스 production serve를 검사합니다. |
+| `verify:external-serve` | 외부 접속용 별도 테스트 포트 serve를 검사합니다. |
+| `smoke:http` | HTTP smoke test를 실행합니다. |
+| `smoke:ui` | Chrome CDP UI smoke test를 실행합니다. |
+| `verify:fastapi` | backend test와 FastAPI 통합 검증을 실행합니다. |
+| `verify:full:quick` | 재설치 없이 전체 주요 검증을 실행합니다. |
+| `verify:full` | 의존성 설치 포함 전체 검증을 실행합니다. |
+| `test:live-integrations` | 실제 GitHub/Notion/Google/Figma 토큰이 있을 때 live integration을 검사합니다. |
+
+Serverless checks do not start FastAPI, Vite, or Chrome CDP. Server-required checks start or expect FastAPI, Vite, Chrome CDP, or live API credentials.
 
 데모 스크린샷:
 

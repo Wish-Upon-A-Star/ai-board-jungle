@@ -1497,7 +1497,7 @@ function App() {
                 <div className="section-head flat">
                   <div>
                     <strong>OAuth callback 진단</strong>
-                    <span>Figma나 Google에서 Invalid redirect URI가 뜨면 아래 Callback URL을 개발자 콘솔에 그대로 등록합니다.</span>
+                    <span>Figma나 Google에서 Invalid redirect URI가 뜨면 아래 Callback URL을 개발자 콘솔에 그대로 등록합니다. 임시 터널 주소가 바뀌면 callback도 다시 등록해야 합니다.</span>
                   </div>
                   <button type="button" onClick={() => loadAll()}><Search size={13} /> 다시 확인</button>
                 </div>
