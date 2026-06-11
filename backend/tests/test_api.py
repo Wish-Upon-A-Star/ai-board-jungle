@@ -1450,6 +1450,10 @@ def test_full_fastapi_flow(monkeypatch):
         assert post_page["offset"] == 0
         assert post_page["nextOffset"] == len(post_page["posts"])
         assert "hasMore" in post_page
+        board_page = client.get("/api/posts?kind=board&limit=20&offset=0").json()
+        assert any(item["id"] == post_id for item in board_page["posts"])
+        automation_page_before_share = client.get("/api/posts?kind=automation&limit=20&offset=0").json()
+        assert all(item["id"] != post_id for item in automation_page_before_share["posts"])
         assert client.post(f"/api/posts/{post_id}/comments", headers=headers, json={"content": "checked"}).status_code == 200
         assert client.post("/api/ai/rag", json={"question": "GitHub Notion integration"}).status_code == 200
 
@@ -1531,7 +1535,14 @@ def test_full_fastapi_flow(monkeypatch):
         assert run_history["total"] == 1
         assert run_history["runs"][0]["taskId"] == task_id
         assert run_history["hasMore"] is False
-        assert client.post(f"/api/automations/{task_id}/share", headers=headers).status_code == 200
+        shared_response = client.post(f"/api/automations/{task_id}/share", headers=headers)
+        assert shared_response.status_code == 200
+        shared_post_id = shared_response.json()["post"]["id"]
+        board_page_after_share = client.get("/api/posts?kind=board&limit=20&offset=0").json()
+        automation_page_after_share = client.get("/api/posts?kind=automation&limit=20&offset=0").json()
+        assert any(item["id"] == post_id for item in board_page_after_share["posts"])
+        assert any(item["id"] == shared_post_id for item in automation_page_after_share["posts"])
+        assert all(item["id"] != shared_post_id for item in board_page_after_share["posts"])
         run_activities = client.get("/api/integration-activities", headers=headers).json()["activities"]
         assert any(item["eventType"] == "automation.run" and item["status"] == "changed" for item in run_activities)
         assert any(item["eventType"] == "automation.run" and item["status"] == "skipped" for item in run_activities)

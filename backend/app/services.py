@@ -288,7 +288,6 @@ def automation_post_filter():
     return or_(
         Post.automation_task_id.is_not(None),
         Post.title.ilike("[자동화]%"),
-        Post.tags.any(Tag.name == "automation"),
     )
 
 
