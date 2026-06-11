@@ -1754,9 +1754,20 @@ function App() {
                   </div>
                   <div className="file-row">
                     <label className="file-picker"><Upload size={14} /> 파일 첨부 (선택)<input type="file" accept=".txt,.md,.csv,.json,.jsonl,.log" onChange={(e) => setKnowledgeForm({ ...knowledgeForm, file: e.target.files?.[0] || null })} /></label>
-                    <label className="file-picker"><Upload size={14} /> 음성 전사<input type="file" accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg,.flac" onChange={(e) => { transcribeKnowledgeAudio(e.target.files?.[0]); e.target.value = ""; }} /></label>
+                    <label className={`file-picker ${openAiProfiles.length ? "" : "disabled"}`} aria-disabled={!openAiProfiles.length}>
+                      <Upload size={14} /> 음성 전사
+                      <input
+                        type="file"
+                        accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg,.flac"
+                        disabled={!openAiProfiles.length}
+                        onChange={(e) => { transcribeKnowledgeAudio(e.target.files?.[0]); e.target.value = ""; }}
+                      />
+                    </label>
                     {knowledgeForm.file && <span className="file-name">📎 {knowledgeForm.file.name}</span>}
-                    <span className="file-help">문서는 바로 저장하고, 음성은 OpenAI 전사 후 자료 내용에 채워 넣습니다. 큰 파일은 서버 ffmpeg로 조각 전사합니다.</span>
+                    <span className="file-help">
+                      문서는 바로 저장하고, 음성은 사용자별 OpenAI API 키로 전사한 뒤 자료 내용에 채워 넣습니다.
+                      {!openAiProfiles.length ? " 먼저 OpenAI 키 프로필을 저장하세요." : " 큰 파일은 서버 ffmpeg로 조각 전사합니다."}
+                    </span>
                     <button disabled={knowledgeSaveState.status === "saving"}><FileText size={14} /> {knowledgeSaveState.status === "saving" ? "저장 중…" : "자료 저장"}</button>
                   </div>
                   {transcriptionState.message ? <div className={`form-status ${transcriptionState.status}`}>{transcriptionState.message}</div> : null}
