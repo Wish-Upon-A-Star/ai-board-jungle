@@ -67,6 +67,15 @@ async function createFixtures(token) {
 
 async function cleanupFixtures(token, ids) {
   const errors = [];
+  if (!ids.appliedTaskId && ids.appliedTaskName) {
+    await apiJson("/api/automations", {}, token)
+      .then((data) => {
+        const task = data.tasks.find((item) => item.name === ids.appliedTaskName);
+        ids.appliedTaskId = task?.id;
+      })
+      .catch((error) => errors.push(error.message));
+  }
+  if (ids.appliedTaskId) await apiJson(`/api/automations/${ids.appliedTaskId}`, { method: "DELETE" }, token).catch((error) => errors.push(error.message));
   if (ids.sharedPostId) await apiJson(`/api/posts/${ids.sharedPostId}`, { method: "DELETE" }, token).catch((error) => errors.push(error.message));
   if (ids.postId) await apiJson(`/api/posts/${ids.postId}`, { method: "DELETE" }, token).catch((error) => errors.push(error.message));
   if (ids.taskId) await apiJson(`/api/automations/${ids.taskId}`, { method: "DELETE" }, token).catch((error) => errors.push(error.message));
@@ -139,8 +148,27 @@ async function main() {
     await page.getByRole("button", { name: /공유 자동화/ }).click();
     await assertNoHorizontalOverflow(page, "desktop shares tab");
     await assertCardReadable(page, ".board-share-card", "desktop shared automation card");
-    const applyButtonText = await page.locator(".board-share-card button").first().innerText();
+    const sharedCard = page.locator(".board-share-card").filter({ hasText: String(fixtureIds.suffix) }).first();
+    await sharedCard.waitFor({ state: "visible", timeout: 10000 });
+    const applyButtonText = await sharedCard.locator("button").first().innerText();
     if (!applyButtonText.includes("내 자동화에 적용")) throw new Error(`Shared automation apply button is unclear: ${applyButtonText}`);
+    await sharedCard.locator("button").first().click();
+    await page.locator("#new-task").waitFor({ state: "visible", timeout: 10000 });
+    const copiedName = await page.locator("form.automation-form input").first().inputValue();
+    if (!copiedName.includes(String(fixtureIds.suffix)) || !copiedName.includes("복사본")) {
+      throw new Error(`Shared automation was not copied into the form: ${copiedName}`);
+    }
+    fixtureIds.appliedTaskName = copiedName;
+    const routeText = await page.locator("form.automation-form .automation-route-preview").innerText();
+    if (!routeText.includes("GitHub commits") || !routeText.includes("Notion BOARD")) {
+      throw new Error(`Shared automation route preview was not copied: ${routeText}`);
+    }
+    await page.locator("form.automation-form").getByRole("button", { name: /자동화 저장/ }).click();
+    await page.getByText("자동화가 저장되었습니다", { exact: false }).waitFor({ state: "visible", timeout: 10000 });
+    const tasksAfterApply = await apiJson("/api/automations", {}, token);
+    const applied = tasksAfterApply.tasks.find((task) => task.name === copiedName);
+    if (!applied) throw new Error(`Applied automation was not persisted: ${copiedName}`);
+    fixtureIds.appliedTaskId = applied.id;
     await page.screenshot({ path: join(screenshotDir, "board-readable-desktop-shares.png"), fullPage: true });
 
     await mobile.goto(appUrl, { waitUntil: "networkidle" });
@@ -167,6 +195,8 @@ async function main() {
             "mobile_no_horizontal_overflow",
             "titles_do_not_overflow",
             "apply_shared_automation_button_visible",
+            "shared_automation_copies_into_form",
+            "shared_automation_can_be_saved_as_new_task",
           ],
           screenshots: [
             "output/playwright/board-readable-desktop-posts.png",
