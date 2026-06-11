@@ -70,9 +70,9 @@ async function main() {
 
     await page.locator("button").filter({ hasText: "지식자료" }).first().click();
     await page.locator("#knowledge-panel").waitFor({ state: "visible", timeout: 10000 });
-    await page.locator('.transcription-settings select').first().selectOption(String(profile.id));
-    await page.locator('.transcription-settings select').nth(1).selectOption("gpt-4o-mini-transcribe");
-    await page.locator('.transcription-settings input').fill("한국어 회의 음성을 업무 지시와 결정사항 중심으로 전사");
+    await page.locator(".transcription-settings select").first().selectOption(String(profile.id));
+    await page.locator(".transcription-settings select").nth(1).selectOption("gpt-4o-mini-transcribe");
+    await page.locator(".transcription-settings input").fill("한국어 회의 음성을 업무 지시와 결정사항 중심으로 전사");
     await page.locator('#knowledge-panel input[type="file"][accept*="audio"]').setInputFiles({
       name: "meeting.wav",
       mimeType: "audio/wav",

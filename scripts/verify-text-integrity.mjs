@@ -35,6 +35,10 @@ const suspiciousFragments = [
   "?\ub311",
   "?\uba50",
 ];
+const suspiciousRegexes = [
+  { name: "cjk-mojibake", pattern: /[\u4e00-\u9fff\uf900-\ufaff]/u },
+  { name: "question-mark-hangul-mojibake", pattern: /\?[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/u },
+];
 
 function runGit(args) {
   try {
@@ -94,11 +98,12 @@ for (const target of scanTargets) {
     lines.forEach((line, index) => {
       const matchedChar = suspiciousChars.find((char) => line.includes(char));
       const matchedFragment = suspiciousFragments.find((fragment) => line.includes(fragment));
-      if (matchedChar || matchedFragment || line.includes("\uFFFD")) {
+      const matchedRegex = suspiciousRegexes.find(({ pattern }) => pattern.test(line));
+      if (matchedChar || matchedFragment || matchedRegex || line.includes("\uFFFD")) {
         hits.push({
           file,
           line: index + 1,
-          marker: matchedChar || matchedFragment || "replacement-character",
+          marker: matchedChar || matchedFragment || matchedRegex?.name || "replacement-character",
           text: line.slice(0, 180),
         });
       }
