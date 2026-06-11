@@ -236,6 +236,10 @@ function App() {
     }),
     [integrationProfiles],
   );
+  const selectedAutomationProfile = useMemo(
+    () => integrationProfiles.find((profile) => String(profile.id) === String(form.integration_profile_id || "")),
+    [integrationProfiles, form.integration_profile_id],
+  );
   const systemCards = buildSystemReadinessCards({ providerReadiness, knowledgeSources, tasks, healthStatus });
   const healthFailureMessage = getHealthFailureMessage(healthStatus);
   const readyProviderCount = providerReadiness.filter((provider) => provider.ready).length;
@@ -1133,6 +1137,12 @@ function App() {
                               <span className="task-arrow">→</span>
                               <span className="task-dest">{task.destination}</span>
                             </div>
+                            <div className="task-profile-line">
+                              <KeyRound size={13} />
+                              {task.integrationProfile
+                                ? `${task.integrationProfile.name} · ${task.integrationProfile.hasToken ? "토큰 연결됨" : "토큰 없음"} · ${task.integrationProfile.tokenStorage || "저장 방식 미확인"}`
+                                : "커스텀 설정 · 실행 전 프로필/토큰 확인 필요"}
+                            </div>
                           </div>
                           <div className="task-card-right">
                             <span className={`run-pill ${runStatus}`}>{runStatus === "ok" ? "✅ 성공" : runStatus === "error" ? "❌ 오류" : runStatus === "running" ? "⏳ 실행 중" : "— 미실행"}</span>
@@ -1245,6 +1255,21 @@ function App() {
                         {integrationProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name} ({profile.sourceKind})</option>)}
                       </select>
                     </Field>
+                    <div className={selectedAutomationProfile ? "selected-profile-summary ready" : "selected-profile-summary missing"}>
+                      {selectedAutomationProfile ? (
+                        <>
+                          <strong>{selectedAutomationProfile.name}</strong>
+                          <span>{providerLabel(selectedAutomationProfile.sourceKind)} · {selectedAutomationProfile.hasToken ? "토큰 연결됨" : "토큰 없음"} · {selectedAutomationProfile.tokenStorage || "저장 방식 미확인"}</span>
+                          <small>Base URL: {selectedAutomationProfile.baseUrl || "미설정"} / AI: {selectedAutomationProfile.aiProvider || form.ai_provider} {selectedAutomationProfile.aiModel || form.ai_model}</small>
+                        </>
+                      ) : (
+                        <>
+                          <strong>프로필 미선택</strong>
+                          <span>자동화 저장 전에 프로필을 선택하면 내 DB에 암호화 저장된 토큰/API 키로 실행됩니다.</span>
+                          <small>커스텀 설정을 쓰려면 고급 설정의 API/URL/지침을 직접 확인하세요.</small>
+                        </>
+                      )}
+                    </div>
                   </section>
                   <div className="grid3 wide">
                     <Field label="자동화 이름" hint="목록에 표시되는 이름입니다."><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="예: GitHub 이슈 → Notion 정리" required /></Field>

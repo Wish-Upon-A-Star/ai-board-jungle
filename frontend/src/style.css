@@ -437,6 +437,30 @@ pre {
   gap: 6px;
 }
 .scheduler-bar span { color: var(--muted); overflow-wrap: anywhere; }
+.selected-profile-summary {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.selected-profile-summary.ready {
+  border-color: #bad9d4;
+  background: #fbfffd;
+}
+.selected-profile-summary.missing {
+  border-color: #eadca8;
+  background: var(--yellow-soft);
+}
+.selected-profile-summary strong {
+  color: var(--text);
+}
+.selected-profile-summary span,
+.selected-profile-summary small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
 
 .task-card { padding: 14px; }
 .task-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -452,6 +476,20 @@ pre {
 }
 .task-meta dt { font-weight: 750; color: var(--muted); }
 .task-meta dd { margin: 0; color: var(--text); word-break: break-word; }
+.task-profile-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.task-profile-line svg {
+  flex: 0 0 auto;
+  color: var(--accent-strong);
+}
 .task-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
 .task-actions .secondary { color: var(--muted); }
 .task-actions button { white-space: nowrap; }
