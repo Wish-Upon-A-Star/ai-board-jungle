@@ -49,11 +49,15 @@ async function main() {
     const readinessCard = form.locator(".automation-readiness-card");
     await readinessCard.waitFor({ state: "visible", timeout: 10000 });
     const readinessText = await readinessCard.innerText();
-    if (!readinessText.includes("provider") || !readinessText.includes("프로필/Callback 확인")) {
+    if (!readinessText.includes("현재 경로") || !readinessText.includes("프로필/Callback 확인")) {
       throw new Error(`Automation readiness card is not actionable: ${readinessText}`);
     }
     const readinessChipCount = await readinessCard.locator(".automation-readiness-list span").count();
     if (readinessChipCount < 1) throw new Error("Automation readiness card should list provider status chips");
+    const initialRouteRequiredText = (await readinessCard.locator(".route-required").allTextContents()).join("\n");
+    if (!initialRouteRequiredText.includes("GitHub") || !initialRouteRequiredText.includes("Notion")) {
+      throw new Error(`Default GitHub -> Notion preset should highlight GitHub and Notion readiness: ${initialRouteRequiredText}`);
+    }
     const routePreview = form.locator(".automation-route-preview");
     await routePreview.waitFor({ state: "visible", timeout: 10000 });
     const routePreviewText = await routePreview.innerText();
@@ -76,6 +80,10 @@ async function main() {
     if (!populatedRouteText.includes("Figma") || !populatedRouteText.includes("Calendar")) {
       throw new Error(`Preset did not update route preview: ${populatedRouteText}`);
     }
+    const figmaCalendarRequiredText = (await readinessCard.locator(".route-required").allTextContents()).join("\n");
+    if (!figmaCalendarRequiredText.includes("Figma") || !figmaCalendarRequiredText.includes("Google Calendar")) {
+      throw new Error(`Figma -> Calendar preset should highlight Figma and Google Calendar readiness: ${figmaCalendarRequiredText}`);
+    }
 
     await advanced.locator("summary").click();
     const visibleAdvancedInputs = await advanced.locator("input, textarea").count();
@@ -92,6 +100,7 @@ async function main() {
         "advanced_collapsed_by_default",
         "basic_controls_reduced_to_profile_name_interval",
         "automation_readiness_card_visible",
+        "automation_readiness_route_required_providers_visible",
         "automation_readiness_action_opens_profiles",
         "route_preview_visible",
         "route_edit_collapsed_by_default",

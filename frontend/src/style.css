@@ -519,6 +519,11 @@ pre {
   background: #fff9df;
   color: #725100;
 }
+.automation-readiness-list span.route-required {
+  border-style: solid;
+  box-shadow: inset 3px 0 0 currentColor;
+  padding-left: 9px;
+}
 .automation-readiness-card button {
   width: auto;
   white-space: nowrap;

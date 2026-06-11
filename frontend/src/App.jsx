@@ -48,6 +48,32 @@ function activityDetailBadges(activity) {
   return badges;
 }
 
+function detectAutomationProviderKeys(form) {
+  const sourceText = [
+    form?.template_preset,
+    form?.source,
+    form?.destination,
+    form?.api_provider,
+    form?.ai_agent,
+    ...(form?.custom_connections || []).flatMap((connection) => [
+      connection.service,
+      connection.api,
+      connection.operation,
+      connection.url,
+      connection.auth_key_name,
+    ]),
+  ].filter(Boolean).join(" ").toLowerCase();
+  const keys = [];
+  const add = (key) => {
+    if (!keys.includes(key)) keys.push(key);
+  };
+  if (/github|git hub|gh_|github_/.test(sourceText)) add("github");
+  if (/notion/.test(sourceText)) add("notion");
+  if (/figma/.test(sourceText)) add("figma");
+  if (/google_calendar|google calendar|calendar|gcal/.test(sourceText)) add("google_calendar");
+  return keys;
+}
+
 function runOverviewItems(result) {
   const data = parseRunResult(result);
   const items = [];
@@ -303,6 +329,19 @@ function App() {
   const readyProviderCount = providerReadiness.filter((provider) => provider.ready).length;
   const missingProviderReadiness = providerReadiness.filter((provider) => !provider.ready);
   const providerReadinessReady = providerReadiness.length > 0 && missingProviderReadiness.length === 0;
+  const automationProviderKeys = useMemo(() => detectAutomationProviderKeys(form), [form]);
+  const routeProviderReadiness = useMemo(
+    () => automationProviderKeys
+      .map((key) => providerReadiness.find((provider) => provider.key === key))
+      .filter(Boolean),
+    [automationProviderKeys, providerReadiness],
+  );
+  const routeMissingProviderReadiness = routeProviderReadiness.filter((provider) => !provider.ready);
+  const routeProviderReadinessReady = routeProviderReadiness.length > 0 && routeMissingProviderReadiness.length === 0;
+  const automationReadinessReady = routeProviderReadiness.length ? routeProviderReadinessReady : providerReadinessReady;
+  const visibleAutomationReadiness = routeProviderReadiness.length
+    ? routeProviderReadiness
+    : (missingProviderReadiness.length ? missingProviderReadiness : providerReadiness).slice(0, 4);
   const manualGuide = manualProfileGuides[integrationForm.source_kind] || manualProfileGuides.custom;
   const currentPublicOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const savedPublicBaseUrl = (systemSettings?.publicBaseUrl || "").replace(/\/$/, "");
@@ -1451,17 +1490,17 @@ function App() {
                       )}
                     </div>
                   </section>
-                  <section className={providerReadinessReady ? "automation-readiness-card ok" : "automation-readiness-card warn"} aria-label="자동화 연동 준비 상태">
+                  <section className={automationReadinessReady ? "automation-readiness-card ok" : "automation-readiness-card warn"} aria-label="자동화 연동 준비 상태">
                     <div className="automation-readiness-main">
-                      <strong>{providerReadinessReady ? "연동 준비 상태가 좋습니다" : "연동 준비 확인이 필요합니다"}</strong>
-                      <span>{readyProviderCount}/{providerReadiness.length || 4}개 provider 준비됨 · 자동화 저장 전에 토큰, Base URL, OAuth callback을 확인하세요.</span>
+                      <strong>{routeProviderReadinessReady ? "이 자동화에 필요한 연동이 준비됐습니다" : routeMissingProviderReadiness.length ? "이 자동화에 필요한 연동을 확인하세요" : providerReadinessReady ? "연동 준비 상태가 좋습니다" : "연동 준비 확인이 필요합니다"}</strong>
+                      <span>{routeProviderReadiness.length ? `현재 경로: ${routeProviderReadiness.filter((provider) => provider.ready).length}/${routeProviderReadiness.length}개 준비됨` : `전체: ${readyProviderCount}/${providerReadiness.length || 4}개 provider 준비됨`} · 저장 전에 토큰, Base URL, OAuth callback을 확인하세요.</span>
                     </div>
                     <div className="automation-readiness-list">
                       {providerReadiness.length === 0 ? (
                         <span className="missing">provider 상태를 불러오는 중입니다. 프로필/Callback 탭에서 다시 확인하세요.</span>
-                      ) : (missingProviderReadiness.length ? missingProviderReadiness : providerReadiness).slice(0, 4).map((provider) => (
-                        <span key={provider.key} className={provider.ready ? "ready" : "missing"}>
-                          {provider.name}: {provider.ready ? "ready" : provider.nextAction || "setup required"}
+                      ) : visibleAutomationReadiness.map((provider) => (
+                        <span key={provider.key} className={`${provider.ready ? "ready" : "missing"} ${automationProviderKeys.includes(provider.key) ? "route-required" : ""}`}>
+                          {automationProviderKeys.includes(provider.key) ? "필수 · " : ""}{provider.name}: {provider.ready ? "ready" : provider.nextAction || "setup required"}
                         </span>
                       ))}
                     </div>
