@@ -40,10 +40,18 @@ async function main() {
     await page.locator('button[aria-controls="settings-panel"]').click();
     const form = page.locator(".system-settings-form");
     await form.waitFor({ state: "visible", timeout: 15000 });
+    await page.locator(".public-url-state").waitFor({ state: "visible", timeout: 15000 });
+    await form.locator("input").fill("https://mismatch.example.test");
+    await page.locator(".public-url-state.warn").waitFor({ state: "visible", timeout: 15000 });
+    await form.locator("button", { hasText: "현재 주소로 채우기" }).click();
+    const filledCurrentOrigin = await form.locator("input").inputValue();
+    if (filledCurrentOrigin !== publicUrl) {
+      throw new Error(`current-origin fill button failed. expected=${publicUrl} actual=${filledCurrentOrigin}`);
+    }
     await form.locator("input").fill(targetPublicBaseUrl);
     await Promise.all([
       page.waitForResponse((response) => response.url().includes("/api/system/settings") && response.request().method() === "PUT"),
-      form.locator("button").click(),
+      form.locator("button").filter({ hasText: "외부 도메인 저장" }).click(),
     ]);
     await page.locator(".system-settings-card .form-status.ok").waitFor({ state: "visible", timeout: 15000 });
 
@@ -63,6 +71,9 @@ async function main() {
       checked: [
         "admin_login",
         "settings_tab_visible",
+        "public_url_state_visible",
+        "public_url_mismatch_warning",
+        "fill_current_origin_button",
         "public_base_url_saved_from_ui",
         "oauth_status_uses_saved_origin",
         "figma_redirect_uri_uses_saved_origin",

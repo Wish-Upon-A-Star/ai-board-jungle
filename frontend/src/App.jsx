@@ -277,6 +277,16 @@ function App() {
   const readyProviderCount = providerReadiness.filter((provider) => provider.ready).length;
   const manualGuide = manualProfileGuides[integrationForm.source_kind] || manualProfileGuides.custom;
   const currentPublicOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const savedPublicBaseUrl = (systemSettings?.publicBaseUrl || "").replace(/\/$/, "");
+  const effectivePublicBaseUrl = savedPublicBaseUrl || (oauthPublicOrigin?.origin || currentPublicOrigin || "").replace(/\/$/, "");
+  const publicBaseUrlMismatch = Boolean(savedPublicBaseUrl && currentPublicOrigin && savedPublicBaseUrl !== currentPublicOrigin);
+  const publicBaseUrlIsTemporary = (() => {
+    try {
+      return /trycloudflare\.com|\.ngrok(-free)?\.app$/i.test(new URL(effectivePublicBaseUrl || "http://local.invalid").hostname);
+    } catch {
+      return false;
+    }
+  })();
 
   useEffect(() => {
     loadHealth();
@@ -1447,6 +1457,17 @@ function App() {
               <section className="settings-group system-settings-card">
                 <div className="settings-group-label">🌐 외부 접속 도메인</div>
                 <p className="settings-group-desc">Figma, Google, GitHub, Notion OAuth callback 기준이 되는 public URL입니다. 팀원이 계속 쓸 주소가 정해지면 여기에 고정 도메인을 저장합니다.</p>
+                <div className={`public-url-state ${publicBaseUrlMismatch ? "warn" : publicBaseUrlIsTemporary ? "temp" : "ok"}`}>
+                  <div>
+                    <strong>{publicBaseUrlMismatch ? "저장된 OAuth 기준 주소와 현재 접속 주소가 다릅니다." : publicBaseUrlIsTemporary ? "임시 터널 주소를 OAuth 기준으로 사용 중입니다." : "OAuth 기준 주소가 현재 접속 주소와 일치합니다."}</strong>
+                    <span>{publicBaseUrlMismatch ? "Figma에서 Invalid redirect uri가 뜨면 현재 접속 주소로 저장하거나 provider 콘솔에 저장된 기준 주소의 callback을 등록하세요." : publicBaseUrlIsTemporary ? "trycloudflare 주소가 바뀌면 provider callback 등록도 다시 맞춰야 합니다." : "이 주소를 provider 개발자 콘솔 callback allowlist에 등록하면 됩니다."}</span>
+                  </div>
+                  <dl>
+                    <div><dt>현재 접속</dt><dd>{currentPublicOrigin || "확인 중"}</dd></div>
+                    <div><dt>OAuth 기준</dt><dd>{effectivePublicBaseUrl || "요청 주소 사용"}</dd></div>
+                    <div><dt>설정 출처</dt><dd>{systemSettings?.source || "request"}</dd></div>
+                  </dl>
+                </div>
                 {user?.role === "ADMIN" ? (
                   <form className="system-settings-form" onSubmit={saveSystemSettings}>
                     <Field label="Public Base URL" hint="예: https://ai-board.your-domain.example">
@@ -1456,6 +1477,14 @@ function App() {
                         placeholder={currentPublicOrigin}
                       />
                     </Field>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => setSystemSettings({ ...(systemSettings || {}), publicBaseUrl: currentPublicOrigin })}
+                      disabled={!currentPublicOrigin || isBusy("system-settings")}
+                    >
+                      현재 주소로 채우기
+                    </button>
                     <button disabled={isBusy("system-settings")}><KeyRound size={14} /> {isBusy("system-settings") ? "저장 중…" : "외부 도메인 저장"}</button>
                   </form>
                 ) : (

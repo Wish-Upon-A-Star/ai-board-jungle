@@ -590,9 +590,61 @@ pre {
 }
 .system-settings-form {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto;
+  grid-template-columns: minmax(260px, 1fr) auto auto;
   gap: 10px;
   align-items: end;
+}
+.public-url-state {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.2fr);
+  gap: 14px;
+  padding: 12px;
+  margin: 10px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.public-url-state.warn {
+  border-color: #e5a35a;
+  background: #fff8ec;
+}
+.public-url-state.temp {
+  border-color: #d7c16f;
+  background: #fffdf0;
+}
+.public-url-state.ok {
+  border-color: #9acdc4;
+  background: #f7fffc;
+}
+.public-url-state strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text);
+}
+.public-url-state span {
+  display: block;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.public-url-state dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.public-url-state dl div {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+.public-url-state dt {
+  color: var(--muted);
+  font-weight: 900;
+}
+.public-url-state dd {
+  margin: 0;
+  color: var(--accent-strong);
+  overflow-wrap: anywhere;
 }
 .system-settings-readonly {
   display: grid;
@@ -2329,6 +2381,7 @@ pre {
   .oauth-setup-grid,
   .oauth-quick-fix,
   .callback-preview-grid,
+  .public-url-state,
   .taskory-status-card,
   .task-meta,
   .automation-empty-steps,
@@ -2342,6 +2395,7 @@ pre {
   .manual-profile-guide dl div,
   .taskory-status-card dl div,
   .callback-preview-item,
+  .public-url-state dl div,
   .system-settings-form,
   .system-settings-readonly,
   .run-row-main { grid-template-columns: 1fr; }
