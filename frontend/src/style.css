@@ -1316,6 +1316,25 @@ pre {
   min-height: 38px;
   justify-content: center;
 }
+.transcription-save-check {
+  grid-column: span 2;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 700;
+}
+.transcription-save-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
 .file-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .file-picker {
   min-height: 36px;
@@ -1428,6 +1447,9 @@ pre {
     grid-template-columns: 1fr;
   }
   .transcription-settings .field:last-of-type {
+    grid-column: auto;
+  }
+  .transcription-save-check {
     grid-column: auto;
   }
   .next-steps button { border-right: 0; border-bottom: 1px solid var(--line); }

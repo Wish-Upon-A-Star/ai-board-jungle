@@ -208,6 +208,7 @@ function App() {
     integrationProfileId: "",
     model: "gpt-4o-mini-transcribe",
     prompt: "AI Board 지식자료로 저장할 회의, 업무 메모, 자동화 지시 음성입니다.",
+    saveToKnowledge: false,
   });
   const [transcriptionState, setTranscriptionState] = useState({ status: "idle", message: "" });
   const [integrationForm, setIntegrationForm] = useState(defaultIntegration);
@@ -601,6 +602,12 @@ function App() {
       body.set("model", transcriptionSettings.model || "gpt-4o-mini-transcribe");
       body.set("prompt", transcriptionSettings.prompt || "AI Board 지식자료로 저장할 회의, 업무 메모, 자동화 지시 음성입니다.");
       if (selectedProfileId) body.set("integration_profile_id", selectedProfileId);
+      if (transcriptionSettings.saveToKnowledge) {
+        body.set("save_to_knowledge", "true");
+        body.set("title", file.name.replace(/\.[^.]+$/, "") || "음성 전사");
+        body.set("instruction", transcriptionSettings.prompt || "OpenAI 음성 전사 결과를 RAG 지식자료로 사용합니다.");
+        body.set("tags", "audio,transcription,openai");
+      }
       const data = await api("/api/ai/transcribe", { method: "POST", body });
       const audioTitle = file.name.replace(/\.[^.]+$/, "") || "음성 전사";
       const transcript = data.text || "";
@@ -612,7 +619,13 @@ function App() {
         tags: current.tags || "audio,transcription,openai",
       }));
       setApiResult({ called: "ai.transcribe", response: { ...data, text: transcript.slice(0, 500) } });
-      setTranscriptionState({ status: "ok", message: `"${file.name}" 전사 완료. ${data.integrationProfileName || "OpenAI"} / ${data.model} 결과를 확인한 뒤 자료 저장을 누르세요.` });
+      if (data.source) {
+        setResult(data.rag);
+        setTranscriptionState({ status: "ok", message: `"${file.name}" 전사 완료. "${data.source.title}" 지식자료로 바로 저장했습니다.` });
+        await loadAll();
+      } else {
+        setTranscriptionState({ status: "ok", message: `"${file.name}" 전사 완료. ${data.integrationProfileName || "OpenAI"} / ${data.model} 결과를 확인한 뒤 자료 저장을 누르세요.` });
+      }
     } catch (err) {
       showActionError(err);
       setTranscriptionState({ status: "error", message: err.message || "음성 전사에 실패했습니다." });
@@ -1780,6 +1793,14 @@ function App() {
                         placeholder="예: 한국어 회의 내용을 업무 지시로 전사"
                       />
                     </Field>
+                    <label className="inline-check transcription-save-check">
+                      <input
+                        type="checkbox"
+                        checked={transcriptionSettings.saveToKnowledge}
+                        onChange={(e) => setTranscriptionSettings({ ...transcriptionSettings, saveToKnowledge: e.target.checked })}
+                      />
+                      <span>전사 후 지식자료에 바로 저장</span>
+                    </label>
                     {!openAiProfiles.length ? (
                       <button type="button" className="secondary" onClick={() => openAiKeyProfileSetup("openai")}>
                         <KeyRound size={14} /> OpenAI 키 먼저 저장

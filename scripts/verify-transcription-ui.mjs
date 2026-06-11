@@ -60,6 +60,21 @@ async function main() {
           parts: 1,
           integrationProfileId: profile.id,
           integrationProfileName: profile.name,
+          source: {
+            id: 999001,
+            title: "meeting",
+            sourceType: "audio",
+            fileName: "meeting.wav",
+            mimeType: "audio/wav",
+            instruction: "한국어 회의 음성을 업무 지시와 결정사항 중심으로 전사",
+            extractedText: "가짜 OpenAI 전사 결과입니다. 회의 내용을 지식자료로 저장합니다.",
+            tags: ["audio", "transcription", "openai"],
+            createdAt: new Date().toISOString(),
+          },
+          rag: {
+            answer: "전사 결과를 지식자료로 저장했습니다.",
+            sources: ["meeting"],
+          },
         }),
       });
     });
@@ -72,14 +87,15 @@ async function main() {
     await page.locator("#knowledge-panel").waitFor({ state: "visible", timeout: 10000 });
     await page.locator(".transcription-settings select").first().selectOption(String(profile.id));
     await page.locator(".transcription-settings select").nth(1).selectOption("gpt-4o-mini-transcribe");
-    await page.locator(".transcription-settings input").fill("한국어 회의 음성을 업무 지시와 결정사항 중심으로 전사");
+    await page.locator(".transcription-settings input").first().fill("한국어 회의 음성을 업무 지시와 결정사항 중심으로 전사");
+    await page.getByText("전사 후 지식자료에 바로 저장").click();
     await page.locator('#knowledge-panel input[type="file"][accept*="audio"]').setInputFiles({
       name: "meeting.wav",
       mimeType: "audio/wav",
       buffer: Buffer.from("RIFF0000WAVEfmt "),
     });
 
-    await page.getByText("전사 완료", { exact: false }).waitFor({ state: "visible", timeout: 10000 });
+    await page.getByText("지식자료로 바로 저장했습니다", { exact: false }).waitFor({ state: "visible", timeout: 10000 });
     const titleValue = await page.locator("#knowledge-panel input").first().inputValue();
     const bodyValue = await page.locator("#knowledge-panel textarea").nth(1).inputValue();
     const sourceType = await page.locator("#knowledge-panel select").first().inputValue();
@@ -87,6 +103,7 @@ async function main() {
     if (!transcribePayload.includes("gpt-4o-mini-transcribe")) throw new Error("Selected transcription model was not submitted");
     if (!transcribePayload.includes(String(profile.id))) throw new Error("Selected OpenAI profile id was not submitted");
     if (!transcribePayload.includes("한국어")) throw new Error("Transcription prompt was not submitted");
+    if (!transcribePayload.includes("save_to_knowledge")) throw new Error("Immediate knowledge-save option was not submitted");
     if (titleValue !== "meeting") throw new Error(`Expected title to become meeting, got ${titleValue}`);
     if (sourceType !== "audio") throw new Error(`Expected source_type audio, got ${sourceType}`);
     if (!bodyValue.includes("가짜 OpenAI 전사 결과")) throw new Error(`Transcript did not fill knowledge body: ${bodyValue}`);
@@ -95,12 +112,24 @@ async function main() {
       JSON.stringify(
         {
           ok: true,
-          checked: ["login", "openai_profile_select", "transcription_model_select", "prompt_submit", "knowledge_tab", "fake_transcription_route", "title_autofill", "source_type_audio", "transcript_body_fill"],
+          checked: [
+            "login",
+            "openai_profile_select",
+            "transcription_model_select",
+            "prompt_submit",
+            "knowledge_tab",
+            "immediate_knowledge_save_checked",
+            "fake_transcription_route",
+            "title_autofill",
+            "source_type_audio",
+            "transcript_body_fill",
+          ],
           appUrl,
           apiBase,
           transcribeCalls,
           profileId: profile.id,
           modelSubmitted: transcribePayload.includes("gpt-4o-mini-transcribe"),
+          saveToKnowledgeSubmitted: transcribePayload.includes("save_to_knowledge"),
         },
         null,
         2,

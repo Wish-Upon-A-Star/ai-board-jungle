@@ -160,6 +160,80 @@ def test_audio_transcription_uses_user_openai_profile(monkeypatch):
     assert captured["file"][0] == "meeting.wav"
 
 
+def test_audio_transcription_can_save_directly_to_knowledge(monkeypatch):
+    class FakeOpenAIResponse:
+        status_code = 200
+        text = '{"text":"회의 결정사항을 지식자료로 저장합니다."}'
+
+        def json(self):
+            return {"text": "회의 결정사항을 지식자료로 저장합니다."}
+
+    class FakeAsyncClient:
+        def __init__(self, timeout=None):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, headers=None, data=None, files=None):
+            return FakeOpenAIResponse()
+
+    monkeypatch.setattr(main_module.httpx, "AsyncClient", FakeAsyncClient)
+
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "voice-save@example.com", "name": "Voice Save", "password": "password123"},
+        )
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+        profile = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "OpenAI API 키",
+                "source_kind": "custom",
+                "base_url": "https://api.openai.com/v1",
+                "api_provider": "OpenAI API",
+                "token_name": "OPENAI_API_KEY",
+                "token_value": "sk-user-openai",
+                "ai_provider": "OpenAI",
+                "ai_model": "gpt-4o-mini",
+                "ai_api_base": "https://api.openai.com/v1",
+                "rag_targets": ["ai"],
+            },
+        )
+        openai_profile = profile.json()["profile"]
+
+        response = client.post(
+            "/api/ai/transcribe",
+            headers=headers,
+            data={
+                "model": "gpt-4o-mini-transcribe",
+                "prompt": "회의 결정사항 중심으로 전사",
+                "integration_profile_id": openai_profile["id"],
+                "save_to_knowledge": "true",
+                "title": "회의 전사",
+                "instruction": "회의 전사 내용을 RAG 근거로 사용",
+                "tags": "audio,meeting,openai",
+            },
+            files={"file": ("meeting.wav", b"RIFF0000WAVE", "audio/wav")},
+        )
+        sources = client.get("/api/knowledge", headers=headers)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source"]["title"] == "회의 전사"
+    assert payload["source"]["sourceType"] == "audio"
+    assert payload["source"]["extractedText"] == "회의 결정사항을 지식자료로 저장합니다."
+    assert payload["source"]["tags"] == ["audio", "meeting", "openai"]
+    assert "rag" in payload
+    assert sources.status_code == 200
+    assert any(source["title"] == "회의 전사" for source in sources.json()["sources"])
+
+
 def test_audio_transcription_splits_large_files_with_ffmpeg(monkeypatch):
     calls = []
 

@@ -1735,6 +1735,10 @@ async def transcribe_audio(
     model: str = Form("whisper-1"),
     prompt: str = Form(""),
     integration_profile_id: int | None = Form(None),
+    save_to_knowledge: bool = Form(False),
+    title: str = Form(""),
+    instruction: str = Form(""),
+    tags: str = Form("audio,transcription,openai"),
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -1742,6 +1746,23 @@ async def transcribe_audio(
     result = await transcribe_audio_with_openai(api_key, api_base, file, model, prompt)
     result["integrationProfileId"] = profile_id
     result["integrationProfileName"] = profile_name
+    if save_to_knowledge:
+        source_title = title.strip() or Path(result["fileName"]).stem or "음성 전사"
+        tag_list = [tag.strip().removeprefix("#") for tag in tags.split(",") if tag.strip()]
+        source = KnowledgeSource(
+            owner_id=user.id,
+            title=source_title,
+            source_type="audio",
+            file_name=result["fileName"],
+            mime_type=result["mimeType"],
+            instruction=instruction.strip() or prompt.strip() or "OpenAI 음성 전사 결과를 RAG 지식자료로 사용합니다.",
+            extracted_text=result["text"],
+            tags_json=json.dumps(tag_list, ensure_ascii=False),
+        )
+        db.add(source)
+        db.flush()
+        result["source"] = serialize_knowledge(source)
+        result["rag"] = rag_answer(db, f"{source.title}\n{source.instruction}\n{source.extracted_text}", user.id)
     log_activity(
         db,
         user,
@@ -1757,6 +1778,8 @@ async def transcribe_audio(
             "characters": len(result["text"]),
             "integrationProfileId": profile_id,
             "integrationProfileName": profile_name,
+            "savedToKnowledge": save_to_knowledge,
+            "sourceId": result.get("source", {}).get("id"),
         },
     )
     db.commit()
