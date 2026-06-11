@@ -1790,6 +1790,9 @@ function App() {
                     Figma Callback URL
                     <input readOnly value={figmaOAuthProvider?.redirectUri || ""} onFocus={(event) => event.currentTarget.select()} />
                   </label>
+                  <p className="oauth-redirect-source">
+                    현재 로그인 요청 출처: <b>{figmaOAuthProvider?.redirectUriSource || "request_public_origin"}</b>
+                  </p>
                   <button type="button" onClick={() => copyOAuthCallback("figma")} disabled={!figmaOAuthProvider?.redirectUri}>
                     <Copy size={14} /> Callback URL 복사
                   </button>
@@ -1820,6 +1823,9 @@ function App() {
                       </label>
                       <p className="oauth-callback-target">
                         등록 위치: {providerCallbackTarget(provider.provider)}
+                      </p>
+                      <p className="oauth-redirect-source">
+                        redirect 출처: <b>{provider.redirectUriSource || "request_public_origin"}</b>
                       </p>
                       <div className="oauth-diagnostic-meta">
                         <span><b>MCP</b> {provider.mcpServerUrl}</span>

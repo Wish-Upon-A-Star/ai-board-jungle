@@ -21,7 +21,7 @@ from app.config import settings
 from app.db import SessionLocal, engine, init_db
 import app.main as main_module
 from app.main import app
-from app.models import AutomationRun, AutomationTask, IntegrationProfile, KnowledgeSource, User
+from app.models import AutomationRun, AutomationTask, IntegrationProfile, KnowledgeSource, SystemSetting, User
 from app.live_writers import korean_summary_for_source, notion_sources_template_children, write_calendar_event, write_github_issue, write_notion_sources_report, write_notion_task
 from app.security import reveal_secret
 from app.taskory_import import normalize_taskory_export
@@ -669,6 +669,47 @@ def test_figma_oauth_start_prefers_registered_redirect_override(monkeypatch):
     params = parse_qs(parsed.query)
     assert params["redirect_uri"] == ["https://fixed.example.com/api/oauth/figma/callback"]
     assert data["redirectUri"] == "https://fixed.example.com/api/oauth/figma/callback"
+
+
+def test_figma_oauth_start_provider_override_wins_over_saved_public_base(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_FIGMA_OAUTH_REDIRECT_URI", "https://figma-fixed.example.com/api/oauth/figma/callback")
+    monkeypatch.setenv("AI_BOARD_FIGMA_OAUTH_CLIENT_ID", "figma-client")
+    monkeypatch.setenv("AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET", "figma-secret")
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "figma-oauth-db-override@example.com", "name": "Figma DB Override", "password": "password123"},
+        )
+        headers = {
+            "Authorization": f"Bearer {register.json()['token']}",
+            "x-ai-board-public-origin": "https://temporary.trycloudflare.com",
+            "host": "127.0.0.1:8000",
+        }
+        with SessionLocal() as db:
+            setting = db.get(SystemSetting, "public_base_url") or SystemSetting(key="public_base_url")
+            setting.value = "https://database.example.test"
+            db.add(setting)
+            db.commit()
+        try:
+            response = client.get("/api/oauth/figma/start", headers=headers)
+            assert response.status_code == 200
+            data = response.json()
+            params = parse_qs(urlparse(data["authorizeUrl"]).query)
+            assert params["redirect_uri"] == ["https://figma-fixed.example.com/api/oauth/figma/callback"]
+            assert data["redirectUri"] == "https://figma-fixed.example.com/api/oauth/figma/callback"
+            assert data["redirectUriSource"] == "provider_override"
+
+            status = client.get("/api/oauth/status", headers=headers)
+            assert status.status_code == 200
+            providers = {item["provider"]: item for item in status.json()["providers"]}
+            assert providers["figma"]["redirectUri"] == "https://figma-fixed.example.com/api/oauth/figma/callback"
+            assert providers["figma"]["redirectUriSource"] == "provider_override"
+        finally:
+            with SessionLocal() as db:
+                setting = db.get(SystemSetting, "public_base_url")
+                if setting:
+                    db.delete(setting)
+                    db.commit()
 
 
 def test_google_calendar_oauth_start_requests_offline_calendar_access(monkeypatch):

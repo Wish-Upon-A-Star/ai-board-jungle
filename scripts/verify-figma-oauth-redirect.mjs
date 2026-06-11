@@ -33,12 +33,16 @@ async function main() {
   if (data.redirectUri !== redirectUri) {
     throw new Error(`Response redirectUri mismatch: ${data.redirectUri}`);
   }
+  if (!data.redirectUriSource) {
+    throw new Error("Figma OAuth start response must expose redirectUriSource");
+  }
   console.log(JSON.stringify({
     ok: true,
-    checked: ["login", "figma_oauth_start", "client_id_sanitized", "public_origin_redirect_uri"],
+    checked: ["login", "figma_oauth_start", "client_id_sanitized", "public_origin_redirect_uri", "redirect_uri_source_visible"],
     apiBase,
     publicUrl,
     redirectUri,
+    redirectUriSource: data.redirectUriSource,
     clientIdMasked: `${clientId.slice(0, 4)}...${clientId.slice(-4)}`,
   }, null, 2));
 }

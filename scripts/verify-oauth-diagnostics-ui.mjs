@@ -43,6 +43,7 @@ async function main() {
     if (!text.includes("file_comments:write")) throw new Error("Figma scope is not visible in diagnostics");
     if (!text.includes("calendar.events")) throw new Error("Google Calendar scope is not visible in diagnostics");
     if (!text.includes("redirect_uri_mismatch")) throw new Error("diagnostics must mention Google-style redirect_uri_mismatch");
+    if (!text.includes("redirect 출처")) throw new Error("diagnostics must show redirect URI source");
     for (const target of [
       "GitHub OAuth App의 Authorization callback URL",
       "Notion OAuth Integration의 Redirect URI",
@@ -90,6 +91,7 @@ async function main() {
         "google_calendar_callback_visible",
         "provider_setup_links_visible",
         "scopes_visible",
+        "redirect_uri_sources_visible",
         "public_access_origin_visible",
         "public_access_checklist_visible",
         "stable_domain_guide_visible",

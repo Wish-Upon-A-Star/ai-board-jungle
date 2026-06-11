@@ -144,6 +144,30 @@ def serialize_system_settings(db: Session | None) -> dict:
     }
 
 
+def provider_oauth_redirect_override(provider: str) -> str:
+    normalized = provider.lower()
+    override_key = f"AI_BOARD_{normalized.upper()}_OAUTH_REDIRECT_URI"
+    override = os.environ.get(override_key, "").strip().rstrip("/")
+    if override.startswith(("https://", "http://")):
+        return override
+    if normalized == "google_calendar":
+        google_override = os.environ.get("AI_BOARD_GOOGLE_OAUTH_REDIRECT_URI", "").strip().rstrip("/")
+        if google_override.startswith(("https://", "http://")):
+            return google_override
+    return ""
+
+
+def oauth_redirect_uri_source(provider: str, db: Session | None = None) -> str:
+    normalized = provider.lower()
+    if provider_oauth_redirect_override(normalized):
+        return "provider_override"
+    if system_setting_value(db, "public_base_url"):
+        return "database_public_base_url"
+    if os.environ.get("AI_BOARD_PUBLIC_BASE_URL", "").strip().rstrip("/"):
+        return "environment_public_base_url"
+    return "request_public_origin"
+
+
 def upsert_system_setting(db: Session, key: str, value: str) -> SystemSetting:
     setting = db.get(SystemSetting, key)
     if not setting:
@@ -605,17 +629,12 @@ def public_origin_diagnostics(request: Request, db: Session | None = None) -> di
 
 def oauth_redirect_uri(provider: str, request: Request, db: Session | None = None) -> str:
     normalized = provider.lower()
+    provider_override = provider_oauth_redirect_override(normalized)
+    if provider_override:
+        return provider_override
     configured_public_base = system_setting_value(db, "public_base_url")
     if configured_public_base:
         return f"{configured_public_base}/api/oauth/{normalized}/callback"
-    override_key = f"AI_BOARD_{normalized.upper()}_OAUTH_REDIRECT_URI"
-    override = os.environ.get(override_key, "").strip().rstrip("/")
-    if override.startswith(("https://", "http://")):
-        return override
-    if normalized == "google_calendar":
-        google_override = os.environ.get("AI_BOARD_GOOGLE_OAUTH_REDIRECT_URI", "").strip().rstrip("/")
-        if google_override.startswith(("https://", "http://")):
-            return google_override
     return f"{public_base_url(request, db)}/api/oauth/{normalized}/callback"
 
 
@@ -1450,6 +1469,7 @@ def oauth_status(request: Request, user: User = Depends(current_user), db: Sessi
                 "configured": not config["missing"],
                 "missing": config["missing"],
                 "redirectUri": config["redirectUri"],
+                "redirectUriSource": oauth_redirect_uri_source(provider, db),
                 "mcpServerUrl": config["mcpServerUrl"],
                 "setupUrl": config["setupUrl"],
                 "scope": config["scope"],
@@ -1471,6 +1491,7 @@ def start_oauth_login(provider: str, request: Request, user: User = Depends(curr
             "missing": config["missing"],
             "setupUrl": config["setupUrl"],
             "redirectUri": config["redirectUri"],
+            "redirectUriSource": oauth_redirect_uri_source(config["provider"], db),
             "requiredEnv": {name: "" for name in config["missing"]},
         }
     state = sign_oauth_state(
@@ -1498,6 +1519,7 @@ def start_oauth_login(provider: str, request: Request, user: User = Depends(curr
         "configured": True,
         "authorizeUrl": f"{config['authorizeUrl']}?{query}",
         "redirectUri": config["redirectUri"],
+        "redirectUriSource": oauth_redirect_uri_source(config["provider"], db),
         "expiresInSeconds": OAUTH_STATE_TTL_SECONDS,
     }
 

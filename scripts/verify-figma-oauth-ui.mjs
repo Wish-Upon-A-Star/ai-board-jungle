@@ -27,6 +27,10 @@ async function main() {
     if (quickFixCallback !== `${publicUrl}/api/oauth/figma/callback`) {
       throw new Error(`Unexpected Figma quick-fix callback URL: ${quickFixCallback}`);
     }
+    const quickFixSourceText = await page.locator(".oauth-quick-fix .oauth-redirect-source").innerText();
+    if (!quickFixSourceText.includes("request_public_origin") && !quickFixSourceText.includes("database_public_base_url") && !quickFixSourceText.includes("provider_override")) {
+      throw new Error(`Figma quick-fix must show redirect source, got: ${quickFixSourceText}`);
+    }
     const oauthRequest = page.waitForRequest((request) => {
       const url = new URL(request.url());
       return url.hostname === "www.figma.com" && url.pathname === "/oauth";
@@ -51,6 +55,7 @@ async function main() {
         "public_app_login",
         "account_connections_tab",
         "figma_quick_fix_callback_visible",
+        "figma_redirect_source_visible",
         "figma_mcp_button_click",
         "figma_oauth_navigation",
         "client_id_sanitized",

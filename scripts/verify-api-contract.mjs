@@ -65,10 +65,12 @@ try {
   );
   assert(oauthStatusWithSavedOrigin.publicOrigin.origin === contractPublicBaseUrl, "OAuth status must prefer saved public base URL");
   for (const provider of oauthStatusWithSavedOrigin.providers) {
+    assertKeys(provider, ["provider", "configured", "missing", "redirectUri", "redirectUriSource", "mcpServerUrl", "setupUrl", "scope", "baseUrl", "apiProvider"], "oauth provider item");
     assert(
       provider.redirectUri === `${contractPublicBaseUrl}/api/oauth/${provider.provider}/callback`,
       `${provider.provider} redirectUri must use saved public base URL`,
     );
+    assert(provider.redirectUriSource === "database_public_base_url", `${provider.provider} redirectUriSource must report database public base URL`);
   }
   await call("/api/system/settings", { method: "PUT", body: JSON.stringify({ public_base_url: originalSystemPublicBaseUrl }) }, token);
   originalSystemPublicBaseUrl = null;
