@@ -1418,10 +1418,17 @@ function App() {
                     <Field label="자동화 이름" hint="목록에 표시되는 이름입니다."><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="예: GitHub 이슈 → Notion 정리" required /></Field>
                     <Field label="실행 주기 (분)" hint="몇 분마다 실행할지. 최소 1분."><input type="number" min="1" max="1440" value={form.interval_minutes} onChange={(e) => setForm({ ...form, interval_minutes: Number(e.target.value) })} /></Field>
                   </div>
-                  <div className="grid2">
-                    <Field label="📥 읽어올 곳" hint="변경사항을 가져올 서비스/페이지입니다."><input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="예: GitHub 저장소, Notion BOARD" /></Field>
-                    <Field label="📤 저장할 곳" hint="AI가 정리한 결과를 쓸 대상입니다."><input value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="예: Notion 업무 보드, GitHub 이슈" /></Field>
+                  <div className="automation-route-preview" aria-label="자동화 읽기 쓰기 경로">
+                    <div><span>읽기</span><strong>{form.source || "템플릿을 선택하세요"}</strong></div>
+                    <div><span>쓰기</span><strong>{form.destination || "템플릿을 선택하세요"}</strong></div>
                   </div>
+                  <details className="route-edit-details">
+                    <summary>읽기/쓰기 경로 직접 수정</summary>
+                    <div className="grid2">
+                      <Field label="📥 읽어올 곳" hint="변경사항을 가져올 서비스/페이지입니다."><input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="예: GitHub 저장소, Notion BOARD" /></Field>
+                      <Field label="📤 저장할 곳" hint="AI가 정리한 결과를 쓸 대상입니다."><input value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="예: Notion 업무 보드, GitHub 이슈" /></Field>
+                    </div>
+                  </details>
                 </div>
 
                 {/* ③ 고급 설정 (접기 가능) */}

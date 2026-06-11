@@ -461,6 +461,45 @@ pre {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+.automation-route-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.automation-route-preview div {
+  display: grid;
+  gap: 5px;
+  padding: 11px 12px;
+  border: 1px solid #d7e5d6;
+  border-radius: 8px;
+  background: #fbfffd;
+  min-width: 0;
+}
+.automation-route-preview span {
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+.automation-route-preview strong {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.route-edit-details {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+.route-edit-details > summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  color: var(--accent-strong);
+  font-weight: 850;
+}
+.route-edit-details .grid2 {
+  padding: 0 12px 12px;
+}
 
 .form-section {
   display: grid;
@@ -2470,6 +2509,7 @@ pre {
   .task-card-main,
   .task-card-flow,
   .task-detail-meta,
+  .automation-route-preview,
   .stats dl { grid-template-columns: 1fr; }
   .stats div { border-right: 0; border-bottom: 1px solid #edf0eb; padding-bottom: 7px; }
   .scheduler-bar,
