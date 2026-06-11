@@ -1828,9 +1828,12 @@ def execute_automation_task(
         source_change_urls = [source.url for source in items if source.url]
     external_change_key = "|".join(sorted(source_change_urls + ([external_event_key] if external_event_key else [])))
     current_hash = hashlib.sha256(f"{automation_fingerprint(task)}|{external_change_key}".encode("utf-8")).hexdigest()
+    base_plan = automation_plan(task)
     if task.last_input_hash == current_hash:
         result = {
             "taskId": task.id,
+            "agent": task.ai_agent,
+            "targets": base_plan.get("targets", []),
             "status": "skipped",
             "reason": "Watched automation input did not change since the previous run.",
             "aiCallPolicy": "skipped: no watched input change, so no AI/model call or live write is allowed.",
@@ -1864,6 +1867,8 @@ def execute_automation_task(
     if watched_profile_without_data:
         result = {
             "taskId": task.id,
+            "agent": task.ai_agent,
+            "targets": base_plan.get("targets", []),
             "status": "no-data",
             "reason": "No GitHub/Notion source changes were collected, so no AI/model call or live write was performed.",
             "aiCallPolicy": "skipped: no collected source items.",
@@ -1893,7 +1898,7 @@ def execute_automation_task(
         db.commit()
         db.refresh(run)
         return {"task": serialize_task(task), "run": {"id": run.id, "result": result, "createdPostId": None}}
-    result = automation_plan(task)
+    result = base_plan
     result["status"] = "changed"
     result["aiCallPolicy"] = "local deterministic summary only unless a configured model call is explicitly added later."
     result["changeHash"] = current_hash

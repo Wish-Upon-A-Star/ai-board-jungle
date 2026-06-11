@@ -38,6 +38,7 @@
     "verify:transcription-ui": "node scripts/verify-transcription-ui.mjs",
     "verify:user-token-ux": "node scripts/verify-user-token-ux.mjs",
     "verify:board-ui": "node scripts/verify-board-readable-ui.mjs",
+    "verify:live-write-gates": "node scripts/verify-live-write-gates.mjs",
     "verify:auto": "node scripts/verify-fastapi.mjs",
     "verify:fastapi": "node scripts/verify-fastapi.mjs",
     "verify:full": "node scripts/verify-full.mjs",
