@@ -12,7 +12,7 @@ import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import httpx
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
@@ -519,12 +519,44 @@ def validate_integration_profile_credentials(profile: IntegrationProfile) -> dic
 
 def public_base_url(request: Request) -> str:
     configured = os.environ.get("AI_BOARD_PUBLIC_BASE_URL", "").strip().rstrip("/")
-    if configured:
-        return configured
+    explicit_origin = request.headers.get("x-ai-board-public-origin", "").strip().rstrip("/")
     forwarded_host = request.headers.get("x-forwarded-host")
     host = forwarded_host or request.headers.get("host") or request.url.netloc
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme
-    return f"{proto}://{host}".rstrip("/")
+    request_base = f"{proto}://{host}".rstrip("/")
+    if explicit_origin.startswith(("https://", "http://")):
+        origin_host = urlparse(explicit_origin).netloc.lower()
+        if (
+            "trycloudflare.com" in origin_host
+            or origin_host.endswith(".ngrok-free.app")
+            or origin_host.endswith(".ngrok.app")
+        ):
+            return explicit_origin
+    host_lower = host.lower()
+    if configured and not (
+        "trycloudflare.com" in host_lower
+        or host_lower.endswith(".ngrok-free.app")
+        or host_lower.endswith(".ngrok.app")
+    ):
+        return configured
+    return request_base or configured
+
+
+def clean_oauth_env_value(value: str) -> str:
+    cleaned = str(value or "").strip().lstrip("\ufeff").strip().strip("\"'")
+    if not cleaned:
+        return ""
+    if "=" in cleaned:
+        left, right = cleaned.split("=", 1)
+        if left.strip().replace("_", "").replace("-", "").isalnum() and len(left.strip()) <= 60:
+            cleaned = right.strip().strip("\"'")
+    if ":" in cleaned:
+        left, right = cleaned.split(":", 1)
+        label = left.strip().lower()
+        label_markers = ("client", "secret", "id", "클라이언트", "시크릿", "보안", "비밀번호", "아이디")
+        if any(marker in label for marker in label_markers):
+            cleaned = right.strip().strip("\"'")
+    return cleaned
 
 
 def oauth_state_secret() -> bytes:
@@ -560,8 +592,8 @@ def oauth_provider_config(provider: str, request: Request) -> dict:
     base_url = public_base_url(request)
     redirect_uri = f"{base_url}/api/oauth/{normalized}/callback"
     if normalized == "github":
-        client_id = os.environ.get("AI_BOARD_GITHUB_OAUTH_CLIENT_ID", "").strip()
-        client_secret = os.environ.get("AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET", "").strip()
+        client_id = clean_oauth_env_value(os.environ.get("AI_BOARD_GITHUB_OAUTH_CLIENT_ID", ""))
+        client_secret = clean_oauth_env_value(os.environ.get("AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET", ""))
         return {
             "provider": "github",
             "clientId": client_id,
@@ -587,8 +619,8 @@ def oauth_provider_config(provider: str, request: Request) -> dict:
             "setupUrl": "https://github.com/settings/developers",
         }
     if normalized == "notion":
-        client_id = os.environ.get("AI_BOARD_NOTION_OAUTH_CLIENT_ID", "").strip()
-        client_secret = os.environ.get("AI_BOARD_NOTION_OAUTH_CLIENT_SECRET", "").strip()
+        client_id = clean_oauth_env_value(os.environ.get("AI_BOARD_NOTION_OAUTH_CLIENT_ID", ""))
+        client_secret = clean_oauth_env_value(os.environ.get("AI_BOARD_NOTION_OAUTH_CLIENT_SECRET", ""))
         return {
             "provider": "notion",
             "clientId": client_id,
@@ -614,8 +646,8 @@ def oauth_provider_config(provider: str, request: Request) -> dict:
             "setupUrl": "https://www.notion.so/profile/integrations",
         }
     if normalized == "figma":
-        client_id = os.environ.get("AI_BOARD_FIGMA_OAUTH_CLIENT_ID", "").strip()
-        client_secret = os.environ.get("AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET", "").strip()
+        client_id = clean_oauth_env_value(os.environ.get("AI_BOARD_FIGMA_OAUTH_CLIENT_ID", ""))
+        client_secret = clean_oauth_env_value(os.environ.get("AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET", ""))
         return {
             "provider": "figma",
             "clientId": client_id,
@@ -641,8 +673,8 @@ def oauth_provider_config(provider: str, request: Request) -> dict:
             "setupUrl": "https://www.figma.com/developers/apps",
         }
     if normalized in {"google", "google_calendar"}:
-        client_id = os.environ.get("AI_BOARD_GOOGLE_OAUTH_CLIENT_ID", "").strip()
-        client_secret = os.environ.get("AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
+        client_id = clean_oauth_env_value(os.environ.get("AI_BOARD_GOOGLE_OAUTH_CLIENT_ID", ""))
+        client_secret = clean_oauth_env_value(os.environ.get("AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET", ""))
         return {
             "provider": "google_calendar",
             "clientId": client_id,

@@ -592,6 +592,33 @@ def test_figma_oauth_start_builds_authorize_url(monkeypatch):
     assert data["redirectUri"].endswith("/api/oauth/figma/callback")
 
 
+def test_figma_oauth_start_uses_external_host_and_sanitizes_labeled_credentials(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_PUBLIC_BASE_URL", "https://old-stale.trycloudflare.com")
+    monkeypatch.setenv("AI_BOARD_FIGMA_OAUTH_CLIENT_ID", "클라이언트 ID:figma-client-clean")
+    monkeypatch.setenv("AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET", "클라이언트 시크릿:figma-secret-clean")
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "figma-oauth-host@example.com", "name": "Figma OAuth Host", "password": "password123"},
+        )
+        headers = {
+            "Authorization": f"Bearer {register.json()['token']}",
+            "x-ai-board-public-origin": "https://railway-mediterranean-snap-populations.trycloudflare.com",
+            "host": "127.0.0.1:8000",
+            "x-forwarded-proto": "https",
+        }
+        response = client.get("/api/oauth/figma/start", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    parsed = urlparse(data["authorizeUrl"])
+    params = parse_qs(parsed.query)
+    assert params["client_id"] == ["figma-client-clean"]
+    assert params["redirect_uri"] == ["https://railway-mediterranean-snap-populations.trycloudflare.com/api/oauth/figma/callback"]
+    assert data["redirectUri"] == "https://railway-mediterranean-snap-populations.trycloudflare.com/api/oauth/figma/callback"
+    assert "old-stale" not in data["authorizeUrl"]
+    assert "클라이언트" not in data["authorizeUrl"]
+
+
 def test_google_calendar_oauth_start_requests_offline_calendar_access(monkeypatch):
     monkeypatch.setenv("AI_BOARD_GOOGLE_OAUTH_CLIENT_ID", "google-client")
     monkeypatch.setenv("AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET", "google-secret")

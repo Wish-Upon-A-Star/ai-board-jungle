@@ -25,6 +25,7 @@ function buildHeaders(options = {}) {
   const token = localStorage.getItem("ai-board-token");
   const headers = new Headers(options.headers || {});
   if (!(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
+  if (typeof window !== "undefined" && window.location?.origin) headers.set("X-AI-Board-Public-Origin", window.location.origin);
   if (token) headers.set("Authorization", `Bearer ${token}`);
   return headers;
 }

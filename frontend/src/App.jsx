@@ -238,6 +238,16 @@ function App() {
     }),
     [integrationProfiles],
   );
+  const taskorySources = useMemo(
+    () => knowledgeSources.filter((source) => String(source.sourceType || "").toLowerCase() === "taskory" || source.tags?.some((tag) => String(tag).toLowerCase() === "taskory")),
+    [knowledgeSources],
+  );
+  const latestTaskorySource = useMemo(
+    () => taskorySources
+      .slice()
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0],
+    [taskorySources],
+  );
   const selectedAutomationProfile = useMemo(
     () => integrationProfiles.find((profile) => String(profile.id) === String(form.integration_profile_id || "")),
     [integrationProfiles, form.integration_profile_id],
@@ -1740,6 +1750,23 @@ function App() {
                   <p>사내 규정, 업무 가이드, 자주 쓰는 양식 등을 여기 저장해두면 자동화 실행 시 AI가 그 내용을 보고 답변·정리를 합니다. 예를 들어 "이슈 정리 시 우리 팀 양식 따르기"나 "회의록은 이 템플릿으로 작성"처럼 쓸 수 있습니다.</p>
                   <p><b>연결하려면:</b> 프로필 탭 → 프로필 열기 → <b>지식자료 대상</b> 칸에 아래 자료의 이름이나 태그를 입력하면 됩니다.</p>
                 </div>
+              </div>
+
+              <div className="taskory-status-card" aria-label="Taskory 동기화 상태">
+                <div>
+                  <span className="status-kicker">Taskory / myqueue</span>
+                  <strong>{taskorySources.length ? `${taskorySources.length}개 작업 자료가 연결됨` : "아직 Taskory 작업 자료가 없습니다"}</strong>
+                  <p>
+                    {latestTaskorySource
+                      ? `마지막 자료: ${latestTaskorySource.title} · ${new Date(latestTaskorySource.createdAt).toLocaleString()}`
+                      : "Taskory 상태 JSON 또는 JSONL을 올리면 자동화가 작업 목록과 메모를 RAG 근거로 참고합니다."}
+                  </p>
+                </div>
+                <dl>
+                  <div><dt>자료 종류</dt><dd>Taskory 작업 내보내기</dd></div>
+                  <div><dt>자동화 RAG 대상</dt><dd>taskory 또는 자료명</dd></div>
+                  <div><dt>자동 업로드</dt><dd>python D:\myqueue\scripts\sync_taskory_to_ai_board.py --watch</dd></div>
+                </dl>
               </div>
 
               {/* 자료 추가 폼 */}

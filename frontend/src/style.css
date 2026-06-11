@@ -1269,6 +1269,57 @@ pre {
   font-weight: 700;
   overflow-wrap: anywhere;
 }
+.taskory-status-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(320px, 1.5fr);
+  gap: 16px;
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid #cfe0d8;
+  border-radius: 8px;
+  background: #f4faf7;
+}
+.taskory-status-card .status-kicker {
+  display: block;
+  margin-bottom: 5px;
+  color: #0f6c5c;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.taskory-status-card strong {
+  display: block;
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.35;
+}
+.taskory-status-card p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.taskory-status-card dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.taskory-status-card dl div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.taskory-status-card dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.taskory-status-card dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
 .tag-row {
   display: flex;
   flex-wrap: wrap;
@@ -1436,12 +1487,14 @@ pre {
   .grid3,
   .grid3.wide,
   .oauth-setup-grid,
+  .taskory-status-card,
   .task-meta,
   .stats dl { grid-template-columns: 1fr; }
   .stats div { border-right: 0; border-bottom: 1px solid #edf0eb; padding-bottom: 7px; }
   .scheduler-bar,
   .activity-row,
   .manual-profile-guide dl div,
+  .taskory-status-card dl div,
   .run-row-main { grid-template-columns: 1fr; }
   .transcription-settings {
     grid-template-columns: 1fr;
