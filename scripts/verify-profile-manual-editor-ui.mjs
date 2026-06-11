@@ -18,7 +18,7 @@ async function openApp(page, token) {
   await page.evaluate((value) => localStorage.setItem("ai-board-token", value), token);
   await page.reload({ waitUntil: "networkidle" });
   await page.locator(".site-header nav button").nth(1).click();
-  await page.locator(".oauth-diagnostics").waitFor({ state: "visible", timeout: 15000 });
+  await page.locator(".profile-section-tabs").waitFor({ state: "visible", timeout: 15000 });
 }
 
 async function main() {
@@ -27,6 +27,13 @@ async function main() {
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
   try {
     await openApp(page, token);
+
+    const sectionTabs = page.locator(".profile-section-tabs button");
+    await sectionTabs.first().waitFor({ state: "visible", timeout: 15000 });
+    const tabCount = await sectionTabs.count();
+    if (tabCount !== 3) throw new Error(`expected 3 profile section tabs, got ${tabCount}`);
+    const connectSelected = await sectionTabs.nth(0).getAttribute("aria-selected");
+    if (connectSelected !== "true") throw new Error("connect section should be selected by default");
 
     const editor = page.locator(".manual-profile-editor");
     const form = page.locator("#profile-manual-form");
@@ -39,6 +46,18 @@ async function main() {
     if (!openAfterAiKey) throw new Error("AI key action did not open the manual profile editor");
     const aiSource = await form.locator("select").first().inputValue();
     if (aiSource !== "custom") throw new Error(`AI key action should select custom source, got ${aiSource}`);
+
+    await sectionTabs.nth(2).click();
+    await page.locator(".oauth-diagnostics").waitFor({ state: "visible", timeout: 15000 });
+    if (await page.locator(".ai-key-guide").isVisible()) throw new Error("AI key guide should not be visible in diagnostics section");
+    const callbackValues = await page.locator(".oauth-diagnostics input").evaluateAll((inputs) => inputs.map((input) => input.value));
+    if (!callbackValues.some((value) => value.includes("/api/oauth/figma/callback"))) {
+      throw new Error("diagnostics section must show the Figma callback URL");
+    }
+
+    await sectionTabs.nth(1).click();
+    await page.locator(".knowledge-list").waitFor({ state: "visible", timeout: 15000 });
+    if (await page.locator(".oauth-diagnostics").isVisible()) throw new Error("OAuth diagnostics should not be visible in saved profiles section");
 
     await openApp(page, token);
     if (await form.isVisible()) throw new Error("manual profile form should collapse again on a fresh load");
@@ -54,9 +73,13 @@ async function main() {
       ok: true,
       checked: [
         "profile_tab_loaded",
+        "profile_section_tabs_visible",
+        "connect_section_selected_by_default",
         "manual_editor_collapsed_by_default",
         "ai_key_action_opens_manual_editor",
         "ai_key_action_prefills_custom_profile",
+        "diagnostics_section_isolated",
+        "saved_profiles_section_isolated",
         "manual_figma_action_opens_manual_editor",
         "manual_figma_action_prefills_figma_profile",
       ],

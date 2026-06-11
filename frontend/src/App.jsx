@@ -218,6 +218,7 @@ function App() {
   const [profileValidationState, setProfileValidationState] = useState({});
   const [expandedProfiles, setExpandedProfiles] = useState({});
   const [manualProfileEditorOpen, setManualProfileEditorOpen] = useState(false);
+  const [profileSection, setProfileSection] = useState("connect");
   const [showWriteForm, setShowWriteForm] = useState(false);
   const [boardSubTab, setBoardSubTab] = useState("posts");
   const [expandedTasks, setExpandedTasks] = useState({});
@@ -875,6 +876,7 @@ function App() {
     };
     const config = defaults[kind] || defaults.github;
     setActiveMainTab("integrations");
+    setProfileSection("connect");
     setIntegrationForm({
       ...defaultIntegration,
       name: config.name,
@@ -937,6 +939,7 @@ function App() {
     };
     const selected = defaults[provider] || defaults.openai;
     setActiveMainTab("integrations");
+    setProfileSection("connect");
     setIntegrationForm({
       ...defaultIntegration,
       name: selected.name,
@@ -965,6 +968,7 @@ function App() {
   async function startMcpLogin(kind = "github") {
     clearErrorState();
     setActiveMainTab("integrations");
+    setProfileSection("connect");
     try {
       const data = await api(`/api/oauth/${kind}/start`);
       setApiResult({ called: `oauth.${kind}.start`, response: data });
@@ -1480,28 +1484,50 @@ function App() {
                   </div>
                 );
               })()}
-              <section className="credential-guide">
-                <div>
-                  <strong>내 계정 연결</strong>
-                  <p>먼저 로그인 버튼을 누릅니다. 안 되면 수동 프로필에서 URL과 토큰/API Key를 넣습니다. 자동화는 여기 저장한 내 프로필만 사용합니다.</p>
-                </div>
-                <ol>
-                  <li>GitHub/Notion/Figma/Calendar 로그인</li>
-                  <li>필요하면 수동 토큰 저장</li>
-                  <li>자동화 탭에서 이 프로필 선택</li>
-                </ol>
-              </section>
-              <div className="mcp-setup-actions">
-                <button type="button" onClick={() => startMcpLogin("github")}><GitBranch size={14} /> GitHub MCP 로그인</button>
-                <button type="button" onClick={() => startMcpLogin("notion")}><Link2 size={14} /> Notion MCP 로그인</button>
-                <button type="button" onClick={() => startMcpLogin("figma")}><Link2 size={14} /> Figma MCP 로그인</button>
-                <button type="button" onClick={() => startMcpLogin("google_calendar")}><CalendarClock size={14} /> Google Calendar MCP 로그인</button>
-                <button type="button" onClick={() => openMcpProfileSetup("github")}>수동 GitHub 프로필</button>
-                <button type="button" onClick={() => openMcpProfileSetup("notion")}>수동 Notion 프로필</button>
-                <button type="button" onClick={() => openMcpProfileSetup("figma")}>수동 Figma 프로필</button>
-                <button type="button" onClick={() => openMcpProfileSetup("google_calendar")}>수동 Google Calendar 프로필</button>
+              <div className="profile-section-tabs" role="tablist" aria-label="프로필 관리 섹션">
+                {[
+                  { id: "connect", label: "연결하기", desc: "로그인, API 키" },
+                  { id: "profiles", label: "저장된 프로필", desc: `${integrationProfiles.length}개` },
+                  { id: "diagnostics", label: "진단", desc: "Callback, 상태" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={profileSection === tab.id}
+                    className={profileSection === tab.id ? "active" : ""}
+                    onClick={() => setProfileSection(tab.id)}
+                  >
+                    <strong>{tab.label}</strong>
+                    <span>{tab.desc}</span>
+                  </button>
+                ))}
               </div>
-              <section className="oauth-diagnostics" aria-label="OAuth callback 진단">
+              <section className={`profile-subsection ${profileSection === "connect" ? "" : "tab-hidden"}`}>
+                <section className="credential-guide">
+                  <div>
+                    <strong>내 계정 연결</strong>
+                    <p>먼저 로그인 버튼을 누릅니다. 안 되면 수동 프로필에서 URL과 토큰/API Key를 넣습니다. 자동화는 여기 저장한 내 프로필만 사용합니다.</p>
+                  </div>
+                  <ol>
+                    <li>GitHub/Notion/Figma/Calendar 로그인</li>
+                    <li>필요하면 수동 토큰 저장</li>
+                    <li>자동화 탭에서 이 프로필 선택</li>
+                  </ol>
+                </section>
+                <div className="mcp-setup-actions">
+                  <button type="button" onClick={() => startMcpLogin("github")}><GitBranch size={14} /> GitHub MCP 로그인</button>
+                  <button type="button" onClick={() => startMcpLogin("notion")}><Link2 size={14} /> Notion MCP 로그인</button>
+                  <button type="button" onClick={() => startMcpLogin("figma")}><Link2 size={14} /> Figma MCP 로그인</button>
+                  <button type="button" onClick={() => startMcpLogin("google_calendar")}><CalendarClock size={14} /> Google Calendar MCP 로그인</button>
+                  <button type="button" onClick={() => openMcpProfileSetup("github")}>수동 GitHub 프로필</button>
+                  <button type="button" onClick={() => openMcpProfileSetup("notion")}>수동 Notion 프로필</button>
+                  <button type="button" onClick={() => openMcpProfileSetup("figma")}>수동 Figma 프로필</button>
+                  <button type="button" onClick={() => openMcpProfileSetup("google_calendar")}>수동 Google Calendar 프로필</button>
+                </div>
+              </section>
+              <section className={`profile-subsection ${profileSection === "diagnostics" ? "" : "tab-hidden"}`}>
+                <section className="oauth-diagnostics" aria-label="OAuth callback 진단">
                 <div className="section-head flat">
                   <div>
                     <strong>OAuth callback 진단</strong>
@@ -1546,8 +1572,10 @@ function App() {
                     <li>터널 주소가 바뀌면 새 주소 기준 Callback URL을 다시 등록합니다.</li>
                   </ol>
                 </div>
+                </section>
               </section>
-              <section className="ai-key-guide">
+              <section className={`profile-subsection ${profileSection === "connect" ? "" : "tab-hidden"}`}>
+                <section className="ai-key-guide">
                 <div>
                   <strong>AI API 키 저장</strong>
                   <p>OpenAI, Gemini, Anthropic 키는 우리에게 보내지 말고 본인 계정으로 직접 저장합니다. 자동화는 선택한 사용자 프로필의 키만 사용합니다.</p>
@@ -1558,8 +1586,8 @@ function App() {
                   <button type="button" onClick={() => openAiKeyProfileSetup("gemini")}>Gemini 키 입력</button>
                   <button type="button" onClick={() => openAiKeyProfileSetup("compatible")}>호환 API 키</button>
                 </div>
-              </section>
-              {oauthSetup ? (
+                </section>
+                {oauthSetup ? (
                 <section className="oauth-setup-card">
                   <div>
                     <strong>{providerLabel(oauthSetup.provider)} MCP 로그인 준비 필요</strong>
@@ -1577,13 +1605,13 @@ function App() {
                     </label>
                   </div>
                 </section>
-              ) : null}
-              <p className="inline-help">대부분은 위 로그인 버튼만 쓰면 됩니다. AI API 키는 위 AI 키 버튼을 누른 뒤 토큰/API Key 칸에 붙여 넣고 저장합니다.</p>
-              <details
+                ) : null}
+                <p className="inline-help">대부분은 위 로그인 버튼만 쓰면 됩니다. AI API 키는 위 AI 키 버튼을 누른 뒤 토큰/API Key 칸에 붙여 넣고 저장합니다.</p>
+                <details
                 className="manual-profile-editor"
                 open={manualProfileEditorOpen}
                 onToggle={(event) => setManualProfileEditorOpen(event.currentTarget.open)}
-              >
+                >
                 <summary>
                   <span>
                     <strong>수동 토큰/API 키 직접 입력</strong>
@@ -1677,8 +1705,10 @@ function App() {
                 <div className={`form-status ${integrationSaveState.status}`}>{integrationSaveState.message}</div>
                   <button><KeyRound size={14} /> 연동 프로필 저장</button>
                 </form>
-              </details>
-              <div className="knowledge-list">
+                </details>
+              </section>
+              <section className={`profile-subsection ${profileSection === "profiles" ? "" : "tab-hidden"}`}>
+                <div className="knowledge-list">
                 <div className="panel-title compact">저장된 내 프로필</div>
                 {integrationProfiles.map((profile) => {
                   const kindMeta = {
@@ -1805,7 +1835,8 @@ function App() {
                     {activityPage.hasMore ? <button type="button" className="load-more" onClick={() => loadActivities(activityFilters, activityPage.nextOffset, true)}>활동 더 보기</button> : null}
                   </div>
                 </details>
-              </div>
+                </div>
+              </section>
             </article>
 
             <article id="knowledge-panel" className={`panel ${activeMainTab === "knowledge" ? "" : "tab-hidden"}`}>

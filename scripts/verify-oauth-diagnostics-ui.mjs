@@ -22,6 +22,7 @@ async function main() {
     await page.evaluate((value) => localStorage.setItem("ai-board-token", value), token);
     await page.reload({ waitUntil: "networkidle" });
     await page.locator(".site-header nav button").nth(1).click();
+    await page.locator(".profile-section-tabs button").nth(2).click();
     const panel = page.locator(".oauth-diagnostics");
     await panel.waitFor({ state: "visible", timeout: 15000 });
     await panel.locator(".oauth-diagnostic-row").first().waitFor({ state: "visible", timeout: 15000 });

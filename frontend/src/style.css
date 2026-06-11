@@ -641,6 +641,142 @@ pre {
 .mcp-setup-actions { margin: 14px 14px 4px; }
 .mcp-setup-actions button { min-width: 168px; border-color: #a8d0ca; color: var(--accent-strong); }
 .inline-help { margin: 0 14px 2px; color: var(--muted); font-size: 13px; }
+.profile-section-tabs {
+  margin: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.profile-section-tabs button {
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+  text-align: left;
+  min-height: 54px;
+  border-color: var(--line);
+  background: #fff;
+}
+.profile-section-tabs button.active,
+.profile-section-tabs button[aria-selected="true"] {
+  border-color: #9fcfc8;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.profile-section-tabs strong {
+  font-size: 14px;
+}
+.profile-section-tabs span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.profile-subsection {
+  display: grid;
+  gap: 12px;
+}
+.profile-subsection.tab-hidden {
+  display: none;
+}
+.profile-card {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--profile-color, var(--accent));
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+.profile-card-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  cursor: pointer;
+}
+.profile-card-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.profile-service-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 86px;
+  max-width: 160px;
+  color: #fff;
+  border-radius: 7px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.profile-name {
+  min-width: 0;
+  color: var(--text);
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-card-badges {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  padding: 4px 7px;
+  font-size: 11px;
+  font-weight: 750;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+.badge-ok { border-color: #b8dcbf; background: #eff8f1; color: #17652c; }
+.badge-err { border-color: #f1b6b6; background: var(--red-soft); color: var(--red); }
+.badge-info { border-color: #bdd6eb; background: var(--blue-soft); color: var(--blue); }
+.badge-gray { color: var(--muted); }
+.profile-card-body {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding: 12px;
+  background: #fbfcfa;
+}
+.profile-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: var(--muted);
+}
+.profile-meta-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.profile-meta-row b {
+  color: var(--text);
+}
+.profile-connections,
+.profile-item-actions,
+.live-write-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.connection-tag {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--muted);
+  background: #fff;
+}
 .manual-profile-editor {
   margin: 12px 14px 14px;
   border: 1px solid var(--line);
@@ -1638,6 +1774,7 @@ pre {
   .system-readiness,
   .next-steps,
   .provider-grid,
+  .profile-section-tabs,
   .ai-key-guide,
   .manual-profile-guide,
   .oauth-diagnostic-row,
@@ -1667,6 +1804,18 @@ pre {
   .next-steps button { border-right: 0; border-bottom: 1px solid var(--line); }
   .next-steps button:last-child { border-bottom: 0; }
   .task-meta div { grid-template-columns: 104px minmax(0, 1fr); }
+  .profile-card-header,
+  .profile-card-title {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+  .profile-card-title,
+  .profile-card-badges {
+    width: 100%;
+  }
+  .profile-name {
+    white-space: normal;
+  }
   .inline-link { justify-self: start; }
   .ai-key-actions { justify-content: flex-start; }
   .row-title { align-items: flex-start; flex-direction: column; }
