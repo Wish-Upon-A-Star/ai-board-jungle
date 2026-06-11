@@ -641,6 +641,75 @@ pre {
 .mcp-setup-actions { margin: 14px 14px 4px; }
 .mcp-setup-actions button { min-width: 168px; border-color: #a8d0ca; color: var(--accent-strong); }
 .inline-help { margin: 0 14px 2px; color: var(--muted); font-size: 13px; }
+.conn-status-grid {
+  margin: 0 14px 14px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(130px, 1fr));
+  gap: 8px;
+}
+.conn-status-tile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 8px;
+  align-items: center;
+  min-height: 86px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+}
+.conn-status-tile.ok {
+  border-color: #b8dcbf;
+  background: #f7fcf8;
+}
+.conn-status-tile.warn {
+  border-color: #eadca8;
+  background: var(--yellow-soft);
+}
+.conn-status-tile.missing {
+  border-color: #d9e1dc;
+  background: #fff;
+}
+.conn-status-emoji {
+  grid-row: span 2;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  font-size: 17px;
+}
+.conn-status-label {
+  min-width: 0;
+  color: var(--text);
+  font-weight: 850;
+  white-space: pre-line;
+  line-height: 1.15;
+}
+.conn-status-badge {
+  width: max-content;
+  max-width: 100%;
+  border-radius: 999px;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conn-status-badge.ok { background: #eaf7ed; color: #17652c; }
+.conn-status-badge.warn { background: #fff2c7; color: #725100; }
+.conn-status-badge.missing { background: #eef2ef; color: var(--muted); }
+.conn-status-btn {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 8px;
+  border-color: #a8d0ca;
+  color: var(--accent-strong);
+}
 .profile-section-tabs {
   margin: 14px;
   display: grid;
@@ -1774,6 +1843,7 @@ pre {
   .system-readiness,
   .next-steps,
   .provider-grid,
+  .conn-status-grid,
   .profile-section-tabs,
   .ai-key-guide,
   .manual-profile-guide,

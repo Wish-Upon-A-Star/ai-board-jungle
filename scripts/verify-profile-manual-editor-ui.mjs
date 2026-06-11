@@ -28,6 +28,15 @@ async function main() {
   try {
     await openApp(page, token);
 
+    const connectionTiles = page.locator(".conn-status-tile");
+    await connectionTiles.first().waitFor({ state: "visible", timeout: 15000 });
+    const tileCount = await connectionTiles.count();
+    if (tileCount !== 5) throw new Error(`expected 5 connection status tiles, got ${tileCount}`);
+    const firstTileBox = await connectionTiles.first().boundingBox();
+    if (!firstTileBox || firstTileBox.width < 100 || firstTileBox.height < 70) {
+      throw new Error(`connection status tile is not rendered as a readable card: ${JSON.stringify(firstTileBox)}`);
+    }
+
     const sectionTabs = page.locator(".profile-section-tabs button");
     await sectionTabs.first().waitFor({ state: "visible", timeout: 15000 });
     const tabCount = await sectionTabs.count();
@@ -73,6 +82,7 @@ async function main() {
       ok: true,
       checked: [
         "profile_tab_loaded",
+        "connection_status_cards_visible",
         "profile_section_tabs_visible",
         "connect_section_selected_by_default",
         "manual_editor_collapsed_by_default",
