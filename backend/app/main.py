@@ -150,7 +150,19 @@ def parse_json_object(raw: str) -> dict:
         return {}
 
 
-def find_user_openai_credentials(db: Session, user: User) -> tuple[str, str]:
+def find_user_openai_credentials(db: Session, user: User, profile_id: int | None = None) -> tuple[str, str, int | None, str]:
+    if profile_id:
+        profile = db.get(IntegrationProfile, profile_id)
+        if not profile or profile.owner_id != user.id:
+            raise HTTPException(status_code=404, detail="선택한 OpenAI API 키 프로필을 찾을 수 없습니다.")
+        provider = f"{profile.ai_provider} {profile.api_provider} {profile.name}".lower()
+        if "openai" not in provider:
+            raise HTTPException(status_code=400, detail="선택한 프로필은 OpenAI 전사용 프로필이 아닙니다.")
+        token = reveal_secret(profile.token_value).strip()
+        if not token:
+            raise HTTPException(status_code=400, detail="선택한 OpenAI 프로필에 API 키가 저장되어 있지 않습니다.")
+        return token, (profile.ai_api_base or profile.base_url or "https://api.openai.com/v1").rstrip("/"), profile.id, profile.name
+
     stmt = (
         select(IntegrationProfile)
         .where(IntegrationProfile.owner_id == user.id)
@@ -162,9 +174,9 @@ def find_user_openai_credentials(db: Session, user: User) -> tuple[str, str]:
             continue
         token = reveal_secret(profile.token_value).strip()
         if token:
-            return token, (profile.ai_api_base or profile.base_url or "https://api.openai.com/v1").rstrip("/")
+            return token, (profile.ai_api_base or profile.base_url or "https://api.openai.com/v1").rstrip("/"), profile.id, profile.name
     if settings.openai_api_key:
-        return settings.openai_api_key, "https://api.openai.com/v1"
+        return settings.openai_api_key, "https://api.openai.com/v1", None, "server OPENAI_API_KEY"
     raise HTTPException(status_code=400, detail="OpenAI API 키 프로필이 없습니다. 프로필 탭에서 OpenAI 키를 먼저 저장하세요.")
 
 
@@ -1567,19 +1579,30 @@ async def transcribe_audio(
     file: UploadFile = File(...),
     model: str = Form("whisper-1"),
     prompt: str = Form(""),
+    integration_profile_id: int | None = Form(None),
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    api_key, api_base = find_user_openai_credentials(db, user)
+    api_key, api_base, profile_id, profile_name = find_user_openai_credentials(db, user, integration_profile_id)
     result = await transcribe_audio_with_openai(api_key, api_base, file, model, prompt)
+    result["integrationProfileId"] = profile_id
+    result["integrationProfileName"] = profile_name
     log_activity(
         db,
         user,
         "ai.transcription",
         "openai",
         "completed",
-        f"Transcribed {result['fileName']} with {result['model']}",
-        {"fileName": result["fileName"], "mimeType": result["mimeType"], "model": result["model"], "parts": result.get("parts", 1), "characters": len(result["text"])},
+        f"Transcribed {result['fileName']} with {result['model']} using {profile_name}",
+        {
+            "fileName": result["fileName"],
+            "mimeType": result["mimeType"],
+            "model": result["model"],
+            "parts": result.get("parts", 1),
+            "characters": len(result["text"]),
+            "integrationProfileId": profile_id,
+            "integrationProfileName": profile_name,
+        },
     )
     db.commit()
     return result

@@ -119,6 +119,7 @@ const tabIntro = {
 const aiProviderOptions = ["OpenAI", "OpenAI-compatible", "Anthropic", "Google Gemini", "Local"];
 const aiModelOptions = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "o4-mini", "claude-sonnet-4", "gemini-1.5-pro", "local-model"];
 const aiApiBaseOptions = ["https://api.openai.com/v1", "https://api.anthropic.com", "https://generativelanguage.googleapis.com/v1beta", "http://localhost:11434/v1"];
+const transcriptionModelOptions = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"];
 
 function AiOptionDatalists() {
   return (
@@ -166,6 +167,11 @@ function App() {
   const [activeMainTab, setActiveMainTab] = useState("automations");
   const [form, setForm] = useState(defaultAutomation);
   const [knowledgeForm, setKnowledgeForm] = useState(defaultKnowledge);
+  const [transcriptionSettings, setTranscriptionSettings] = useState({
+    integrationProfileId: "",
+    model: "gpt-4o-mini-transcribe",
+    prompt: "AI Board 지식자료로 저장할 회의, 업무 메모, 자동화 지시 음성입니다.",
+  });
   const [transcriptionState, setTranscriptionState] = useState({ status: "idle", message: "" });
   const [integrationForm, setIntegrationForm] = useState(defaultIntegration);
   const [integrationSaveState, setIntegrationSaveState] = useState({ status: "idle", message: "프로필을 저장하면 자동화에서 선택할 수 있습니다." });
@@ -186,6 +192,13 @@ function App() {
 
   const myTasks = useMemo(() => tasks.filter((task) => task.owner?.id === user?.id), [tasks, user]);
   const sharedCount = automationShares.length;
+  const openAiProfiles = useMemo(
+    () => integrationProfiles.filter((profile) => {
+      const provider = `${profile.aiProvider || ""} ${profile.apiProvider || ""} ${profile.name || ""}`.toLowerCase();
+      return provider.includes("openai") && profile.hasToken;
+    }),
+    [integrationProfiles],
+  );
   const systemCards = buildSystemReadinessCards({ providerReadiness, knowledgeSources, tasks, healthStatus });
   const healthFailureMessage = getHealthFailureMessage(healthStatus);
   const readyProviderCount = providerReadiness.filter((provider) => provider.ready).length;
@@ -537,12 +550,14 @@ function App() {
   async function transcribeKnowledgeAudio(file) {
     if (!file) return;
     clearErrorState();
-    setTranscriptionState({ status: "saving", message: "OpenAI로 음성을 전사하는 중입니다." });
+    const selectedProfileId = transcriptionSettings.integrationProfileId || (openAiProfiles[0]?.id ? String(openAiProfiles[0].id) : "");
+    setTranscriptionState({ status: "saving", message: "선택한 OpenAI API 키로 음성을 전사하는 중입니다." });
     try {
       const body = new FormData();
       body.set("file", file);
-      body.set("model", "whisper-1");
-      body.set("prompt", "AI Board 지식자료로 저장할 회의, 업무 메모, 자동화 지시 음성입니다.");
+      body.set("model", transcriptionSettings.model || "gpt-4o-mini-transcribe");
+      body.set("prompt", transcriptionSettings.prompt || "AI Board 지식자료로 저장할 회의, 업무 메모, 자동화 지시 음성입니다.");
+      if (selectedProfileId) body.set("integration_profile_id", selectedProfileId);
       const data = await api("/api/ai/transcribe", { method: "POST", body });
       const audioTitle = file.name.replace(/\.[^.]+$/, "") || "음성 전사";
       const transcript = data.text || "";
@@ -554,7 +569,7 @@ function App() {
         tags: current.tags || "audio,transcription,openai",
       }));
       setApiResult({ called: "ai.transcribe", response: { ...data, text: transcript.slice(0, 500) } });
-      setTranscriptionState({ status: "ok", message: `"${file.name}" 전사 완료. 내용을 확인한 뒤 자료 저장을 누르세요.` });
+      setTranscriptionState({ status: "ok", message: `"${file.name}" 전사 완료. ${data.integrationProfileName || "OpenAI"} / ${data.model} 결과를 확인한 뒤 자료 저장을 누르세요.` });
     } catch (err) {
       showActionError(err);
       setTranscriptionState({ status: "error", message: err.message || "음성 전사에 실패했습니다." });
@@ -1626,6 +1641,43 @@ function App() {
                   </div>
                   <Field label="AI 사용 지침" hint="이 자료를 언제, 어떻게 참고할지 AI에게 알려줍니다."><textarea value={knowledgeForm.instruction} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, instruction: e.target.value })} placeholder="예: 답변 작성 시 이 규정을 우선 참고하고 규정에 없으면 일반 상식을 사용하세요." /></Field>
                   <Field label="자료 내용" hint="AI가 검색할 실제 텍스트입니다. 문서를 붙여넣거나 파일을 첨부하세요."><textarea value={knowledgeForm.extracted_text} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, extracted_text: e.target.value })} placeholder="문서 내용, 음성 녹취, 이미지 설명, 스프레드시트 데이터 등을 여기에 붙여넣으세요." /></Field>
+                  <div className="transcription-settings" aria-label="OpenAI 음성 전사 설정">
+                    <div>
+                      <strong>OpenAI 음성 전사</strong>
+                      <p>음성 파일을 올리면 선택한 내 OpenAI API 키와 모델로 전사한 뒤 위 자료 내용에 채워 넣습니다.</p>
+                    </div>
+                    <Field label="OpenAI API 키 프로필" hint="프로필 탭에서 저장한 사용자별 API 키를 사용합니다.">
+                      <select
+                        value={transcriptionSettings.integrationProfileId}
+                        onChange={(e) => setTranscriptionSettings({ ...transcriptionSettings, integrationProfileId: e.target.value })}
+                      >
+                        <option value="">{openAiProfiles.length ? "첫 번째 OpenAI 프로필 자동 선택" : "저장된 OpenAI 프로필 없음"}</option>
+                        {openAiProfiles.map((profile) => (
+                          <option key={profile.id} value={profile.id}>{profile.name} ({profile.aiProvider || profile.apiProvider})</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="전사 모델">
+                      <select
+                        value={transcriptionSettings.model}
+                        onChange={(e) => setTranscriptionSettings({ ...transcriptionSettings, model: e.target.value })}
+                      >
+                        {transcriptionModelOptions.map((model) => <option key={model} value={model}>{model}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="전사 프롬프트" hint="회의/강의/업무 메모 등 전사 맥락을 OpenAI에 전달합니다.">
+                      <input
+                        value={transcriptionSettings.prompt}
+                        onChange={(e) => setTranscriptionSettings({ ...transcriptionSettings, prompt: e.target.value })}
+                        placeholder="예: 한국어 회의 내용을 업무 지시로 전사"
+                      />
+                    </Field>
+                    {!openAiProfiles.length ? (
+                      <button type="button" className="secondary" onClick={() => openAiKeyProfileSetup("openai")}>
+                        <KeyRound size={14} /> OpenAI 키 먼저 저장
+                      </button>
+                    ) : null}
+                  </div>
                   <div className="file-row">
                     <label className="file-picker"><Upload size={14} /> 파일 첨부 (선택)<input type="file" accept=".txt,.md,.csv,.json,.jsonl,.log" onChange={(e) => setKnowledgeForm({ ...knowledgeForm, file: e.target.files?.[0] || null })} /></label>
                     <label className="file-picker"><Upload size={14} /> 음성 전사<input type="file" accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg,.flac" onChange={(e) => { transcribeKnowledgeAudio(e.target.files?.[0]); e.target.value = ""; }} /></label>

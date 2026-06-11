@@ -140,19 +140,22 @@ def test_audio_transcription_uses_user_openai_profile(monkeypatch):
             },
         )
         assert profile.status_code == 200
+        openai_profile = profile.json()["profile"]
 
         response = client.post(
             "/api/ai/transcribe",
             headers=headers,
-            data={"model": "whisper-1", "prompt": "업무 회의"},
+            data={"model": "gpt-4o-mini-transcribe", "prompt": "업무 회의", "integration_profile_id": openai_profile["id"]},
             files={"file": ("meeting.wav", b"RIFF0000WAVE", "audio/wav")},
         )
 
     assert response.status_code == 200
     assert response.json()["text"] == "회의 내용을 작업 카드로 정리합니다."
+    assert response.json()["integrationProfileId"] == openai_profile["id"]
+    assert response.json()["integrationProfileName"] == "OpenAI API 키"
     assert captured["url"] == "https://api.openai.com/v1/audio/transcriptions"
     assert captured["headers"]["Authorization"] == "Bearer sk-user-openai"
-    assert captured["data"]["model"] == "whisper-1"
+    assert captured["data"]["model"] == "gpt-4o-mini-transcribe"
     assert captured["data"]["prompt"] == "업무 회의"
     assert captured["file"][0] == "meeting.wav"
 
