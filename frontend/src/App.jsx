@@ -1620,7 +1620,7 @@ function App() {
                   ) : null}
                   <label>
                     현재 접속 주소
-                    <input readOnly value={oauthPublicOrigin?.origin || currentPublicOrigin} onFocus={(event) => event.currentTarget.select()} />
+                    <input className="current-public-origin-input" readOnly value={oauthPublicOrigin?.origin || currentPublicOrigin} onFocus={(event) => event.currentTarget.select()} />
                   </label>
                   <ol>
                     <li>위 주소로 접속해 각자 계정을 만들거나 로그인합니다.</li>
@@ -1628,6 +1628,22 @@ function App() {
                     <li>OAuth 오류가 나면 해당 provider 카드의 Callback URL을 복사해서 카드에 표시된 등록 위치에 붙여넣습니다.</li>
                     <li>터널 주소가 바뀌면 새 주소 기준 Callback URL을 다시 등록합니다.</li>
                   </ol>
+                  <div className="stable-domain-guide">
+                    <strong>고정 도메인 전환 순서</strong>
+                    <ol>
+                      <li>Cloudflare named tunnel 또는 배포 서비스에서 고정 HTTPS 도메인을 정합니다.</li>
+                      <li>서버 실행 환경에 <code>AI_BOARD_PUBLIC_BASE_URL=https://고정도메인</code>을 설정하고 라이브 서버를 재시작합니다.</li>
+                      <li>아래 provider별 Callback URL을 각 개발자 콘솔에 그대로 등록합니다.</li>
+                    </ol>
+                    <div className="callback-preview-grid">
+                      {oauthProviders.map((provider) => (
+                        <label key={`stable-${provider.provider}`}>
+                          {providerLabel(provider.provider)}
+                          <input readOnly value={provider.redirectUri || ""} onFocus={(event) => event.currentTarget.select()} />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 </section>
               </section>

@@ -1488,6 +1488,31 @@ pre {
 .public-access-checklist li + li {
   margin-top: 3px;
 }
+.stable-domain-guide {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #dce8e2;
+  border-radius: 8px;
+  background: #fff;
+}
+.stable-domain-guide code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  color: var(--accent-strong);
+}
+.stable-domain-guide ol {
+  padding-left: 20px;
+}
+.callback-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.callback-preview-grid label {
+  min-width: 0;
+}
 
 .provider-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .provider-card { padding: 12px; }
@@ -2263,6 +2288,7 @@ pre {
   .grid3.wide,
   .oauth-setup-grid,
   .oauth-quick-fix,
+  .callback-preview-grid,
   .taskory-status-card,
   .task-meta,
   .automation-empty-steps,

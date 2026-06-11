@@ -55,12 +55,18 @@ async function main() {
     if (setupLinks < 4) throw new Error(`expected at least four provider setup links, got ${setupLinks}`);
     const checklist = panel.locator(".public-access-checklist");
     await checklist.waitFor({ state: "visible", timeout: 15000 });
-    const publicOriginValue = await checklist.locator("input").inputValue();
+    const publicOriginValue = await checklist.locator(".current-public-origin-input").inputValue();
     if (publicOriginValue !== publicUrl) throw new Error(`public access origin mismatch: ${publicOriginValue}`);
     const checklistText = await checklist.innerText();
     if (!checklistText.includes("임시 터널 주소 사용 중")) throw new Error("temporary tunnel warning must be visible");
     if (!checklistText.includes("AI_BOARD_PUBLIC_BASE_URL")) throw new Error("stable domain next action must mention AI_BOARD_PUBLIC_BASE_URL");
-    const checklistItems = await checklist.locator("li").evaluateAll((items) => items.map((item) => item.innerText));
+    if (!checklistText.includes("고정 도메인 전환 순서")) throw new Error("stable domain guide must be visible");
+    if (!checklistText.includes("Cloudflare named tunnel")) throw new Error("stable domain guide must mention Cloudflare named tunnel");
+    const previewCallbacks = await checklist.locator(".callback-preview-grid input").evaluateAll((inputs) => inputs.map((input) => input.value));
+    for (const callback of expected) {
+      if (!previewCallbacks.includes(callback)) throw new Error(`missing callback in stable domain preview: ${callback}`);
+    }
+    const checklistItems = await checklist.locator(":scope > ol > li").evaluateAll((items) => items.map((item) => item.innerText));
     if (checklistItems.length !== 4) throw new Error(`expected four public access checklist items, got ${checklistItems.length}`);
     if (!checklistItems.join(" ").includes("Callback URL")) throw new Error("checklist must mention Callback URL registration");
     console.log(JSON.stringify({
@@ -76,6 +82,8 @@ async function main() {
         "scopes_visible",
         "public_access_origin_visible",
         "public_access_checklist_visible",
+        "stable_domain_guide_visible",
+        "stable_domain_callback_preview_visible",
       ],
       publicUrl,
     }, null, 2));
