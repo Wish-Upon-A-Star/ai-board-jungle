@@ -641,8 +641,37 @@ pre {
 .mcp-setup-actions { margin: 14px 14px 4px; }
 .mcp-setup-actions button { min-width: 168px; border-color: #a8d0ca; color: var(--accent-strong); }
 .inline-help { margin: 0 14px 2px; color: var(--muted); font-size: 13px; }
+.manual-profile-editor {
+  margin: 12px 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.manual-profile-editor > summary {
+  cursor: pointer;
+  padding: 13px 14px;
+  color: var(--text);
+}
+.manual-profile-editor > summary span {
+  display: grid;
+  gap: 4px;
+}
+.manual-profile-editor > summary strong {
+  font-size: 15px;
+}
+.manual-profile-editor > summary small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+.manual-profile-editor[open] {
+  background: #fbfcfa;
+  padding-bottom: 2px;
+}
+.manual-profile-editor .knowledge-form {
+  padding-top: 12px;
+}
 .manual-profile-guide {
-  margin: 12px 14px 0;
+  margin: 0 14px;
   padding: 14px;
   display: grid;
   grid-template-columns: minmax(220px, .72fr) minmax(0, 1fr);

@@ -217,6 +217,7 @@ function App() {
   const [liveWriteConfirmations, setLiveWriteConfirmations] = useState({});
   const [profileValidationState, setProfileValidationState] = useState({});
   const [expandedProfiles, setExpandedProfiles] = useState({});
+  const [manualProfileEditorOpen, setManualProfileEditorOpen] = useState(false);
   const [showWriteForm, setShowWriteForm] = useState(false);
   const [boardSubTab, setBoardSubTab] = useState("posts");
   const [expandedTasks, setExpandedTasks] = useState({});
@@ -889,6 +890,14 @@ function App() {
       rag_targets: config.rag_targets,
     });
     setAutomationSaveState({ status: "error", message: `Create a ${providerLabel(kind)} MCP profile first, then return to the Automation tab.` });
+    revealManualProfileForm();
+  }
+
+  function revealManualProfileForm() {
+    setManualProfileEditorOpen(true);
+    window.setTimeout(() => {
+      document.getElementById("profile-manual-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
   }
 
   function openAiKeyProfileSetup(provider = "openai") {
@@ -950,9 +959,7 @@ function App() {
       custom_connections: [],
     });
     setIntegrationSaveState({ status: "saved", message: `${selected.name} 프로필을 채웠습니다. 토큰/API Key 칸에 본인 키를 직접 넣고 저장하세요.` });
-    window.setTimeout(() => {
-      document.getElementById("profile-manual-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
+    revealManualProfileForm();
   }
 
   async function startMcpLogin(kind = "github") {
@@ -1572,18 +1579,29 @@ function App() {
                 </section>
               ) : null}
               <p className="inline-help">대부분은 위 로그인 버튼만 쓰면 됩니다. AI API 키는 위 AI 키 버튼을 누른 뒤 토큰/API Key 칸에 붙여 넣고 저장합니다.</p>
-              <section className="manual-profile-guide" aria-live="polite">
-                <div>
-                  <strong>{manualGuide.title}</strong>
-                  <p>{manualGuide.tokenHint}</p>
-                </div>
-                <dl>
-                  <div><dt>Base URL</dt><dd>{manualGuide.baseUrl}</dd></div>
-                  <div><dt>토큰 이름</dt><dd>{manualGuide.tokenName}</dd></div>
-                  <div><dt>확인 방법</dt><dd>{manualGuide.testHint}</dd></div>
-                </dl>
-              </section>
-              <form id="profile-manual-form" className="knowledge-form" onSubmit={saveIntegrationProfile}>
+              <details
+                className="manual-profile-editor"
+                open={manualProfileEditorOpen}
+                onToggle={(event) => setManualProfileEditorOpen(event.currentTarget.open)}
+              >
+                <summary>
+                  <span>
+                    <strong>수동 토큰/API 키 직접 입력</strong>
+                    <small>OAuth 로그인이 안 되거나 사내 API, OpenAI 키를 직접 저장해야 할 때만 엽니다.</small>
+                  </span>
+                </summary>
+                <section className="manual-profile-guide" aria-live="polite">
+                  <div>
+                    <strong>{manualGuide.title}</strong>
+                    <p>{manualGuide.tokenHint}</p>
+                  </div>
+                  <dl>
+                    <div><dt>Base URL</dt><dd>{manualGuide.baseUrl}</dd></div>
+                    <div><dt>토큰 이름</dt><dd>{manualGuide.tokenName}</dd></div>
+                    <div><dt>확인 방법</dt><dd>{manualGuide.testHint}</dd></div>
+                  </dl>
+                </section>
+                <form id="profile-manual-form" className="knowledge-form" onSubmit={saveIntegrationProfile}>
                 <div className="grid3 wide">
                   <Field label="프로필명"><input value={integrationForm.name} onChange={(e) => setIntegrationForm({ ...integrationForm, name: e.target.value })} /></Field>
                   <Field label="종류">
@@ -1657,8 +1675,9 @@ function App() {
                   {(integrationForm.custom_connections || []).length === 0 ? <p className="empty-state">연결이 없으면 source kind와 base URL만 사용합니다.</p> : null}
                 </section>
                 <div className={`form-status ${integrationSaveState.status}`}>{integrationSaveState.message}</div>
-                <button><KeyRound size={14} /> 연동 프로필 저장</button>
-              </form>
+                  <button><KeyRound size={14} /> 연동 프로필 저장</button>
+                </form>
+              </details>
               <div className="knowledge-list">
                 <div className="panel-title compact">저장된 내 프로필</div>
                 {integrationProfiles.map((profile) => {
