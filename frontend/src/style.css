@@ -802,6 +802,49 @@ pre {
   font-size: 13px;
   font-weight: 800;
 }
+.public-access-checklist {
+  display: grid;
+  grid-template-columns: minmax(220px, .9fr) minmax(260px, 1.1fr);
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #bad9d4;
+  border-radius: 8px;
+  background: #fbfffd;
+}
+.public-access-checklist > div {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+.public-access-checklist strong {
+  color: var(--text);
+}
+.public-access-checklist span,
+.public-access-checklist ol {
+  margin: 0;
+  color: var(--muted);
+}
+.public-access-checklist label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.public-access-checklist input {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  background: #fff;
+}
+.public-access-checklist ol {
+  grid-column: 1 / -1;
+  padding-left: 20px;
+  line-height: 1.55;
+}
+.public-access-checklist li + li {
+  margin-top: 3px;
+}
 
 .provider-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .provider-card { padding: 12px; }

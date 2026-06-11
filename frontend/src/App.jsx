@@ -257,6 +257,7 @@ function App() {
   const healthFailureMessage = getHealthFailureMessage(healthStatus);
   const readyProviderCount = providerReadiness.filter((provider) => provider.ready).length;
   const manualGuide = manualProfileGuides[integrationForm.source_kind] || manualProfileGuides.custom;
+  const currentPublicOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
   useEffect(() => {
     loadHealth();
@@ -1521,6 +1522,22 @@ function App() {
                     </article>
                   ))}
                   {!oauthProviders.length ? <p className="empty-state">OAuth 진단 정보를 불러오지 못했습니다. 다시 확인을 눌러주세요.</p> : null}
+                </div>
+                <div className="public-access-checklist">
+                  <div>
+                    <strong>외부 접속 체크리스트</strong>
+                    <span>팀원에게 안내할 때는 이 순서만 보내면 됩니다.</span>
+                  </div>
+                  <label>
+                    현재 접속 주소
+                    <input readOnly value={currentPublicOrigin} onFocus={(event) => event.currentTarget.select()} />
+                  </label>
+                  <ol>
+                    <li>위 주소로 접속해 각자 계정을 만들거나 로그인합니다.</li>
+                    <li>프로필 탭에서 GitHub, Notion, Figma, Calendar, AI API 키를 본인 계정으로 연결합니다.</li>
+                    <li>OAuth 오류가 나면 해당 provider의 Callback URL을 개발자 콘솔에 등록합니다.</li>
+                    <li>터널 주소가 바뀌면 새 주소 기준 Callback URL을 다시 등록합니다.</li>
+                  </ol>
                 </div>
               </section>
               <section className="ai-key-guide">
