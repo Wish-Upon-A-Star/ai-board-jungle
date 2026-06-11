@@ -382,6 +382,7 @@ Cloudflare quick tunnel 주의:
 - quick tunnel 주소가 바뀌면 GitHub/Notion/Figma/Google OAuth 앱의 callback URL도 모두 새 주소로 다시 등록해야 합니다.
 - 6~10명(6-10 users)이 계속 쓰는 팀 데모라면 Cloudflare named tunnel, ngrok reserved domain, Vercel/Render/Railway 같은 hosted deployment 중 하나로 고정 도메인을 쓰는 것이 낫습니다.
 - 고정 도메인을 쓰면 `.env` 또는 실행 환경의 `AI_BOARD_PUBLIC_BASE_URL`을 `https://your-domain.example`로 맞춥니다.
+- `AI_BOARD_PUBLIC_BASE_URL`을 설정하면 라이브 재시작 시 이전 `.cloudflare-url.txt` quick tunnel 주소보다 이 고정 도메인이 우선됩니다.
 
 Cloudflare named tunnel 준비:
 

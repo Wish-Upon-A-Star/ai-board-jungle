@@ -9,6 +9,7 @@ const serveExternal = readFileSync("scripts/serve-external.mjs", "utf8");
 const postgresEnv = readFileSync("scripts/postgres-env.mjs", "utf8");
 const verifyFastapi = readFileSync("scripts/verify-fastapi.mjs", "utf8");
 const verifyFull = readFileSync("scripts/verify-full.mjs", "utf8");
+const applyLive = readFileSync("scripts/apply-live.mjs", "utf8");
 
 assert.ok(devFastapi.includes('import os from "node:os"'), "dev server must inspect local network interfaces");
 assert.ok(devFastapi.includes('const host = process.env.AI_BOARD_HOST || "0.0.0.0"'), "dev server must bind to all interfaces by default");
@@ -39,6 +40,10 @@ assert.ok(devFastapi.includes("postgresEnv()"), "dev server must use PostgreSQL 
 assert.ok(serveExternal.includes("postgresDatabaseUrl()"), "external server must use PostgreSQL by default");
 assert.ok(postgresEnv.includes("postgresql://ai_board:ai_board@localhost:5432/ai_board"), "shared PostgreSQL default URL must be explicit");
 assert.ok(serveExternal.includes("AI Board public URL:"), "external serve must print the public tunnel URL");
+assert.ok(
+  applyLive.includes("process.env.AI_BOARD_PUBLIC_BASE_URL || tunnelUrl || \"\""),
+  "apply-live must prefer fixed AI_BOARD_PUBLIC_BASE_URL over stale quick tunnel files",
+);
 assert.ok(!serveExternal.includes("stopLocalServers"), "external serve must not stop the running LAN/dev server");
 assert.ok(!verifyFastapi.includes("stopLocalServers"), "verify:fastapi must not stop the current 3000/8000 server");
 assert.ok(!verifyFull.includes("stopLocalServers"), "verify:full must not stop the current 3000/8000 server");
@@ -55,6 +60,7 @@ console.log(JSON.stringify({
     "README LAN instructions",
     "external tunnel serve script",
     "Cloudflare named tunnel setup contract",
+    "fixed public origin precedence",
     "PostgreSQL-first runtime defaults",
     "non-destructive verification ports",
   ],
