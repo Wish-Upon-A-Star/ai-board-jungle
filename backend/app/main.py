@@ -26,6 +26,7 @@ from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity,
 from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LiveWriteIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
 from .security import create_token, current_user, hash_password, protect_secret, reveal_secret, secret_preview, secret_storage_type, verify_password
 from .services import agent_review, automation_fingerprint, automation_plan, get_or_create_tags, instruction_hub, rag_answer, result_to_text, search_posts, summarize
+from .taskory_import import normalize_taskory_export
 from .config import settings
 
 app = FastAPI(title="AI Board API", description="React + FastAPI + PostgreSQL + Redis AI board API.")
@@ -379,7 +380,7 @@ def oauth_provider_config(provider: str, request: Request) -> dict:
             "authorizeUrl": "https://www.figma.com/oauth",
             "tokenUrl": "https://api.figma.com/v1/oauth/token",
             "redirectUri": redirect_uri,
-            "scope": "file_read file_write",
+            "scope": "file_content:read,file_metadata:read,file_versions:read,file_comments:read,file_comments:write,current_user:read",
             "mcpServerUrl": "mcp://figma",
             "apiProvider": "Figma MCP OAuth",
             "tokenName": "FIGMA_MCP_OAUTH_TOKEN",
@@ -919,8 +920,11 @@ async def extract_upload_text(upload: UploadFile | None) -> tuple[str, str, str]
     raw = await upload.read()
     mime_type = upload.content_type or ""
     file_name = upload.filename or ""
-    if mime_type.startswith("text/") or file_name.lower().endswith((".txt", ".md", ".csv", ".json", ".log")):
-        text = raw[:20000].decode("utf-8", errors="ignore")
+    if mime_type.startswith("text/") or file_name.lower().endswith((".txt", ".md", ".csv", ".json", ".jsonl", ".log")):
+        text = raw[:20000].decode("utf-8-sig", errors="ignore")
+        normalized, is_taskory = normalize_taskory_export(text, file_name)
+        if is_taskory:
+            return file_name, mime_type or "application/json", normalized
         return file_name, mime_type, text
     return file_name, mime_type, f"[{mime_type or 'binary'} 파일: {file_name}] 파일 이름과 메타데이터를 RAG 근거로 사용합니다."
 

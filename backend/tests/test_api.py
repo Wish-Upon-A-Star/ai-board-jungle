@@ -24,6 +24,7 @@ from app.main import app
 from app.models import AutomationRun, AutomationTask, IntegrationProfile, KnowledgeSource
 from app.live_writers import korean_summary_for_source, notion_sources_template_children, write_calendar_event, write_github_issue, write_notion_sources_report, write_notion_task
 from app.security import reveal_secret
+from app.taskory_import import normalize_taskory_export
 
 
 def find_first_block(blocks, block_type):
@@ -46,6 +47,45 @@ def collect_block_text(blocks):
         parts.append("".join(part["text"]["content"] for part in rich_text if "text" in part))
         parts.append(collect_block_text(payload.get("children", [])))
     return "\n".join(part for part in parts if part)
+
+
+def test_taskory_state_json_normalizes_for_rag():
+    raw = json.dumps(
+        {
+            "nodes": {
+                "root": {"title": "root", "children": ["project"]},
+                "project": {"title": "AI Board 연동", "memo": "Taskory 작업을 RAG로 보냅니다.", "children": ["child"]},
+                "child": {"title": "JSONL 내보내기", "isToday": True, "priority": 2, "memo": "자동화 참고 자료로 저장"},
+            }
+        },
+        ensure_ascii=False,
+    )
+
+    normalized, detected = normalize_taskory_export(raw, "task-explorer-state.json")
+
+    assert detected is True
+    assert "Taskory 작업 자료" in normalized
+    assert "AI Board 연동" in normalized
+    assert "경로: AI Board 연동 > JSONL 내보내기" in normalized
+    assert "상태: 오늘 작업" in normalized
+    assert "자동화 참고 자료로 저장" in normalized
+
+
+def test_taskory_jsonl_export_normalizes_for_rag():
+    raw = "\n".join(
+        [
+            json.dumps({"title": "커밋 요약", "path": "운영 > GitHub", "kind": "task", "text": "최근 커밋을 한국어로 요약"}, ensure_ascii=False),
+            json.dumps({"title": "Notion 반영", "memo": "보드에 카드 생성", "completedAt": "2026-06-11T00:00:00Z"}, ensure_ascii=False),
+        ]
+    )
+
+    normalized, detected = normalize_taskory_export(raw, "taskory-ai-board.jsonl")
+
+    assert detected is True
+    assert "커밋 요약" in normalized
+    assert "최근 커밋을 한국어로 요약" in normalized
+    assert "Notion 반영" in normalized
+    assert "상태: 완료" in normalized
 
 
 def test_health_recovers_after_startup_database_error(monkeypatch):
@@ -193,7 +233,15 @@ def test_figma_oauth_start_builds_authorize_url(monkeypatch):
     assert parsed.path == "/oauth"
     assert params["client_id"] == ["figma-client"]
     assert params["response_type"] == ["code"]
-    assert params["scope"] == ["file_read file_write"]
+    scope_values = set(params["scope"][0].replace(",", " ").split())
+    assert {
+        "file_content:read",
+        "file_metadata:read",
+        "file_versions:read",
+        "file_comments:read",
+        "file_comments:write",
+        "current_user:read",
+    } <= scope_values
     assert data["redirectUri"].endswith("/api/oauth/figma/callback")
 
 

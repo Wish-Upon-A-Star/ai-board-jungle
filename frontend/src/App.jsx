@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Bot, CalendarClock, Database, FileText, GitBranch, KeyRound, Link2, LogOut, Play, Plus, Search, Share2, Trash2, Upload, UserPlus } from "lucide-react";
+import { Bot, CalendarClock, CheckCircle2, ChevronDown, ChevronUp, Database, FileText, GitBranch, KeyRound, Link2, LogOut, Play, Plus, Search, Share2, Trash2, Upload, UserPlus, XCircle } from "lucide-react";
 import { api, apiStatus } from "./api";
 import { customPreset, defaultAutomation, defaultIntegration, defaultKnowledge, figmaCalendarPreset, integrationConnectionPresets, mcpGithubToNotionPreset, mcpNotionToGithubPreset, teamNotionGanttToCalendarPreset } from "./presets";
 import { buildSystemReadinessCards, getHealthFailureMessage, getRunStatus, mergePostsById, parseRunResult, summarizeRunResult } from "./viewModel";
@@ -169,11 +169,19 @@ function App() {
   const [integrationForm, setIntegrationForm] = useState(defaultIntegration);
   const [integrationSaveState, setIntegrationSaveState] = useState({ status: "idle", message: "프로필을 저장하면 자동화에서 선택할 수 있습니다." });
   const [liveWriteConfirmations, setLiveWriteConfirmations] = useState({});
+  const [expandedProfiles, setExpandedProfiles] = useState({});
+  const [showWriteForm, setShowWriteForm] = useState(false);
+  const [boardSubTab, setBoardSubTab] = useState("posts");
+  const [expandedTasks, setExpandedTasks] = useState({});
   const [profileSettings, setProfileSettings] = useState(null);
   const [error, setError] = useState("");
   const [validationIssues, setValidationIssues] = useState([]);
   const [oauthSetup, setOauthSetup] = useState(null);
   const [automationSaveState, setAutomationSaveState] = useState({ status: "idle", message: "" });
+  const [busyActions, setBusyActions] = useState(new Set());
+  const [postSaveState, setPostSaveState] = useState({ status: "idle", message: "" });
+  const [knowledgeSaveState, setKnowledgeSaveState] = useState({ status: "idle", message: "" });
+  const [deleteConfirmProfileId, setDeleteConfirmProfileId] = useState(null);
 
   const myTasks = useMemo(() => tasks.filter((task) => task.owner?.id === user?.id), [tasks, user]);
   const sharedCount = automationShares.length;
@@ -196,6 +204,24 @@ function App() {
     setValidationIssues(Array.isArray(err.validationIssues) ? err.validationIssues : []);
   }
 
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(clearErrorState, 8000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
+  useEffect(() => {
+    if (postSaveState.status !== "ok") return;
+    const timer = setTimeout(() => setPostSaveState({ status: "idle", message: "" }), 4000);
+    return () => clearTimeout(timer);
+  }, [postSaveState.status]);
+
+  useEffect(() => {
+    if (knowledgeSaveState.status !== "ok") return;
+    const timer = setTimeout(() => setKnowledgeSaveState({ status: "idle", message: "" }), 4000);
+    return () => clearTimeout(timer);
+  }, [knowledgeSaveState.status]);
+
   async function loadHealth() {
     try {
       const health = await apiStatus("/api/health");
@@ -210,15 +236,19 @@ function App() {
   }
 
   async function loadActivities(filters = activityFilters, offset = 0, append = false) {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== "" && value !== null && value !== undefined) params.set(key, value);
-    });
-    params.set("limit", "12");
-    params.set("offset", String(offset));
-    const data = await api(`/api/integration-activities?${params.toString()}`);
-    setActivityPage({ total: data.total, limit: data.limit, offset: data.offset, nextOffset: data.nextOffset, hasMore: data.hasMore });
-    setIntegrationActivities((current) => (append ? [...current, ...data.activities] : data.activities));
+    try {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== "" && value !== null && value !== undefined) params.set(key, value);
+      });
+      params.set("limit", "12");
+      params.set("offset", String(offset));
+      const data = await api(`/api/integration-activities?${params.toString()}`);
+      setActivityPage({ total: data.total, limit: data.limit, offset: data.offset, nextOffset: data.nextOffset, hasMore: data.hasMore });
+      setIntegrationActivities((current) => (append ? [...current, ...data.activities] : data.activities));
+    } catch (err) {
+      showActionError(err);
+    }
   }
 
   async function loadAll(search = q, filters = activityFilters) {
@@ -258,15 +288,29 @@ function App() {
   }
 
   async function loadMorePosts() {
-    const data = await api(`/api/posts?q=${encodeURIComponent(q)}&kind=board&limit=${postPage.limit}&offset=${postPage.nextOffset}`);
-    setPosts((current) => mergePostsById(current, data.posts));
-    setPostPage({ total: data.total, limit: data.limit, offset: data.offset, nextOffset: data.nextOffset, hasMore: data.hasMore });
+    setBusy("more-posts");
+    try {
+      const data = await api(`/api/posts?q=${encodeURIComponent(q)}&kind=board&limit=${postPage.limit}&offset=${postPage.nextOffset}`);
+      setPosts((current) => mergePostsById(current, data.posts));
+      setPostPage({ total: data.total, limit: data.limit, offset: data.offset, nextOffset: data.nextOffset, hasMore: data.hasMore });
+    } catch (err) {
+      showActionError(err);
+    } finally {
+      clearBusy("more-posts");
+    }
   }
 
   async function loadMoreShares() {
-    const data = await api(`/api/posts?q=${encodeURIComponent(q)}&kind=automation&limit=${sharePage.limit}&offset=${sharePage.nextOffset}`);
-    setAutomationShares((current) => mergePostsById(current, data.posts));
-    setSharePage({ total: data.total, limit: data.limit, offset: data.offset, nextOffset: data.nextOffset, hasMore: data.hasMore });
+    setBusy("more-shares");
+    try {
+      const data = await api(`/api/posts?q=${encodeURIComponent(q)}&kind=automation&limit=${sharePage.limit}&offset=${sharePage.nextOffset}`);
+      setAutomationShares((current) => mergePostsById(current, data.posts));
+      setSharePage({ total: data.total, limit: data.limit, offset: data.offset, nextOffset: data.nextOffset, hasMore: data.hasMore });
+    } catch (err) {
+      showActionError(err);
+    } finally {
+      clearBusy("more-shares");
+    }
   }
 
   async function submitAuth(event) {
@@ -320,25 +364,43 @@ function App() {
   }
 
   async function runTask(task) {
-    const data = await api(`/api/automations/${task.id}/run`, { method: "POST" });
-    setResult(data.run.result);
-    setApiResult({ called: "automation.run", response: data });
-    await loadAll();
+    setBusy(`run:${task.id}`);
+    try {
+      const data = await api(`/api/automations/${task.id}/run`, { method: "POST" });
+      setResult(data.run.result);
+      setApiResult({ called: "automation.run", response: data });
+      await loadAll();
+    } catch (err) {
+      showActionError(err);
+    } finally {
+      clearBusy(`run:${task.id}`);
+    }
   }
 
   async function retryTaskFromRun(task, run) {
     const key = `${task.id}:${run.id}`;
-    setRetryRunState((current) => ({ ...current, [key]: { status: "running", message: "Retrying" } }));
-    await runTask(task);
-    await loadTaskRuns(task);
-    setRetryRunState((current) => ({ ...current, [key]: { status: "ok", message: "Retry updated" } }));
+    setRetryRunState((current) => ({ ...current, [key]: { status: "running", message: "재실행 중" } }));
+    try {
+      await runTask(task);
+      await loadTaskRuns(task);
+      setRetryRunState((current) => ({ ...current, [key]: { status: "ok", message: "재실행 완료" } }));
+    } catch (err) {
+      setRetryRunState((current) => ({ ...current, [key]: { status: "error", message: err.message || "재실행 실패" } }));
+    }
   }
 
   async function shareTask(task) {
-    const data = await api(`/api/automations/${task.id}/share`, { method: "POST" });
-    setAutomationShares((current) => mergePostsById([data.post, ...current], current));
-    setApiResult({ called: "automation.share", response: data });
-    await loadAll();
+    setBusy(`share:${task.id}`);
+    try {
+      const data = await api(`/api/automations/${task.id}/share`, { method: "POST" });
+      setAutomationShares((current) => mergePostsById([data.post, ...current], current));
+      setApiResult({ called: "automation.share", response: data });
+      await loadAll();
+    } catch (err) {
+      showActionError(err);
+    } finally {
+      clearBusy(`share:${task.id}`);
+    }
   }
 
   function applySharedAutomation(post) {
@@ -354,24 +416,45 @@ function App() {
   }
 
   async function deleteTask(task) {
-    await api(`/api/automations/${task.id}`, { method: "DELETE" });
-    setDeleteConfirmTaskId(null);
-    await loadAll();
+    setBusy(`delete:${task.id}`);
+    try {
+      await api(`/api/automations/${task.id}`, { method: "DELETE" });
+      setDeleteConfirmTaskId(null);
+      await loadAll();
+    } catch (err) {
+      showActionError(err);
+    } finally {
+      clearBusy(`delete:${task.id}`);
+    }
   }
 
   async function schedulerTick() {
-    const data = await api("/api/automations/scheduler/tick", { method: "POST" });
-    setApiResult({ called: "scheduler.tick", response: data });
-    await loadAll();
+    setBusy("scheduler");
+    try {
+      const data = await api("/api/automations/scheduler/tick", { method: "POST" });
+      setApiResult({ called: "scheduler.tick", response: data });
+      await loadAll();
+    } catch (err) {
+      showActionError(err);
+    } finally {
+      clearBusy("scheduler");
+    }
   }
 
   async function loadTaskRuns(task, offset = 0, append = false) {
-    const data = await api(`/api/automations/${task.id}/runs?limit=5&offset=${offset}`);
-    setRunHistory((current) => ({
-      ...current,
-      [task.id]: { ...data, runs: append ? [...(current[task.id]?.runs || []), ...data.runs] : data.runs, loadedAt: new Date().toLocaleTimeString() },
-    }));
-    setApiResult({ called: "automation.runs", response: data });
+    setBusy(`runs:${task.id}`);
+    try {
+      const data = await api(`/api/automations/${task.id}/runs?limit=5&offset=${offset}`);
+      setRunHistory((current) => ({
+        ...current,
+        [task.id]: { ...data, runs: append ? [...(current[task.id]?.runs || []), ...data.runs] : data.runs, loadedAt: new Date().toLocaleTimeString() },
+      }));
+      setApiResult({ called: "automation.runs", response: data });
+    } catch (err) {
+      showActionError(err);
+    } finally {
+      clearBusy(`runs:${task.id}`);
+    }
   }
 
   async function callApiDemo(kind) {
@@ -403,6 +486,7 @@ function App() {
   async function createPost(event) {
     event.preventDefault();
     clearErrorState();
+    setPostSaveState({ status: "saving", message: "게시글을 저장하는 중입니다." });
     try {
       const data = await api("/api/posts", {
         method: "POST",
@@ -410,15 +494,18 @@ function App() {
       });
       setSelected(data.post);
       event.currentTarget.reset();
+      setPostSaveState({ status: "ok", message: "게시글이 작성되었습니다." });
       await loadAll();
     } catch (err) {
       showActionError(err);
+      setPostSaveState({ status: "error", message: err.message || "게시글 작성에 실패했습니다." });
     }
   }
 
   async function saveKnowledge(event) {
     event.preventDefault();
     clearErrorState();
+    setKnowledgeSaveState({ status: "saving", message: "지식자료를 저장하는 중입니다." });
     try {
       let data;
       if (knowledgeForm.file) {
@@ -438,9 +525,11 @@ function App() {
       setApiResult({ called: "knowledge.save", response: data });
       setResult(data.rag);
       setKnowledgeForm({ ...defaultKnowledge });
+      setKnowledgeSaveState({ status: "ok", message: `"${data.source?.title || "자료"}"가 저장되었습니다.` });
       await loadAll();
     } catch (err) {
       showActionError(err);
+      setKnowledgeSaveState({ status: "error", message: err.message || "저장에 실패했습니다." });
     }
   }
 
@@ -519,6 +608,7 @@ function App() {
   async function saveProfileSettings(event) {
     event.preventDefault();
     clearErrorState();
+    setBusy("profile-settings");
     try {
       const body = {
         ai_provider: profileSettings?.aiProvider || "OpenAI",
@@ -533,26 +623,56 @@ function App() {
       setProfileSettings(data.profileSettings);
       setApiResult({ called: "profile-settings.save", response: data });
       setResult(data.profileSettings);
+      setAutomationSaveState({ status: "ok", message: "기본 설정이 저장되었습니다." });
       await loadAll();
     } catch (err) {
       showActionError(err);
+    } finally {
+      clearBusy("profile-settings");
     }
   }
 
   async function collectIntegrationProfile(profile) {
-    const data = await api(`/api/integration-profiles/${profile.id}/collect`, { method: "POST" });
-    setApiResult({ called: "integration-profile.collect", response: data });
-    await loadAll();
+    setBusy(`collect:${profile.id}`);
+    try {
+      const data = await api(`/api/integration-profiles/${profile.id}/collect`, { method: "POST" });
+      setApiResult({ called: "integration-profile.collect", response: data });
+      await loadAll();
+    } catch (err) {
+      showActionError(err);
+    } finally {
+      clearBusy(`collect:${profile.id}`);
+    }
+  }
+
+  async function deleteIntegrationProfile(profile) {
+    setBusy(`delete-profile:${profile.id}`);
+    try {
+      await api(`/api/integration-profiles/${profile.id}`, { method: "DELETE" });
+      setDeleteConfirmProfileId(null);
+      await loadAll();
+    } catch (err) {
+      showActionError(err);
+    } finally {
+      clearBusy(`delete-profile:${profile.id}`);
+    }
   }
 
   async function writeIntegrationProfile(profile, dryRun = true) {
-    const confirmation = liveWriteConfirmations[profile.id] || "";
-    const data = await api(`/api/integration-profiles/${profile.id}/write`, {
-      method: "POST",
-      body: JSON.stringify({ title: `AI Board ${profile.sourceKind} ${dryRun ? "write check" : "live write"}`, body: `${dryRun ? "Dry-run" : "Actual write"} from ${profile.name}.`, dry_run: dryRun, confirmation }),
-    });
-    setApiResult({ called: "integration-profile.write", response: data });
-    await loadAll();
+    setBusy(`write:${profile.id}:${dryRun}`);
+    try {
+      const confirmation = liveWriteConfirmations[profile.id] || "";
+      const data = await api(`/api/integration-profiles/${profile.id}/write`, {
+        method: "POST",
+        body: JSON.stringify({ title: `AI Board ${profile.sourceKind} ${dryRun ? "write check" : "live write"}`, body: `${dryRun ? "Dry-run" : "Actual write"} from ${profile.name}.`, dry_run: dryRun, confirmation }),
+      });
+      setApiResult({ called: "integration-profile.write", response: data });
+      await loadAll();
+    } catch (err) {
+      showActionError(err);
+    } finally {
+      clearBusy(`write:${profile.id}:${dryRun}`);
+    }
   }
 
   function applyIntegrationProfile(profileId) {
@@ -751,6 +871,10 @@ function App() {
     loadActivities(nextFilters, 0, false);
   }
 
+  function setBusy(key) { setBusyActions((s) => new Set([...s, key])); }
+  function clearBusy(key) { setBusyActions((s) => { const n = new Set(s); n.delete(key); return n; }); }
+  function isBusy(key) { return busyActions.has(key); }
+
   if (!token || !user) {
     return (
       <main className="login-page">
@@ -768,9 +892,9 @@ function App() {
             <button className={authMode === "register" ? "active" : ""} onClick={() => setAuthMode("register")}>회원가입</button>
           </div>
           <form className="auth-form" onSubmit={submitAuth}>
-            <input value={authForm.email} onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })} placeholder="email" />
-            {authMode === "register" ? <input value={authForm.name} onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })} placeholder="name" /> : null}
-            <input type="password" value={authForm.password} onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })} placeholder="password" />
+            <input type="email" autoComplete="email" value={authForm.email} onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })} placeholder="이메일" aria-label="이메일" required />
+            {authMode === "register" ? <input type="text" autoComplete="name" value={authForm.name} onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })} placeholder="이름" aria-label="이름" required /> : null}
+            <input type="password" autoComplete={authMode === "register" ? "new-password" : "current-password"} value={authForm.password} onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })} placeholder="비밀번호" aria-label="비밀번호" required />
             <button>{authMode === "register" ? <UserPlus size={14} /> : null}{authMode === "register" ? "계정 만들기" : "로그인"}</button>
           </form>
           <div className="demo-actions">
@@ -847,7 +971,10 @@ function App() {
 
         {error && (
           <div className="top-error">
-            <strong>{error}</strong>
+            <div className="top-error-head">
+              <strong>{error}</strong>
+              <button type="button" className="error-dismiss" onClick={clearErrorState} aria-label="오류 닫기">✕</button>
+            </div>
             {validationIssues.length ? (
               <ul className="validation-list">
                 {validationIssues.map((issue, index) => <li key={`${issue.field}:${index}`}><b>{issue.field}</b><span>{issue.message}</span></li>)}
@@ -886,164 +1013,244 @@ function App() {
             </article>
 
             <article id="automations-panel" className={`panel ${activeMainTab === "automations" ? "" : "tab-hidden"}`}>
-              <div className="panel-title row-title">
-                <span>저장된 자동화</span>
-                <span className="subtle">실행, 공유, 기록 확인을 여기서 처리합니다.</span>
-              </div>
-              <div className="task-list">
-                <div className="scheduler-bar">
-                  <button type="button" onClick={schedulerTick}><CalendarClock size={14} /> 예약 작업 확인</button>
-                  <span>활성 자동화를 확인하고 입력 변경이 없으면 실행을 건너뜁니다.</span>
+              <div className="automation-list-header">
+                <div>
+                  <h2>⚡ 저장된 자동화</h2>
+                  <p className="muted">연결된 서비스 간 데이터를 AI가 자동으로 읽고 정리해 줍니다.</p>
                 </div>
-                {tasks.map((task) => (
-                  <section key={task.id} className="task-card">
-                    <div className="task-head"><h2>{task.name}</h2><Badge role={task.owner.role} /></div>
-                    <p className="owner">{task.owner.name} / {task.owner.email}</p>
-                    <dl className="task-meta">
-                      <div><dt>주기</dt><dd>{task.intervalMinutes}분마다</dd></div>
-                      <div><dt>경로</dt><dd>{task.source} {"->"} {task.destination}</dd></div>
-                      <div><dt>AI</dt><dd>{task.aiProvider} / {task.aiModel}</dd></div>
-                      <div><dt>API</dt><dd>{task.apiProvider}</dd></div>
-                      <div><dt>Last run</dt><dd><span className={`run-status compact ${getRunStatus(task.lastResult)}`}>{getRunStatus(task.lastResult)}</span></dd></div>
-                      <div><dt>연동 프로필</dt><dd>{task.integrationProfile ? `${task.integrationProfile.name} / ${task.integrationProfile.sourceKind}` : "커스텀"}</dd></div>
-                      <div><dt>템플릿</dt><dd>{task.templatePreset || "github_notion"}</dd></div>
-                    </dl>
-                    <div className="task-actions">
-                      <button onClick={() => runTask(task)}><Play size={14} /> 지금 실행</button>
-                      <button onClick={() => shareTask(task)} className="secondary"><Share2 size={14} /> 공유 자동화로 등록</button>
-                      <button onClick={() => loadTaskRuns(task)} className="secondary"><Database size={14} /> 실행 기록</button>
-                      {deleteConfirmTaskId === task.id ? (
-                        <>
-                          <button onClick={() => deleteTask(task)} className="danger confirm-delete"><Trash2 size={14} /> 삭제 확정</button>
-                          <button onClick={() => setDeleteConfirmTaskId(null)} className="secondary">취소</button>
-                        </>
-                      ) : (
-                        <button onClick={() => setDeleteConfirmTaskId(task.id)} className="danger"><Trash2 size={14} /> 삭제</button>
-                      )}
-                    </div>
-                    {runHistory[task.id] ? (
-                      <div className="run-history">
-                        <div className="run-history-head"><strong>실행 기록</strong><span>{runHistory[task.id].runs.length} / {runHistory[task.id].total} · {runHistory[task.id].loadedAt} 갱신</span></div>
-                        {runHistory[task.id].runs.map((run) => {
-                          const key = `${task.id}:${run.id}`;
-                          const expanded = expandedRuns[key];
-                          const retryState = retryRunState[key];
-                          const status = getRunStatus(run.result);
-                          return (
-                            <div key={run.id} className={`run-row ${status}`}>
-                              <div className="run-row-main">
-                                <span>#{run.id}</span>
-                                <span>{run.createdAt}</span>
-                                <span className={`run-status ${status}`}>{status}</span>
-                                <p>{summarizeRunResult(run.result)}</p>
-                                <button type="button" className="inline-link retry" disabled={retryState?.status === "running"} onClick={() => retryTaskFromRun(task, run)}>
-                                  {retryState?.status === "running" ? "재실행 중" : "재실행"}
-                                </button>
-                                <button type="button" className="inline-link" onClick={() => setExpandedRuns((current) => ({ ...current, [key]: !current[key] }))}>
-                                  {expanded ? "접기" : "상세"}
-                                </button>
-                              </div>
-                              {retryState?.message ? <div className={`run-retry-message ${retryState.status}`}>{retryState.message}</div> : null}
-                              {expanded ? <pre className="run-json">{JSON.stringify(parseRunResult(run.result), null, 2)}</pre> : null}
-                            </div>
-                          );
-                        })}
-                        {runHistory[task.id].hasMore ? <button className="load-more" onClick={() => loadTaskRuns(task, runHistory[task.id].nextOffset, true)}>실행 기록 더 보기</button> : null}
-                      </div>
-                    ) : null}
-                  </section>
-                ))}
+                <button type="button" onClick={schedulerTick} disabled={isBusy("scheduler")} className="secondary scheduler-btn">
+                  <CalendarClock size={14} /> {isBusy("scheduler") ? "확인 중…" : "예약 실행 확인"}
+                </button>
               </div>
+
+              {tasks.length === 0 ? (
+                <div className="automation-empty">
+                  <div className="automation-empty-icon">⚡</div>
+                  <h3>아직 자동화가 없습니다</h3>
+                  <p>아래 <b>자동화 등록</b> 패널에서 템플릿을 골라 첫 번째 자동화를 만들어보세요.</p>
+                  <div className="automation-empty-steps">
+                    <div className="step"><span>1</span><b>프로필 선택</b><small>연결할 GitHub/Notion 계정</small></div>
+                    <div className="step"><span>2</span><b>템플릿 선택</b><small>어떤 흐름으로 자동화할지</small></div>
+                    <div className="step"><span>3</span><b>저장 & 실행</b><small>주기 실행 또는 즉시 실행</small></div>
+                  </div>
+                </div>
+              ) : (
+                <div className="task-list">
+                  {tasks.map((task) => {
+                    const runStatus = getRunStatus(task.lastResult);
+                    const isExpanded = expandedTasks?.[task.id];
+                    return (
+                      <section key={task.id} className="task-card-v2">
+                        <div className="task-card-main" onClick={() => setExpandedTasks((p) => ({ ...p, [task.id]: !p?.[task.id] }))}>
+                          <div className="task-card-left">
+                            <div className="task-card-title-row">
+                              <h3>{task.name}</h3>
+                              <Badge role={task.owner.role} />
+                            </div>
+                            <div className="task-card-flow">
+                              <span className="task-source">{task.source}</span>
+                              <span className="task-arrow">→</span>
+                              <span className="task-dest">{task.destination}</span>
+                            </div>
+                          </div>
+                          <div className="task-card-right">
+                            <span className={`run-pill ${runStatus}`}>{runStatus === "ok" ? "✅ 성공" : runStatus === "error" ? "❌ 오류" : runStatus === "running" ? "⏳ 실행 중" : "— 미실행"}</span>
+                            <span className="task-interval">⏰ {task.intervalMinutes}분</span>
+                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="task-card-detail">
+                            <div className="task-detail-meta">
+                              <span><b>소유자</b> {task.owner.name} ({task.owner.email})</span>
+                              <span><b>AI</b> {task.aiProvider} / {task.aiModel}</span>
+                              <span><b>연동 프로필</b> {task.integrationProfile ? task.integrationProfile.name : "커스텀"}</span>
+                              <span><b>템플릿</b> {task.templatePreset || "github_notion"}</span>
+                            </div>
+                            <div className="task-actions">
+                              <button onClick={() => runTask(task)} disabled={isBusy(`run:${task.id}`)}><Play size={14} /> {isBusy(`run:${task.id}`) ? "실행 중…" : "지금 실행"}</button>
+                              <button onClick={() => shareTask(task)} className="secondary" disabled={isBusy(`share:${task.id}`)}><Share2 size={14} /> {isBusy(`share:${task.id}`) ? "등록 중…" : "게시판에 공유"}</button>
+                              <button onClick={() => loadTaskRuns(task)} className="secondary" disabled={isBusy(`runs:${task.id}`)}><Database size={14} /> {isBusy(`runs:${task.id}`) ? "불러오는 중…" : "실행 기록"}</button>
+                              {deleteConfirmTaskId === task.id ? (
+                                <>
+                                  <button onClick={() => deleteTask(task)} className="danger confirm-delete" disabled={isBusy(`delete:${task.id}`)}><Trash2 size={14} /> {isBusy(`delete:${task.id}`) ? "삭제 중…" : "삭제 확정"}</button>
+                                  <button onClick={() => setDeleteConfirmTaskId(null)} className="secondary">취소</button>
+                                </>
+                              ) : (
+                                <button onClick={() => setDeleteConfirmTaskId(task.id)} className="danger"><Trash2 size={14} /> 삭제</button>
+                              )}
+                            </div>
+                            {runHistory[task.id] && (
+                              <div className="run-history">
+                                <div className="run-history-head"><strong>실행 기록</strong><span>{runHistory[task.id].runs.length} / {runHistory[task.id].total}건 · {runHistory[task.id].loadedAt} 갱신</span></div>
+                                {runHistory[task.id].runs.map((run) => {
+                                  const key = `${task.id}:${run.id}`;
+                                  const expanded = expandedRuns[key];
+                                  const retryState = retryRunState[key];
+                                  const status = getRunStatus(run.result);
+                                  return (
+                                    <div key={run.id} className={`run-row ${status}`}>
+                                      <div className="run-row-main">
+                                        <span>#{run.id}</span>
+                                        <span>{run.createdAt}</span>
+                                        <span className={`run-status ${status}`}>{status}</span>
+                                        <p>{summarizeRunResult(run.result)}</p>
+                                        <button type="button" className="inline-link retry" disabled={retryState?.status === "running"} onClick={() => retryTaskFromRun(task, run)}>{retryState?.status === "running" ? "재실행 중" : "재실행"}</button>
+                                        <button type="button" className="inline-link" onClick={() => setExpandedRuns((c) => ({ ...c, [key]: !c[key] }))}>{expanded ? "접기" : "상세"}</button>
+                                      </div>
+                                      {retryState?.message ? <div className={`run-retry-message ${retryState.status}`}>{retryState.message}</div> : null}
+                                      {expanded ? <pre className="run-json">{JSON.stringify(parseRunResult(run.result), null, 2)}</pre> : null}
+                                    </div>
+                                  );
+                                })}
+                                {runHistory[task.id].hasMore ? <button className="load-more" onClick={() => loadTaskRuns(task, runHistory[task.id].nextOffset, true)} disabled={isBusy(`runs:${task.id}`)}>{isBusy(`runs:${task.id}`) ? "불러오는 중…" : "더 보기"}</button> : null}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
             </article>
 
             <article id="new-task" className={`panel ${activeMainTab === "automations" ? "" : "tab-hidden"}`}>
-              <div className="panel-title row-title"><span>자동화 등록</span><span className="subtle">프로필 또는 커스텀 설정을 자동화마다 선택합니다.</span></div>
+              <div className="panel-title row-title">
+                <span>➕ 자동화 등록</span>
+                <span className="subtle">①템플릿 선택 → ②프로필 연결 → ③저장</span>
+              </div>
               <form className="automation-form" onSubmit={createAutomation}>
-                <div className="preset-actions">
-                  <button type="button" onClick={() => applyMcpAutomationPreset(mcpGithubToNotionPreset, "github")}>GitHub -&gt; Notion BOARD</button>
-                  <button type="button" onClick={() => applyMcpAutomationPreset(mcpNotionToGithubPreset, "notion")}>Notion BOARD -&gt; GitHub Issue</button>
-                  <button type="button" onClick={() => setForm(defaultAutomation)}>GitHub + Notion</button>
-                  <button type="button" onClick={() => setForm(teamNotionGanttToCalendarPreset)}>Notion GANTT -&gt; Calendar</button>
-                  <button type="button" onClick={() => setForm(figmaCalendarPreset)}>Figma + Google Calendar</button>
-                  <button type="button" onClick={() => setForm(customPreset)}>Custom API</button>
-                  <button type="button" onClick={applyProfileDefaultsToAutomation}>사용자 기본값 적용</button>
+
+                {/* ① 템플릿 선택 */}
+                <div className="form-section">
+                  <div className="form-section-head">
+                    <span className="form-section-num">1</span>
+                    <div><strong>템플릿 선택</strong><small>어떤 자동화를 만들지 고르면 아래 칸이 자동 입력됩니다.</small></div>
+                  </div>
+                  <div className="preset-cards">
+                    {[
+                      { label: "GitHub → Notion", desc: "이슈·커밋을 Notion 보드에 정리", action: () => applyMcpAutomationPreset(mcpGithubToNotionPreset, "github"), icon: "🐙" },
+                      { label: "Notion → GitHub", desc: "Notion 요청 카드를 GitHub 이슈로", action: () => applyMcpAutomationPreset(mcpNotionToGithubPreset, "notion"), icon: "📝" },
+                      { label: "Notion GANTT → Calendar", desc: "간트 일정을 Google Calendar에 등록", action: () => setForm(teamNotionGanttToCalendarPreset), icon: "📅" },
+                      { label: "Figma → Calendar", desc: "디자인 검토 일정을 캘린더에 추가", action: () => setForm(figmaCalendarPreset), icon: "🎨" },
+                      { label: "커스텀 API", desc: "직접 연결 설정", action: () => setForm(customPreset), icon: "🔧" },
+                    ].map((preset) => (
+                      <button key={preset.label} type="button" className="preset-card" onClick={preset.action}>
+                        <span className="preset-icon">{preset.icon}</span>
+                        <span className="preset-card-label">{preset.label}</span>
+                        <span className="preset-card-desc">{preset.desc}</span>
+                      </button>
+                    ))}
+                    <button type="button" className="preset-card secondary-preset" onClick={applyProfileDefaultsToAutomation}>
+                      <span className="preset-icon">⚙️</span>
+                      <span className="preset-card-label">내 기본값 적용</span>
+                      <span className="preset-card-desc">기본 설정 탭의 값 불러오기</span>
+                    </button>
+                  </div>
                 </div>
-                <section className="integration-profile-box">
-                  <div className="grid2">
-                    <Field label="저장된 연동 프로필">
+
+                {/* ② 프로필 & 기본 정보 */}
+                <div className="form-section">
+                  <div className="form-section-head">
+                    <span className="form-section-num">2</span>
+                    <div><strong>프로필 & 기본 정보</strong><small>어떤 계정으로 실행할지, 이름과 주기를 정합니다.</small></div>
+                  </div>
+                  <section className="integration-profile-box">
+                    <Field label="🔗 연동 프로필 선택" hint="프로필 탭에서 연결한 GitHub/Notion 계정을 선택합니다. 선택하면 토큰이 자동으로 적용됩니다.">
                       <select value={form.integration_profile_id || ""} onChange={(e) => applyIntegrationProfile(e.target.value)}>
-                        <option value="">커스텀 설정 사용</option>
-                        {integrationProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name} / {profile.sourceKind} / {profile.aiModel}</option>)}
+                        <option value="">— 커스텀 설정 사용 —</option>
+                        {integrationProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name} ({profile.sourceKind})</option>)}
                       </select>
                     </Field>
-                    <Field label="프로필 RAG 범위"><input value={integrationProfiles.find((profile) => String(profile.id) === String(form.integration_profile_id))?.ragTargets?.join(", ") || "선택 프로필 없음"} readOnly /></Field>
+                  </section>
+                  <div className="grid3 wide">
+                    <Field label="자동화 이름" hint="목록에 표시되는 이름입니다."><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="예: GitHub 이슈 → Notion 정리" required /></Field>
+                    <Field label="실행 주기 (분)" hint="몇 분마다 실행할지. 최소 1분."><input type="number" min="1" max="1440" value={form.interval_minutes} onChange={(e) => setForm({ ...form, interval_minutes: Number(e.target.value) })} /></Field>
+                    <Field label="처리 방식" hint="템플릿 선택 시 자동 입력됩니다."><input value={form.ai_agent} onChange={(e) => setForm({ ...form, ai_agent: e.target.value })} placeholder="github_notion_agent" /></Field>
                   </div>
-                </section>
-                <div className="grid3 wide">
-                  <Field label="작업명" hint="목록과 실행 기록에 표시되는 이름입니다."><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="예: GitHub 변경사항을 Notion 업무 보드에 정리" /></Field>
-                  <Field label="실행 주기(분)" hint="몇 분마다 변경사항을 확인할지 정합니다."><input type="number" min="1" value={form.interval_minutes} onChange={(e) => setForm({ ...form, interval_minutes: Number(e.target.value) })} /></Field>
-                  <Field label="처리 방식" hint="자동화가 어떤 수집/작성 도구 조합을 쓸지 나타냅니다. 보통 템플릿을 누르면 자동 입력됩니다."><input value={form.ai_agent} onChange={(e) => setForm({ ...form, ai_agent: e.target.value })} placeholder="예: github_notion_agent" /></Field>
+                  <div className="grid2">
+                    <Field label="📥 읽어올 곳" hint="변경사항을 가져올 서비스/페이지입니다."><input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="예: GitHub 저장소, Notion BOARD" /></Field>
+                    <Field label="📤 저장할 곳" hint="AI가 정리한 결과를 쓸 대상입니다."><input value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="예: Notion 업무 보드, GitHub 이슈" /></Field>
+                  </div>
                 </div>
-                <div className="grid2">
-                  <Field label="읽어올 곳" hint="자동화가 변경사항을 가져올 서비스나 페이지입니다."><input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="예: GitHub 저장소, Notion BOARD, Figma 파일" /></Field>
-                  <Field label="결과 저장 위치" hint="AI가 정리한 결과를 쓸 대상입니다. 이 칸이 방금 물어본 목적지 입력칸입니다."><input value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="예: Notion 업무 보드, GitHub 이슈, Google Calendar" /></Field>
-                </div>
-                <div className="grid3 wide">
-                  <Field label="AI 제공자"><input list="ai-provider-options" value={form.ai_provider} onChange={(e) => setForm({ ...form, ai_provider: e.target.value })} placeholder="OpenAI 또는 OpenAI-compatible" /></Field>
-                  <Field label="AI 모델"><input list="ai-model-options" value={form.ai_model} onChange={(e) => setForm({ ...form, ai_model: e.target.value })} placeholder="gpt-4o-mini" /></Field>
-                  <Field label="AI API Base"><input list="ai-api-base-options" value={form.ai_api_base} onChange={(e) => setForm({ ...form, ai_api_base: e.target.value })} placeholder="https://api.openai.com/v1" /></Field>
-                </div>
-                <Field label="API Provider"><input value={form.api_provider} onChange={(e) => setForm({ ...form, api_provider: e.target.value })} /></Field>
-                <div className="grid2">
-                  <Field label="GitHub Repo URL"><input value={form.github_repo_url} onChange={(e) => setForm({ ...form, github_repo_url: e.target.value })} /></Field>
-                  <Field label="Notion DB URL"><input value={form.notion_database_url} onChange={(e) => setForm({ ...form, notion_database_url: e.target.value })} /></Field>
-                </div>
-                <div className="grid2">
-                  <Field label="Figma File URL"><input value={form.figma_file_url} onChange={(e) => setForm({ ...form, figma_file_url: e.target.value })} /></Field>
-                  <Field label="Google Calendar ID"><input value={form.calendar_id} onChange={(e) => setForm({ ...form, calendar_id: e.target.value })} /></Field>
-                </div>
-                <Field label="실행 지침"><textarea value={form.instruction} onChange={(e) => setForm({ ...form, instruction: e.target.value })} /></Field>
-                <Field label="결과 템플릿"><textarea value={form.template} onChange={(e) => setForm({ ...form, template: e.target.value })} /></Field>
-                <Field label="API Key 전략"><textarea value={form.api_key_strategy} onChange={(e) => setForm({ ...form, api_key_strategy: e.target.value })} /></Field>
-                <div className="connection-preview">
-                  <strong>자동화 연결 미리보기</strong>
-                  <span>{(form.custom_connections || []).length ? `${form.custom_connections.length}개 연결: ${form.custom_connections.map((connection) => `${connection.service}:${connection.operation}`).join(" / ")}` : "자동화 텍스트와 선택 프로필에서 연결을 추론합니다."}</span>
-                </div>
+
+                {/* ③ 고급 설정 (접기 가능) */}
+                <details className="form-section advanced-section">
+                  <summary className="form-section-head">
+                    <span className="form-section-num">3</span>
+                    <div><strong>고급 설정</strong><small>AI 모델, URL, 실행 지침 등을 직접 설정합니다. 템플릿 선택 시 기본값이 채워집니다.</small></div>
+                  </summary>
+                  <div className="grid3 wide" style={{ marginTop: 12 }}>
+                    <Field label="AI 제공자"><input list="ai-provider-options" value={form.ai_provider} onChange={(e) => setForm({ ...form, ai_provider: e.target.value })} placeholder="OpenAI" /></Field>
+                    <Field label="AI 모델"><input list="ai-model-options" value={form.ai_model} onChange={(e) => setForm({ ...form, ai_model: e.target.value })} placeholder="gpt-4o-mini" /></Field>
+                    <Field label="AI API Base"><input list="ai-api-base-options" value={form.ai_api_base} onChange={(e) => setForm({ ...form, ai_api_base: e.target.value })} placeholder="https://api.openai.com/v1" /></Field>
+                  </div>
+                  <div className="grid2">
+                    <Field label="GitHub Repo URL"><input value={form.github_repo_url} onChange={(e) => setForm({ ...form, github_repo_url: e.target.value })} /></Field>
+                    <Field label="Notion DB URL"><input value={form.notion_database_url} onChange={(e) => setForm({ ...form, notion_database_url: e.target.value })} /></Field>
+                  </div>
+                  <div className="grid2">
+                    <Field label="Figma File URL"><input value={form.figma_file_url} onChange={(e) => setForm({ ...form, figma_file_url: e.target.value })} /></Field>
+                    <Field label="Google Calendar ID"><input value={form.calendar_id} onChange={(e) => setForm({ ...form, calendar_id: e.target.value })} /></Field>
+                  </div>
+                  <Field label="실행 지침" hint="AI에게 어떻게 처리할지 구체적으로 알려줍니다."><textarea value={form.instruction} onChange={(e) => setForm({ ...form, instruction: e.target.value })} /></Field>
+                  <Field label="결과 출력 형식" hint="AI가 정리한 결과를 어떤 양식으로 출력할지 정합니다."><textarea value={form.template} onChange={(e) => setForm({ ...form, template: e.target.value })} /></Field>
+                </details>
+
                 <div className={`form-status ${automationSaveState.status}`}>
-                  {automationSaveState.message || "저장 버튼을 누르면 자동화가 생성되고 저장된 자동화 목록에 표시됩니다."}
+                  {automationSaveState.message || "저장하면 자동화가 목록에 추가됩니다."}
                 </div>
-                <button disabled={automationSaveState.status === "saving"}><CalendarClock size={14} /> {automationSaveState.status === "saving" ? "저장 중" : "자동화 저장"}</button>
+                <button disabled={automationSaveState.status === "saving"}><CalendarClock size={14} /> {automationSaveState.status === "saving" ? "저장 중…" : "자동화 저장"}</button>
               </form>
             </article>
 
             <article id="settings-panel" className={`panel ${activeMainTab === "settings" ? "" : "tab-hidden"}`}>
-              <div className="panel-title row-title"><span>사용자 기본 자동화 설정</span><span className="subtle">새 자동화나 커스텀 지침에 재사용할 AI 모델, 템플릿, 연결 기본값입니다.</span></div>
+              <div className="panel-title row-title"><span>⚙️ 기본 설정</span><span className="subtle">자동화를 만들 때마다 쓰는 기본값을 여기 저장해두면 매번 입력하지 않아도 됩니다.</span></div>
+
+              {/* 기본 설정 안내 */}
+              <div className="explainer-box">
+                <div className="explainer-icon">💡</div>
+                <div>
+                  <strong>자동화 만들 때마다 같은 걸 입력하기 번거롭죠?</strong>
+                  <p>여기서 AI 모델과 출력 형식을 한 번 저장해두면, 자동화 등록 폼에서 <b>"내 기본값 적용"</b> 버튼 하나로 자동으로 채워집니다.</p>
+                </div>
+              </div>
+
               <form className="knowledge-form" onSubmit={saveProfileSettings}>
-                <div className="grid3 wide">
-                  <Field label="AI 제공자"><input list="ai-provider-options" value={profileSettings?.aiProvider || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiProvider: e.target.value })} placeholder="OpenAI 또는 OpenAI-compatible" /></Field>
-                  <Field label="AI 모델"><input list="ai-model-options" value={profileSettings?.aiModel || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiModel: e.target.value })} placeholder="gpt-4o-mini" /></Field>
-                  <Field label="AI API Base"><input list="ai-api-base-options" value={profileSettings?.aiApiBase || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiApiBase: e.target.value })} placeholder="https://api.openai.com/v1" /></Field>
+                {/* AI 설정 */}
+                <div className="settings-group">
+                  <div className="settings-group-label">🤖 AI 설정</div>
+                  <div className="grid3 wide">
+                    <Field label="AI 제공자" hint="예: OpenAI, Anthropic, 로컬 서버 등"><input list="ai-provider-options" value={profileSettings?.aiProvider || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiProvider: e.target.value })} placeholder="OpenAI" /></Field>
+                    <Field label="AI 모델" hint="예: gpt-4o-mini, claude-3-haiku"><input list="ai-model-options" value={profileSettings?.aiModel || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiModel: e.target.value })} placeholder="gpt-4o-mini" /></Field>
+                    <Field label="AI API 주소" hint="OpenAI 호환 서버 주소"><input list="ai-api-base-options" value={profileSettings?.aiApiBase || ""} onChange={(e) => setProfileSettings({ ...profileSettings, aiApiBase: e.target.value })} placeholder="https://api.openai.com/v1" /></Field>
+                  </div>
                 </div>
-                <div className="grid2">
-                  <Field label="템플릿 프리셋" hint="자동화가 어떤 기본 양식과 연결 흐름을 쓸지 고릅니다.">
-                    <select value={profileSettings?.templatePreset || "github_notion"} onChange={(e) => setProfileSettings({ ...profileSettings, templatePreset: e.target.value })}>
-                      {templatePresetOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="API Key 전략"><input value={profileSettings?.apiKeyStrategy || ""} onChange={(e) => setProfileSettings({ ...profileSettings, apiKeyStrategy: e.target.value })} /></Field>
+
+                {/* 자동화 템플릿 */}
+                <div className="settings-group">
+                  <div className="settings-group-label">📋 자동화 기본 형식</div>
+                  <div className="grid2">
+                    <Field label="템플릿 프리셋" hint="자동화가 기본으로 쓸 연결 흐름을 고릅니다. 자동화 등록 폼에서 바꿀 수 있습니다.">
+                      <select value={profileSettings?.templatePreset || "github_notion"} onChange={(e) => setProfileSettings({ ...profileSettings, templatePreset: e.target.value })}>
+                        {templatePresetOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="API Key 전략" hint="프로필 토큰 외에 추가 API 키가 필요한 경우 입력합니다."><input value={profileSettings?.apiKeyStrategy || ""} onChange={(e) => setProfileSettings({ ...profileSettings, apiKeyStrategy: e.target.value })} placeholder="예: env:OPENAI_API_KEY" /></Field>
+                  </div>
+                  <Field label="기본 결과 출력 형식" hint="AI가 자동화 결과를 어떻게 정리할지 형식을 지정합니다. 자동화마다 덮어쓸 수 있습니다."><textarea value={profileSettings?.customTemplate || ""} onChange={(e) => setProfileSettings({ ...profileSettings, customTemplate: e.target.value })} placeholder="예: ## {title}&#10;{summary}&#10;&#10;변경 사항: {changes}" /></Field>
                 </div>
-                <Field label="기본 커스텀 템플릿"><textarea value={profileSettings?.customTemplate || ""} onChange={(e) => setProfileSettings({ ...profileSettings, customTemplate: e.target.value })} /></Field>
-                <section className="connection-builder">
-                  <div className="section-head flat">
-                    <div>
-                      <strong>사용자 기본 커스텀 연결</strong>
-                      <span>자동화마다 직접 입력하지 않아도 되는 개인 기본 연결 목록입니다.</span>
-                    </div>
-                    <div className="profile-actions">
-                      {Object.keys(integrationConnectionPresets).map((kind) => (
-                        <button key={kind} type="button" onClick={() => addProfileConnection(kind)}><Plus size={13} /> {kind}</button>
-                      ))}
-                    </div>
+
+                {/* 기본 연결 */}
+                <details className="settings-group advanced-section">
+                  <summary className="settings-group-label" style={{ cursor: "pointer" }}>🔗 기본 커스텀 연결 <small>(고급)</small></summary>
+                  <p className="settings-group-desc">자동화마다 직접 입력하지 않아도 되는 개인 기본 연결 목록입니다. 보통은 프로필 탭의 OAuth 로그인으로 충분합니다.</p>
+                  <div className="profile-actions" style={{ marginBottom: 8 }}>
+                    {Object.keys(integrationConnectionPresets).map((kind) => (
+                      <button key={kind} type="button" onClick={() => addProfileConnection(kind)}><Plus size={13} /> {kind}</button>
+                    ))}
                   </div>
                   {(profileSettings?.customConnections || []).map((connection, index) => (
                     <div key={`${connection.service}:${index}`} className="connection-card">
@@ -1064,14 +1271,52 @@ function App() {
                       <Field label="연결 템플릿"><textarea value={connection.template} onChange={(e) => updateProfileConnection(index, "template", e.target.value)} /></Field>
                     </div>
                   ))}
-                  {(profileSettings?.customConnections || []).length === 0 ? <p className="empty-state">기본 연결이 없으면 자동화 또는 연동 프로필에서 직접 선택합니다.</p> : null}
-                </section>
-                <button><KeyRound size={14} /> 기본 설정 저장</button>
+                  {(profileSettings?.customConnections || []).length === 0 && <p className="empty-state">아직 기본 연결이 없습니다.</p>}
+                </details>
+
+                <button disabled={isBusy("profile-settings")}><KeyRound size={14} /> {isBusy("profile-settings") ? "저장 중…" : "기본 설정 저장"}</button>
               </form>
             </article>
 
             <article id="integrations-panel" className={`panel ${activeMainTab === "integrations" ? "" : "tab-hidden"}`}>
-              <div className="panel-title row-title"><span>내 프로필</span><span className="subtle">계정 로그인, 토큰, API 키를 여기서 한 번에 관리합니다.</span></div>
+              <div className="panel-title row-title"><span>🔗 내 프로필</span><span className="subtle">계정 로그인, 토큰, API 키를 여기서 한 번에 관리합니다.</span></div>
+
+              {/* 연결 현황 요약 */}
+              {(() => {
+                const SERVICE_LIST = [
+                  { kind: "github", label: "GitHub", emoji: "🐙", loginFn: () => startMcpLogin("github") },
+                  { kind: "notion", label: "Notion", emoji: "📝", loginFn: () => startMcpLogin("notion") },
+                  { kind: "google_calendar", label: "Google\nCalendar", emoji: "📅", loginFn: () => startMcpLogin("google_calendar") },
+                  { kind: "figma", label: "Figma", emoji: "🎨", loginFn: () => startMcpLogin("figma") },
+                  { kind: "openai", label: "OpenAI", emoji: "🤖", loginFn: () => openAiKeyProfileSetup("openai") },
+                ];
+                return (
+                  <div className="conn-status-grid">
+                    {SERVICE_LIST.map(({ kind, label, emoji, loginFn }) => {
+                      const profiles = integrationProfiles.filter(p => p.sourceKind === kind || (kind === "openai" && p.sourceKind === "custom" && p.name?.toLowerCase().includes("openai")));
+                      const connected = profiles.some(p => p.hasToken);
+                      const hasProfile = profiles.length > 0;
+                      return (
+                        <div key={kind} className={`conn-status-tile ${connected ? "ok" : hasProfile ? "warn" : "missing"}`}>
+                          <span className="conn-status-emoji">{emoji}</span>
+                          <span className="conn-status-label">{label}</span>
+                          {connected
+                            ? <span className="conn-status-badge ok">✅ 연결됨</span>
+                            : hasProfile
+                              ? <span className="conn-status-badge warn">⚠️ 토큰 없음</span>
+                              : <span className="conn-status-badge missing">➕ 미연결</span>
+                          }
+                          {!connected && (
+                            <button type="button" className="conn-status-btn" onClick={loginFn}>
+                              연결하기
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
               <section className="credential-guide">
                 <div>
                   <strong>내 계정 연결</strong>
@@ -1142,7 +1387,7 @@ function App() {
                 <div className="grid3 wide">
                   <Field label="Base URL"><input value={integrationForm.base_url} onChange={(e) => setIntegrationForm({ ...integrationForm, base_url: e.target.value })} /></Field>
                   <Field label="토큰 이름"><input value={integrationForm.token_name} onChange={(e) => setIntegrationForm({ ...integrationForm, token_name: e.target.value })} /></Field>
-                  <Field label="토큰/API Key"><input type="password" value={integrationForm.token_value} onChange={(e) => setIntegrationForm({ ...integrationForm, token_value: e.target.value })} placeholder="서버 DB에 사용자별 저장" /></Field>
+                  <Field label="토큰/API Key"><input type="password" autoComplete="off" value={integrationForm.token_value} onChange={(e) => setIntegrationForm({ ...integrationForm, token_value: e.target.value })} placeholder="서버 DB에 사용자별 저장" /></Field>
                 </div>
                 <div className="grid3 wide">
                   <Field label="AI 제공자"><input list="ai-provider-options" value={integrationForm.ai_provider} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_provider: e.target.value })} placeholder="OpenAI 또는 OpenAI-compatible" /></Field>
@@ -1157,7 +1402,7 @@ function App() {
                     </select>
                   </Field>
                   <Field label="MCP Server"><input value={integrationForm.mcp_server_url} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_server_url: e.target.value })} placeholder="mcp://notion or https://mcp.example.com" /></Field>
-                  <Field label="MCP User"><input value={integrationForm.mcp_auth_subject} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_auth_subject: e.target.value })} placeholder="user@example.com" /></Field>
+                  <Field label="MCP User"><input type="email" autoComplete="email" value={integrationForm.mcp_auth_subject} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_auth_subject: e.target.value })} placeholder="user@example.com" /></Field>
                 </div>
                 <details className="advanced-panel">
                   <summary>고급 프로필 설정</summary>
@@ -1203,25 +1448,93 @@ function App() {
               </form>
               <div className="knowledge-list">
                 <div className="panel-title compact">저장된 내 프로필</div>
-                {integrationProfiles.map((profile) => (
-                  <div key={profile.id} className="knowledge-item">
-                    <strong>{profile.name}</strong>
-                    <p>Auth: {profile.authType || "api_key"}{profile.mcpAuthSubject ? ` / ${profile.mcpAuthSubject}` : ""}{profile.mcpServerUrl ? ` / ${profile.mcpServerUrl}` : ""}</p>
-                    {profile.mcpScopes?.length ? <p>MCP scopes: {profile.mcpScopes.join(", ")}</p> : null}
-                    <span>{profile.sourceKind} / {profile.apiProvider} / {profile.aiModel} / token {profile.hasToken ? "저장됨" : "없음"} / {profile.tokenStorage || "empty"}</span>
-                    <p>{profile.baseUrl} / RAG: {profile.ragTargets.join(", ") || "미설정"}</p>
-                    <p>Connections: {profile.customConnections?.map((connection) => `${connection.service}:${connection.operation}`).join(" / ") || "기본 연결"}</p>
-                    {profile.lastCollect?.warnings?.length ? <p className="warning-line">{profile.lastCollect.warnings.join(" / ")}</p> : null}
-                    <button type="button" onClick={() => collectIntegrationProfile(profile)}><Search size={14} /> RAG 수집 실행</button>
-                    {["figma", "google_calendar"].includes(profile.sourceKind) ? (
-                      <div className="live-write-controls">
-                        <button type="button" onClick={() => writeIntegrationProfile(profile, true)}><Play size={14} /> Dry-run write</button>
-                        <input value={liveWriteConfirmations[profile.id] || ""} onChange={(e) => setLiveWriteConfirmations({ ...liveWriteConfirmations, [profile.id]: e.target.value })} placeholder="WRITE LIVE" />
-                        <button type="button" className="danger-action" disabled={(liveWriteConfirmations[profile.id] || "").trim() !== "WRITE LIVE"} onClick={() => writeIntegrationProfile(profile, false)}><Play size={14} /> Actual write</button>
+                {integrationProfiles.map((profile) => {
+                  const kindMeta = {
+                    github: { label: "GitHub", color: "#24292f", emoji: "🐙" },
+                    notion: { label: "Notion", color: "#000000", emoji: "📝" },
+                    google_calendar: { label: "Google Calendar", color: "#1a73e8", emoji: "📅" },
+                    figma: { label: "Figma", color: "#a259ff", emoji: "🎨" },
+                    openai: { label: "OpenAI", color: "#10a37f", emoji: "🤖" },
+                    custom: { label: "Custom", color: "#666", emoji: "🔧" },
+                  };
+                  const meta = kindMeta[profile.sourceKind] || kindMeta.custom;
+                  const isExpanded = expandedProfiles?.[profile.id];
+                  return (
+                    <div key={profile.id} className="profile-card" style={{ "--profile-color": meta.color }}>
+                      <div className="profile-card-header" onClick={() => setExpandedProfiles((prev) => ({ ...prev, [profile.id]: !prev?.[profile.id] }))}>
+                        <div className="profile-card-title">
+                          <span className="profile-service-badge" style={{ background: meta.color }}>{meta.emoji} {meta.label}</span>
+                          <span className="profile-name">{profile.name}</span>
+                        </div>
+                        <div className="profile-card-badges">
+                          {profile.hasToken
+                            ? <span className="badge badge-ok"><CheckCircle2 size={12} /> 토큰 연결됨</span>
+                            : <span className="badge badge-err"><XCircle size={12} /> 토큰 없음</span>}
+                          {profile.authType?.includes("mcp") || profile.authType?.includes("oauth")
+                            ? <span className="badge badge-info">OAuth</span>
+                            : <span className="badge badge-gray">API Key</span>}
+                          {profile.ragTargets?.length > 0 && <span className="badge badge-gray">RAG: {profile.ragTargets.join(", ")}</span>}
+                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </div>
                       </div>
-                    ) : null}
-                  </div>
-                ))}
+
+                      {isExpanded && (
+                        <div className="profile-card-body">
+                          <div className="profile-meta-row">
+                            <span><b>서비스</b> {profile.apiProvider || profile.sourceKind}</span>
+                            <span><b>AI 모델</b> {profile.aiModel || "미설정"}</span>
+                            <span><b>저장 방식</b> {profile.tokenStorage || "DB 암호화"}</span>
+                          </div>
+                          {profile.baseUrl && <div className="profile-meta-row"><span><b>Base URL</b> {profile.baseUrl}</span></div>}
+                          {profile.mcpServerUrl && <div className="profile-meta-row"><span><b>MCP</b> {profile.mcpServerUrl}{profile.mcpAuthSubject ? ` / ${profile.mcpAuthSubject}` : ""}</span></div>}
+                          {profile.mcpScopes?.length > 0 && <div className="profile-meta-row"><span><b>Scopes</b> {profile.mcpScopes.join(", ")}</span></div>}
+                          {profile.customConnections?.length > 0 && (
+                            <div className="profile-connections">
+                              {profile.customConnections.map((c, i) => (
+                                <span key={i} className="connection-tag">{c.service} · {c.operation}</span>
+                              ))}
+                            </div>
+                          )}
+                          {profile.lastCollect?.warnings?.length ? <p className="warning-line">{profile.lastCollect.warnings.join(" / ")}</p> : null}
+
+                          <div className="profile-item-actions">
+                            <button type="button" onClick={() => collectIntegrationProfile(profile)} disabled={isBusy(`collect:${profile.id}`)}>
+                              <Search size={14} /> {isBusy(`collect:${profile.id}`) ? "수집 중…" : "RAG 수집"}
+                            </button>
+                            {deleteConfirmProfileId === profile.id ? (
+                              <>
+                                <button type="button" className="danger confirm-delete" onClick={() => deleteIntegrationProfile(profile)} disabled={isBusy(`delete-profile:${profile.id}`)}>
+                                  <Trash2 size={14} /> {isBusy(`delete-profile:${profile.id}`) ? "삭제 중…" : "삭제 확정"}
+                                </button>
+                                <button type="button" className="secondary" onClick={() => setDeleteConfirmProfileId(null)}>취소</button>
+                              </>
+                            ) : (
+                              <button type="button" className="danger" onClick={() => setDeleteConfirmProfileId(profile.id)}><Trash2 size={14} /> 삭제</button>
+                            )}
+                          </div>
+
+                          {["figma", "google_calendar"].includes(profile.sourceKind) && (
+                            <div className="live-write-controls">
+                              <button type="button" onClick={() => writeIntegrationProfile(profile, true)} disabled={isBusy(`write:${profile.id}:true`)}>
+                                <Play size={14} /> {isBusy(`write:${profile.id}:true`) ? "확인 중…" : "Dry-run"}
+                              </button>
+                              <input
+                                value={liveWriteConfirmations[profile.id] || ""}
+                                onChange={(e) => setLiveWriteConfirmations({ ...liveWriteConfirmations, [profile.id]: e.target.value })}
+                                placeholder="WRITE LIVE 입력 후 활성화"
+                              />
+                              <button type="button" className="danger-action"
+                                disabled={(liveWriteConfirmations[profile.id] || "").trim() !== "WRITE LIVE" || isBusy(`write:${profile.id}:false`)}
+                                onClick={() => writeIntegrationProfile(profile, false)}>
+                                <Play size={14} /> {isBusy(`write:${profile.id}:false`) ? "쓰는 중…" : "실제 쓰기"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 {integrationProfiles.length === 0 ? <p className="empty-state">저장된 프로필이 없습니다. 위 로그인 버튼 또는 수동 프로필 저장을 사용하세요.</p> : null}
                 <details className="advanced-panel">
                   <summary>고급 진단 보기</summary>
@@ -1245,6 +1558,7 @@ function App() {
                         <span>{activity.eventType}</span><span>{activity.provider || "board"}</span><span>{activity.status}</span><p>{activity.summary}</p>
                       </div>
                     ))}
+                    {integrationActivities.length === 0 ? <p className="empty-state">아직 연동 활동이 없습니다.</p> : null}
                     {activityPage.hasMore ? <button type="button" className="load-more" onClick={() => loadActivities(activityFilters, activityPage.nextOffset, true)}>활동 더 보기</button> : null}
                   </div>
                 </details>
@@ -1252,147 +1566,252 @@ function App() {
             </article>
 
             <article id="knowledge-panel" className={`panel ${activeMainTab === "knowledge" ? "" : "tab-hidden"}`}>
-              <div className="panel-title row-title"><span>RAG 지식자료</span><span className="subtle">문서, 음성, 이미지, 기타 파일 설명을 사용자별로 저장합니다.</span></div>
-              <form className="knowledge-form" onSubmit={saveKnowledge}>
-                <div className="grid3 wide">
-                  <Field label="자료명"><input value={knowledgeForm.title} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, title: e.target.value })} /></Field>
-                  <Field label="자료 종류" hint="자동화가 이 자료를 어떤 유형으로 참고할지 고릅니다."><select value={knowledgeForm.source_type} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, source_type: e.target.value })}><option value="document">문서</option><option value="audio">음성</option><option value="image">이미지</option><option value="spreadsheet">스프레드시트</option><option value="custom">기타</option></select></Field>
-                  <Field label="태그"><input value={knowledgeForm.tags} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, tags: e.target.value })} /></Field>
+              <div className="panel-title row-title"><span>📚 지식자료 (RAG)</span><span className="subtle">AI가 자동화 실행 중 참고할 문서·텍스트를 저장합니다.</span></div>
+
+              {/* 지식자료 안내 */}
+              <div className="explainer-box">
+                <div className="explainer-icon">📚</div>
+                <div>
+                  <strong>자동화가 내 문서를 참고하게 만들 수 있습니다.</strong>
+                  <p>사내 규정, 업무 가이드, 자주 쓰는 양식 등을 여기 저장해두면 자동화 실행 시 AI가 그 내용을 보고 답변·정리를 합니다. 예를 들어 "이슈 정리 시 우리 팀 양식 따르기"나 "회의록은 이 템플릿으로 작성"처럼 쓸 수 있습니다.</p>
+                  <p><b>연결하려면:</b> 프로필 탭 → 프로필 열기 → <b>지식자료 대상</b> 칸에 아래 자료의 이름이나 태그를 입력하면 됩니다.</p>
                 </div>
-                <Field label="작성/사용 지침"><textarea value={knowledgeForm.instruction} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, instruction: e.target.value })} /></Field>
-                <Field label="본문/추출 텍스트" hint="문서 내용, 음성 녹취, 이미지 설명, 스프레드시트 요약처럼 AI가 검색할 내용을 넣습니다."><textarea value={knowledgeForm.extracted_text} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, extracted_text: e.target.value })} /></Field>
-                <div className="file-row">
-                  <label className="file-picker"><Upload size={14} /> 파일<input type="file" onChange={(e) => setKnowledgeForm({ ...knowledgeForm, file: e.target.files?.[0] || null })} /></label>
-                  <span>{knowledgeForm.file ? `첨부 파일: ${knowledgeForm.file.name}` : "파일 첨부는 선택입니다. 선택한 자료 종류에 맞춰 본문/추출 텍스트만으로도 저장할 수 있습니다."}</span>
-                  <button><FileText size={14} /> 저장</button>
-                </div>
-              </form>
-              <div className="knowledge-list">
-                {knowledgeSources.map((source) => <div key={source.id} className="knowledge-item"><strong>{source.title}</strong><span>{source.sourceType} / {source.tags.join(", ")}</span><p>{source.instruction || source.extractedText?.slice(0, 180)}</p></div>)}
+              </div>
+
+              {/* 자료 추가 폼 */}
+              <div className="settings-group">
+                <div className="settings-group-label">➕ 자료 추가</div>
+                <form className="knowledge-form" onSubmit={saveKnowledge}>
+                  <div className="grid3 wide">
+                    <Field label="자료명" hint="프로필의 RAG 대상 칸에 이 이름으로 연결합니다."><input value={knowledgeForm.title} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, title: e.target.value })} placeholder="예: 업무 가이드, 사내 규정" required /></Field>
+                    <Field label="자료 종류" hint="AI가 이 자료를 어떤 유형으로 처리할지 고릅니다.">
+                      <select value={knowledgeForm.source_type} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, source_type: e.target.value })}>
+                        <option value="document">📄 문서</option>
+                        <option value="taskory">✅ Taskory 작업 내보내기</option>
+                        <option value="audio">🎤 음성 녹취</option>
+                        <option value="image">🖼️ 이미지 설명</option>
+                        <option value="spreadsheet">📊 스프레드시트</option>
+                        <option value="custom">🔧 기타</option>
+                      </select>
+                    </Field>
+                    <Field label="태그" hint="쉼표로 구분. 프로필 RAG 대상 연결 시 사용됩니다."><input value={knowledgeForm.tags} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, tags: e.target.value })} placeholder="예: 사내규정, 업무가이드" /></Field>
+                  </div>
+                  <Field label="AI 사용 지침" hint="이 자료를 언제, 어떻게 참고할지 AI에게 알려줍니다."><textarea value={knowledgeForm.instruction} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, instruction: e.target.value })} placeholder="예: 답변 작성 시 이 규정을 우선 참고하고 규정에 없으면 일반 상식을 사용하세요." /></Field>
+                  <Field label="자료 내용" hint="AI가 검색할 실제 텍스트입니다. 문서를 붙여넣거나 파일을 첨부하세요."><textarea value={knowledgeForm.extracted_text} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, extracted_text: e.target.value })} placeholder="문서 내용, 음성 녹취, 이미지 설명, 스프레드시트 데이터 등을 여기에 붙여넣으세요." /></Field>
+                  <div className="file-row">
+                    <label className="file-picker"><Upload size={14} /> 파일 첨부 (선택)<input type="file" accept=".txt,.md,.csv,.json,.jsonl,.log" onChange={(e) => setKnowledgeForm({ ...knowledgeForm, file: e.target.files?.[0] || null })} /></label>
+                    {knowledgeForm.file && <span className="file-name">📎 {knowledgeForm.file.name}</span>}
+                    <span className="file-help">Taskory JSON/JSONL은 작업별 RAG 텍스트로 자동 정리됩니다.</span>
+                    <button disabled={knowledgeSaveState.status === "saving"}><FileText size={14} /> {knowledgeSaveState.status === "saving" ? "저장 중…" : "자료 저장"}</button>
+                  </div>
+                  {knowledgeSaveState.message ? <div className={`form-status ${knowledgeSaveState.status}`}>{knowledgeSaveState.message}</div> : null}
+                </form>
+              </div>
+
+              {/* 저장된 자료 목록 */}
+              <div className="settings-group">
+                <div className="settings-group-label">📂 저장된 자료 ({knowledgeSources.length}개)</div>
+                {knowledgeSources.length === 0 ? (
+                  <div className="rag-empty">
+                    <p>아직 저장된 자료가 없습니다.</p>
+                    <small>위 폼에서 문서나 텍스트를 추가하면 여기에 나타납니다.</small>
+                  </div>
+                ) : (
+                  <div className="rag-source-list">
+                    {knowledgeSources.map((source) => (
+                      <div key={source.id} className="rag-source-card">
+                        <div className="rag-source-header">
+                          <strong>{source.title}</strong>
+                          <div className="rag-source-badges">
+                            <span className="badge badge-info">{source.sourceType}</span>
+                            {source.tags.map((t) => <span key={t} className="badge badge-gray">#{t}</span>)}
+                          </div>
+                        </div>
+                        {source.instruction && <p className="rag-source-instruction">💬 {source.instruction}</p>}
+                        {source.extractedText && <p className="rag-source-preview">{source.extractedText.slice(0, 200)}{source.extractedText.length > 200 ? "…" : ""}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </article>
 
             <article id="board-panel" className={`panel ${activeMainTab === "board" ? "" : "tab-hidden"}`}>
-              <div className="board-header">
-                <div>
-                  <span className="eyebrow">팀 게시판</span>
-                  <h2>공유 자동화와 일반 게시글</h2>
-                  <p>자동화 템플릿 공유와 사람이 작성한 게시글을 분리해서 봅니다.</p>
+              {/* ── 게시판 헤더 ── */}
+              <div className="board-top">
+                <div className="board-top-info">
+                  <h2>📋 게시판</h2>
+                  <p>공지, 요청, 공유 자동화 템플릿을 여기서 한눈에 봅니다.</p>
                 </div>
-                <div className="board-metrics" aria-label="게시판 요약">
-                  <span><b>{postPage.total}</b>일반 글</span>
-                  <span><b>{sharePage.total}</b>공유 자동화</span>
-                  <span><b>{posts.length}</b>불러온 글</span>
+                <div className="board-top-actions">
+                  <form className="search" role="search" onSubmit={(e) => { e.preventDefault(); loadAll(q); }}>
+                    <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="검색…" aria-label="게시글 검색" />
+                    <button type="submit" aria-label="검색"><Search size={13} /></button>
+                  </form>
+                  <button type="button" className="board-write-btn" onClick={() => setShowWriteForm((v) => !v)}><Plus size={14} /> 글 쓰기</button>
                 </div>
               </div>
-              <div className="board-toolbar">
-                <div className="search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="제목, 내용, 태그 검색" /><button type="button" onClick={() => loadAll(q)}><Search size={13} /></button></div>
-                <button type="button" onClick={() => document.getElementById("board-write-title")?.focus()}><Plus size={14} /> 새 글 쓰기</button>
+
+              {/* ── 글 쓰기 폼 (토글) ── */}
+              {showWriteForm && (
+                <form className="board-write-form" onSubmit={createPost}>
+                  <input id="board-write-title" name="title" placeholder="제목을 입력하세요" aria-label="게시글 제목" required />
+                  <textarea name="content" placeholder="내용을 입력하세요" aria-label="게시글 내용" rows={4} required />
+                  <div className="board-write-footer">
+                    <input name="tags" placeholder="태그: github, notion, rag" aria-label="태그" className="board-tags-input" />
+                    {postSaveState.message ? <span className={`form-status inline ${postSaveState.status}`}>{postSaveState.message}</span> : null}
+                    <button disabled={postSaveState.status === "saving"}><Plus size={14} /> {postSaveState.status === "saving" ? "저장 중…" : "게시"}</button>
+                    <button type="button" className="secondary" onClick={() => setShowWriteForm(false)}>취소</button>
+                  </div>
+                </form>
+              )}
+
+              {/* ── 탭: 게시글 / 공유 자동화 ── */}
+              <div className="board-tabs">
+                <button type="button" className={boardSubTab === "posts" ? "board-tab active" : "board-tab"} onClick={() => setBoardSubTab("posts")}>
+                  📝 게시글 <span className="board-tab-count">{postPage.total}</span>
+                </button>
+                <button type="button" className={boardSubTab === "shares" ? "board-tab active" : "board-tab"} onClick={() => setBoardSubTab("shares")}>
+                  ⚡ 공유 자동화 <span className="board-tab-count">{sharePage.total}</span>
+                </button>
               </div>
-              <section className="automation-share-board" aria-label="공유 자동화 목록">
-                <div className="section-head flat">
-                  <div>
-                    <strong>공유 자동화</strong>
-                    <span>다른 사람이 공유한 자동화 템플릿입니다. 적용하면 내 자동화 작성 폼에 복사됩니다.</span>
+
+              {/* ── 게시글 카드 그리드 ── */}
+              {boardSubTab === "posts" && (
+                <div className="board-card-grid">
+                  {posts.length === 0 && <p className="empty-state">게시글이 없습니다. 위 <b>글 쓰기</b> 버튼으로 첫 글을 남겨보세요.</p>}
+                  {posts.map((post) => {
+                    const isExpanded = selected?.id === post.id;
+                    const tags = post.tags?.map((t) => t.tag.name) || [];
+                    return (
+                      <article key={post.id} className={`board-post-card ${isExpanded ? "expanded" : ""}`}>
+                        <div className="board-post-card-header" onClick={() => setSelected(isExpanded ? null : post)}>
+                          <div className="board-post-card-title">
+                            <span className="board-post-title">{post.title}</span>
+                            <div className="board-post-meta">
+                              <span className="board-post-author">✍️ {post.author?.name || "작성자"}</span>
+                              {tags.map((t) => <span key={t} className="board-tag">#{t}</span>)}
+                            </div>
+                          </div>
+                          {!isExpanded && <p className="board-post-excerpt">{post.content?.slice(0, 100) || "내용 없음"}…</p>}
+                          <span className="board-expand-hint">{isExpanded ? "▲ 접기" : "▼ 펼치기"}</span>
+                        </div>
+                        {isExpanded && (
+                          <div className="board-post-body">
+                            <div className="post-content">{renderPostContent(post.content)}</div>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                  <div className="post-page-row">
+                    <span className="muted">{posts.length} / {postPage.total}개 표시</span>
+                    {postPage.hasMore && <button type="button" onClick={loadMorePosts} disabled={isBusy("more-posts")} className="secondary">{isBusy("more-posts") ? "불러오는 중…" : "더 보기"}</button>}
                   </div>
                 </div>
-                <div className="share-card-grid">
+              )}
+
+              {/* ── 공유 자동화 카드 그리드 ── */}
+              {boardSubTab === "shares" && (
+                <div className="board-card-grid">
+                  {automationShares.length === 0 && (
+                    <div className="board-empty-shares">
+                      <p>⚡ 공유된 자동화가 없습니다.</p>
+                      <small>자동화 탭 → 내 자동화 → <b>공유 자동화로 등록</b> 버튼을 누르면 여기에 나타납니다.</small>
+                    </div>
+                  )}
                   {automationShares.map((post) => (
-                    <article key={post.id} className="share-card">
-                      <span className="post-kind">자동화</span>
-                      <h3>{post.title.replace(/^\[자동화\]\s*/, "")}</h3>
-                      <p>{post.summary || post.content?.slice(0, 180) || "공유 설명 없음"}</p>
-                      <div className="share-meta">
-                        <span>{post.author?.name || "작성자 없음"}</span>
-                        <span>{post.tags?.map((tag) => `#${tag.tag.name}`).join(" ")}</span>
+                    <article key={post.id} className="board-share-card">
+                      <div className="board-share-card-top">
+                        <span className="board-share-badge">⚡ 자동화 템플릿</span>
+                        <span className="board-share-author">{post.author?.name || "작성자"}</span>
                       </div>
-                      <button type="button" onClick={() => applySharedAutomation(post)} disabled={!post.automationTemplate}>
-                        <Plus size={14} /> 내 자동화에 적용
+                      <h3 className="board-share-title">{post.title.replace(/^\[자동화\]\s*/, "")}</h3>
+                      <p className="board-share-desc">{post.summary || post.content?.slice(0, 160) || "설명 없음"}</p>
+                      <div className="board-share-tags">{post.tags?.map((t) => <span key={t.tag.name} className="board-tag">#{t.tag.name}</span>)}</div>
+                      <button
+                        type="button"
+                        className={post.automationTemplate ? "" : "secondary"}
+                        onClick={() => applySharedAutomation(post)}
+                        disabled={!post.automationTemplate}
+                        title={post.automationTemplate ? "자동화 탭의 등록 폼에 이 설정이 복사됩니다" : "원본 자동화가 삭제됨"}
+                      >
+                        {post.automationTemplate ? <><Plus size={14} /> 내 자동화에 적용</> : "원본 삭제됨"}
                       </button>
                     </article>
                   ))}
-                  {automationShares.length === 0 ? <p className="empty-state">아직 공유된 자동화가 없습니다. 자동화 탭에서 내 자동화를 공유하면 여기에 표시됩니다.</p> : null}
+                  {sharePage.hasMore && <button type="button" className="load-more" onClick={loadMoreShares} disabled={isBusy("more-shares")}>{isBusy("more-shares") ? "불러오는 중…" : "더 보기"}</button>}
                 </div>
-                {sharePage.hasMore ? <button type="button" className="load-more" onClick={loadMoreShares}>공유 자동화 더 보기</button> : null}
-              </section>
-              <div className="board-reader">
-                <div className="post-list" aria-label="게시글 목록">
-                  {posts.map((post) => {
-                    const isSelected = selected?.id === post.id;
-                    const tags = post.tags?.map((tag) => tag.tag.name).join(", ");
-                    return (
-                      <button
-                        key={post.id}
-                        type="button"
-                        data-post-id={post.id}
-                        aria-pressed={isSelected}
-                        className={`post-link ${isSelected ? "selected" : ""}`}
-                        onClick={() => setSelected(post)}
-                      >
-                        <span className="post-kind">게시글</span>
-                        <span className="post-title">{post.title}</span>
-                        <span className="post-meta">{post.author.name || "작성자 없음"}{tags ? ` · ${tags}` : ""}</span>
-                        <span className="post-excerpt">{post.content?.slice(0, 120) || "내용 없음"}</span>
-                      </button>
-                    );
-                  })}
-                  {posts.length === 0 ? <p className="empty-state">검색 결과가 없습니다. 새 글을 작성하거나 검색어를 지우세요.</p> : null}
-                  <div className="post-page-row">
-                    <span>{posts.length} / {postPage.total}</span>
-                    {postPage.hasMore ? <button type="button" onClick={loadMorePosts}>더 불러오기</button> : null}
-                  </div>
-                </div>
-                <div className="post-preview" aria-label="선택한 게시글 내용">
-                  {selected ? (
-                    <>
-                      <div className="post-preview-head">
-                        <span>게시글</span>
-                        <small>{selected.author?.name || "작성자 없음"} · {selected.tags?.map((tag) => `#${tag.tag.name}`).join(" ") || "태그 없음"}</small>
-                      </div>
-                      <h2>{selected.title}</h2>
-                      <div className="post-content">{renderPostContent(selected.content)}</div>
-                      <div className="tag-row">{selected.tags?.map((tag) => <span key={tag.tag.name}>#{tag.tag.name}</span>)}</div>
-                    </>
-                  ) : (
-                    <p className="empty-state">왼쪽 목록에서 게시글을 선택하세요.</p>
-                  )}
-                </div>
-              </div>
-              <form className="write-form" onSubmit={createPost}>
-                <div className="write-head">
-                  <strong>게시글 작성</strong>
-                  <span>팀원이 볼 공지, 요청, 자동화 보정 내용을 남깁니다.</span>
-                </div>
-                <input id="board-write-title" name="title" placeholder="제목" aria-label="게시글 제목" />
-                <textarea name="content" placeholder="내용을 입력하세요" aria-label="게시글 내용" />
-                <input name="tags" placeholder="태그 예: github, notion, rag" />
-                <button><Plus size={14} /> 게시글 작성</button>
-              </form>
+              )}
             </article>
 
             <article id="api-panel" className={`panel ${activeMainTab === "api" ? "" : "tab-hidden"}`}>
-              <div className="panel-title">API / AI 도구</div>
-              <div className="api-console">
-                <textarea value={apiPrompt} onChange={(e) => setApiPrompt(e.target.value)} />
-                <div className="api-buttons">
-                  <button onClick={() => callApiDemo("health")}><Database size={14} /> Health</button>
-                  <button onClick={() => callApiDemo("rag")}><Search size={14} /> RAG</button>
-                  <button onClick={() => callApiDemo("mcp")}><GitBranch size={14} /> MCP</button>
-                  <button onClick={() => callApiDemo("hub")}><Bot size={14} /> Agent Hub</button>
-                </div>
+              <div className="panel-title row-title"><span>🔍 시스템 점검</span><span className="subtle">서버 연결 상태, AI 동작, 저장된 자료 검색을 여기서 확인합니다.</span></div>
+
+              {/* 점검 항목 카드 */}
+              <div className="check-grid">
+                <button type="button" className="check-card" onClick={() => callApiDemo("health")}>
+                  <span className="check-card-icon">🟢</span>
+                  <div>
+                    <strong>서버 상태 확인</strong>
+                    <small>백엔드가 정상 동작 중인지 확인합니다</small>
+                  </div>
+                </button>
+                <button type="button" className="check-card" onClick={() => callApiDemo("rag")}>
+                  <span className="check-card-icon">🔍</span>
+                  <div>
+                    <strong>지식자료 검색 테스트</strong>
+                    <small>아래 지침 입력 후 RAG 검색 결과를 확인합니다</small>
+                  </div>
+                </button>
+                <button type="button" className="check-card" onClick={() => callApiDemo("mcp")}>
+                  <span className="check-card-icon">🔗</span>
+                  <div>
+                    <strong>MCP 연결 상태</strong>
+                    <small>GitHub, Notion 등 MCP 도구 연결을 확인합니다</small>
+                  </div>
+                </button>
+                <button type="button" className="check-card" onClick={() => callApiDemo("hub")}>
+                  <span className="check-card-icon">🤖</span>
+                  <div>
+                    <strong>AI 에이전트 허브</strong>
+                    <small>AI 도구 실행 가능 여부를 테스트합니다</small>
+                  </div>
+                </button>
+              </div>
+
+              {/* 지침 입력 */}
+              <div className="settings-group">
+                <div className="settings-group-label">💬 테스트 지침 입력 <small>(RAG 검색 시 사용)</small></div>
+                <textarea className="api-prompt-textarea" value={apiPrompt} onChange={(e) => setApiPrompt(e.target.value)} aria-label="AI 도구 실행 지침" placeholder="예: GitHub 이슈 목록에서 오늘 마감인 항목을 정리해줘" rows={3} />
               </div>
             </article>
           </section>
 
-          {activeMainTab === "api" ? <aside className="result-panel" aria-label="선택 항목과 API 결과">
-            <div className="tabs" role="tablist" aria-label="결과 패널">
-              <button type="button" role="tab" aria-label="선택 글 보기" aria-selected={sideTab === "selected"} className={sideTab === "selected" ? "active" : ""} onClick={() => setSideTab("selected")}>선택 글</button>
-              <button type="button" role="tab" aria-label="AI 결과 보기" aria-selected={sideTab === "api"} className={sideTab === "api" ? "active" : ""} onClick={() => setSideTab("api")}>AI 결과</button>
+          {activeMainTab === "api" ? <aside className="result-panel" aria-label="점검 결과">
+            <div className="result-panel-header">
+              <strong>📊 점검 결과</strong>
+              <small>위 항목을 클릭하면 여기에 결과가 표시됩니다.</small>
             </div>
-            {sideTab === "selected" ? (
-              selected ? <><h2>{selected.title}</h2><div className="post-content compact">{renderPostContent(selected.content)}</div><p className="tag-line">{selected.tags?.map((tag) => `#${tag.tag.name}`).join(" ")}</p></> : <p>선택된 게시글이 없습니다.</p>
+            {(apiResult || result) ? (
+              <div className="check-result">
+                {(() => {
+                  const data = apiResult || result;
+                  if (data?.status === "ok" || data?.status === "healthy") {
+                    return <div className="check-result-ok">✅ 정상 동작 중</div>;
+                  }
+                  if (data?.error) {
+                    return <div className="check-result-err">❌ 오류: {data.error}</div>;
+                  }
+                  return null;
+                })()}
+                <pre className="check-result-pre">{JSON.stringify(apiResult || result, null, 2)}</pre>
+              </div>
             ) : (
-              <pre>{JSON.stringify(apiResult || result || { status: "AI 도구를 실행하면 결과가 표시됩니다." }, null, 2)}</pre>
+              <div className="check-result-empty">
+                <p>🔍 위 점검 항목을 클릭하세요</p>
+                <small>서버 상태, RAG, MCP, AI 허브 순서로 확인하면 됩니다.</small>
+              </div>
             )}
           </aside> : null}
         </div>
