@@ -1347,6 +1347,48 @@ pre {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+.connection-choice-panel {
+  margin: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.connection-choice-panel article {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 14px;
+  min-height: 164px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.connection-choice-panel article.primary-choice {
+  border-color: #8fc9bd;
+  background: #f0fbf8;
+  box-shadow: 0 10px 24px rgba(0, 108, 91, .08);
+}
+.connection-choice-panel strong {
+  color: var(--text);
+  font-size: 15px;
+}
+.connection-choice-panel p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.choice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.choice-actions button {
+  width: auto;
+  min-height: 36px;
+  padding: 8px 10px;
+  border-color: #a8d0ca;
+  color: var(--accent-strong);
+}
 .credential-guide {
   margin: 14px;
   padding: 14px;
@@ -2389,6 +2431,7 @@ pre {
   .provider-grid,
   .conn-status-grid,
   .profile-section-tabs,
+  .connection-choice-panel,
   .ai-key-guide,
   .manual-profile-guide,
   .oauth-diagnostic-row,

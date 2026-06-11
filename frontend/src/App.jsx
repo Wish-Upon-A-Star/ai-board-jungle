@@ -1628,6 +1628,37 @@ function App() {
                 ))}
               </div>
               <section className={`profile-subsection ${profileSection === "connect" ? "" : "tab-hidden"}`}>
+                <section className="connection-choice-panel" aria-label="연결 방식 선택">
+                  <article>
+                    <strong>1. 계정으로 로그인</strong>
+                    <p>GitHub, Notion, Figma, Google Calendar는 먼저 로그인 버튼을 눌러 본인 계정을 연결합니다.</p>
+                    <div className="choice-actions">
+                      <button type="button" onClick={() => startMcpLogin("github")}><GitBranch size={14} /> GitHub</button>
+                      <button type="button" onClick={() => startMcpLogin("notion")}><Link2 size={14} /> Notion</button>
+                      <button type="button" onClick={() => startMcpLogin("figma")}><Link2 size={14} /> Figma</button>
+                      <button type="button" onClick={() => startMcpLogin("google_calendar")}><CalendarClock size={14} /> Calendar</button>
+                    </div>
+                  </article>
+                  <article className="primary-choice">
+                    <strong>2. AI API 키 저장</strong>
+                    <p>OpenAI, Gemini, Anthropic 키는 여기에 저장합니다. 값은 DB에 암호화되어 저장되고 다시 표시되지 않습니다.</p>
+                    <div className="choice-actions">
+                      <button type="button" onClick={() => openAiKeyProfileSetup("openai")}>OpenAI 키</button>
+                      <button type="button" onClick={() => openAiKeyProfileSetup("anthropic")}>Anthropic 키</button>
+                      <button type="button" onClick={() => openAiKeyProfileSetup("gemini")}>Gemini 키</button>
+                      <button type="button" onClick={() => openAiKeyProfileSetup("compatible")}>호환 API</button>
+                    </div>
+                  </article>
+                  <article>
+                    <strong>3. 수동 토큰 입력</strong>
+                    <p>OAuth가 안 되거나 사내 API를 연결할 때만 사용합니다. 서비스 종류를 고르고 토큰/API Key 칸에 붙여 넣습니다.</p>
+                    <div className="choice-actions">
+                      <button type="button" onClick={() => openMcpProfileSetup("github")}>GitHub 토큰</button>
+                      <button type="button" onClick={() => openMcpProfileSetup("notion")}>Notion 토큰</button>
+                      <button type="button" onClick={revealManualProfileForm}>직접 입력</button>
+                    </div>
+                  </article>
+                </section>
                 <section className="credential-guide">
                   <div>
                     <strong>내 계정 연결</strong>

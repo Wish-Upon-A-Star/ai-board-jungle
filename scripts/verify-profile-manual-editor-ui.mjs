@@ -44,12 +44,26 @@ async function main() {
     const connectSelected = await sectionTabs.nth(0).getAttribute("aria-selected");
     if (connectSelected !== "true") throw new Error("connect section should be selected by default");
 
+    const choicePanel = page.locator(".connection-choice-panel");
+    await choicePanel.waitFor({ state: "visible", timeout: 15000 });
+    const choiceCards = choicePanel.locator("article");
+    const choiceCount = await choiceCards.count();
+    if (choiceCount !== 3) throw new Error(`expected 3 connection choice cards, got ${choiceCount}`);
+    const aiChoiceText = await choiceCards.nth(1).innerText();
+    if (!aiChoiceText.includes("AI API") || !aiChoiceText.includes("DB")) {
+      throw new Error(`AI API key choice card is not explicit enough: ${aiChoiceText}`);
+    }
+    const choicePanelBox = await choicePanel.boundingBox();
+    if (!choicePanelBox || choicePanelBox.width < 600 || choicePanelBox.height < 150) {
+      throw new Error(`connection choice panel is too compressed: ${JSON.stringify(choicePanelBox)}`);
+    }
+
     const editor = page.locator(".manual-profile-editor");
     const form = page.locator("#profile-manual-form");
     await editor.waitFor({ state: "visible", timeout: 15000 });
     if (await form.isVisible()) throw new Error("manual profile form should be collapsed by default");
 
-    await page.locator(".ai-key-actions button").first().click();
+    await choiceCards.nth(1).locator("button").first().click();
     await form.waitFor({ state: "visible", timeout: 15000 });
     const openAfterAiKey = await editor.evaluate((node) => node.open);
     if (!openAfterAiKey) throw new Error("AI key action did not open the manual profile editor");
@@ -85,6 +99,8 @@ async function main() {
         "connection_status_cards_visible",
         "profile_section_tabs_visible",
         "connect_section_selected_by_default",
+        "connection_choice_panel_visible",
+        "ai_api_key_choice_card_explicit",
         "manual_editor_collapsed_by_default",
         "ai_key_action_opens_manual_editor",
         "ai_key_action_prefills_custom_profile",
