@@ -39,16 +39,16 @@ async function clickTab(page, text) {
 async function fillManualProfileForm(page, profile) {
   const form = page.locator("#profile-manual-form");
   await form.waitFor({ state: "visible", timeout: 10000 });
+  const advanced = form.locator(".manual-profile-advanced");
+  if (await advanced.evaluate((node) => node.open)) {
+    throw new Error("Manual profile advanced settings should stay collapsed for the basic token save flow");
+  }
   await form.locator("input").nth(0).fill(profile.name);
   await form.locator("select").nth(0).selectOption(profile.sourceKind);
   await form.locator("input").nth(1).fill(profile.apiProvider);
   await form.locator("input").nth(2).fill(profile.baseUrl);
   await form.locator("input").nth(3).fill(profile.tokenName);
   await form.locator("input").nth(4).fill(profile.tokenValue);
-  await form.locator("input").nth(5).fill(profile.aiProvider);
-  await form.locator("input").nth(6).fill(profile.aiModel);
-  await form.locator("input").nth(7).fill(profile.aiApiBase);
-  await form.locator("select").nth(1).selectOption(profile.authType || "api_key");
   await Promise.all([
     page.waitForResponse((response) => response.url().includes("/api/integration-profiles") && response.request().method() === "POST", { timeout: 15000 }),
     form.locator("button").last().click(),
@@ -176,6 +176,7 @@ async function main() {
             "openai_api_key_profile_ui",
             "github_token_profile_ui",
             "notion_token_profile_ui",
+            "basic_token_save_flow_keeps_advanced_settings_collapsed",
             "raw_token_redaction",
             "automation_uses_selected_user_profile",
             "profiles_persist_after_relogin",

@@ -1832,6 +1832,10 @@ function App() {
                   </dl>
                 </section>
                 <form id="profile-manual-form" className="knowledge-form" onSubmit={saveIntegrationProfile}>
+                <div className="manual-profile-simple-note">
+                  <strong>기본 입력만으로 저장할 수 있습니다.</strong>
+                  <span>프로필명, 종류, Base URL, 토큰 이름, 토큰/API Key를 채우고 저장하세요. AI 모델, MCP, RAG, 커스텀 연결은 아래 고급 설정에서만 수정합니다.</span>
+                </div>
                 <div className="grid3 wide">
                   <Field label="프로필명"><input value={integrationForm.name} onChange={(e) => setIntegrationForm({ ...integrationForm, name: e.target.value })} /></Field>
                   <Field label="종류">
@@ -1850,28 +1854,27 @@ function App() {
                   <Field label="토큰 이름" hint={manualGuide.tokenName}><input value={integrationForm.token_name} onChange={(e) => setIntegrationForm({ ...integrationForm, token_name: e.target.value })} /></Field>
                   <Field label="토큰/API Key" hint="값은 사용자별로 암호화 저장되고 목록/응답에 다시 보이지 않습니다."><input type="password" autoComplete="off" value={integrationForm.token_value} onChange={(e) => setIntegrationForm({ ...integrationForm, token_value: e.target.value })} placeholder="여기에 본인 API 키 붙여넣기" /></Field>
                 </div>
-                <div className="grid3 wide">
-                  <Field label="AI 제공자"><input list="ai-provider-options" value={integrationForm.ai_provider} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_provider: e.target.value })} placeholder="OpenAI 또는 OpenAI-compatible" /></Field>
-                  <Field label="AI 모델"><input list="ai-model-options" value={integrationForm.ai_model} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_model: e.target.value })} placeholder="gpt-4o-mini" /></Field>
-                  <Field label="AI API Base"><input list="ai-api-base-options" value={integrationForm.ai_api_base} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_api_base: e.target.value })} placeholder="https://api.openai.com/v1" /></Field>
-                  <Field label="Auth Type">
-                    <select value={integrationForm.auth_type} onChange={(e) => setIntegrationForm({ ...integrationForm, auth_type: e.target.value })}>
-                      <option value="api_key">API key</option>
-                      <option value="oauth">OAuth</option>
-                      <option value="mcp">MCP</option>
-                      <option value="mcp_oauth">MCP OAuth</option>
-                    </select>
-                  </Field>
-                  <Field label="MCP Server"><input value={integrationForm.mcp_server_url} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_server_url: e.target.value })} placeholder="mcp://notion or https://mcp.example.com" /></Field>
-                  <Field label="MCP User"><input type="email" autoComplete="email" value={integrationForm.mcp_auth_subject} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_auth_subject: e.target.value })} placeholder="user@example.com" /></Field>
-                </div>
-                <details className="advanced-panel">
-                  <summary>고급 프로필 설정</summary>
+                <details className="advanced-panel manual-profile-advanced">
+                  <summary>고급 설정: AI 모델, MCP, RAG, 커스텀 연결</summary>
+                  <div className="grid3 wide">
+                    <Field label="AI 제공자"><input list="ai-provider-options" value={integrationForm.ai_provider} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_provider: e.target.value })} placeholder="OpenAI 또는 OpenAI-compatible" /></Field>
+                    <Field label="AI 모델"><input list="ai-model-options" value={integrationForm.ai_model} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_model: e.target.value })} placeholder="gpt-4o-mini" /></Field>
+                    <Field label="AI API Base"><input list="ai-api-base-options" value={integrationForm.ai_api_base} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_api_base: e.target.value })} placeholder="https://api.openai.com/v1" /></Field>
+                    <Field label="Auth Type">
+                      <select value={integrationForm.auth_type} onChange={(e) => setIntegrationForm({ ...integrationForm, auth_type: e.target.value })}>
+                        <option value="api_key">API key</option>
+                        <option value="oauth">OAuth</option>
+                        <option value="mcp">MCP</option>
+                        <option value="mcp_oauth">MCP OAuth</option>
+                      </select>
+                    </Field>
+                    <Field label="MCP Server"><input value={integrationForm.mcp_server_url} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_server_url: e.target.value })} placeholder="mcp://notion or https://mcp.example.com" /></Field>
+                    <Field label="MCP User"><input type="email" autoComplete="email" value={integrationForm.mcp_auth_subject} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_auth_subject: e.target.value })} placeholder="user@example.com" /></Field>
+                  </div>
                   <Field label="MCP Scopes"><input value={integrationForm.mcp_scopes} onChange={(e) => setIntegrationForm({ ...integrationForm, mcp_scopes: e.target.value })} placeholder="page.read, page.write, comment.write" /></Field>
                   <Field label="RAG 대상"><input value={integrationForm.rag_targets} onChange={(e) => setIntegrationForm({ ...integrationForm, rag_targets: e.target.value })} /></Field>
                   <Field label="프로필 템플릿"><textarea value={integrationForm.custom_template} onChange={(e) => setIntegrationForm({ ...integrationForm, custom_template: e.target.value })} /></Field>
-                </details>
-                <section className="connection-builder">
+                  <section className="connection-builder">
                   <div className="section-head flat">
                     <div>
                       <strong>프로필 커스텀 연결</strong>
@@ -1903,7 +1906,8 @@ function App() {
                     </div>
                   ))}
                   {(integrationForm.custom_connections || []).length === 0 ? <p className="empty-state">연결이 없으면 source kind와 base URL만 사용합니다.</p> : null}
-                </section>
+                  </section>
+                </details>
                 <div className={`form-status ${integrationSaveState.status}`}>{integrationSaveState.message}</div>
                   <button><KeyRound size={14} /> 연동 프로필 저장</button>
                 </form>

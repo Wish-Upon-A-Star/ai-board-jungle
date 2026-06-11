@@ -67,6 +67,15 @@ async function main() {
     await form.waitFor({ state: "visible", timeout: 15000 });
     const openAfterAiKey = await editor.evaluate((node) => node.open);
     if (!openAfterAiKey) throw new Error("AI key action did not open the manual profile editor");
+    const simpleNoteText = await form.locator(".manual-profile-simple-note").innerText();
+    if (!simpleNoteText.includes("기본 입력") || !simpleNoteText.includes("고급 설정")) {
+      throw new Error(`manual profile simple note is not clear: ${simpleNoteText}`);
+    }
+    const advancedPanel = form.locator(".manual-profile-advanced");
+    const advancedOpen = await advancedPanel.evaluate((node) => node.open);
+    if (advancedOpen) throw new Error("manual profile advanced settings should be collapsed by default");
+    const visibleBasicFields = await form.locator(":scope > .grid3.wide .field").count();
+    if (visibleBasicFields !== 6) throw new Error(`expected 6 immediately visible basic fields, got ${visibleBasicFields}`);
     const aiSource = await form.locator("select").first().inputValue();
     if (aiSource !== "custom") throw new Error(`AI key action should select custom source, got ${aiSource}`);
 
@@ -103,6 +112,9 @@ async function main() {
         "ai_api_key_choice_card_explicit",
         "manual_editor_collapsed_by_default",
         "ai_key_action_opens_manual_editor",
+        "manual_profile_simple_note_visible",
+        "manual_profile_advanced_collapsed",
+        "manual_profile_basic_fields_limited",
         "ai_key_action_prefills_custom_profile",
         "diagnostics_section_isolated",
         "saved_profiles_section_isolated",

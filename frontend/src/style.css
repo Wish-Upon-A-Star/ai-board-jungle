@@ -1307,6 +1307,27 @@ pre {
 .manual-profile-editor .knowledge-form {
   padding-top: 12px;
 }
+.manual-profile-simple-note {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid #a8d0ca;
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+.manual-profile-simple-note strong {
+  color: var(--accent-strong);
+}
+.manual-profile-simple-note span {
+  color: var(--muted);
+  line-height: 1.5;
+}
+.manual-profile-advanced {
+  margin-top: 6px;
+}
+.manual-profile-advanced .connection-builder {
+  margin-top: 10px;
+}
 .manual-profile-guide {
   margin: 0 14px;
   padding: 14px;
