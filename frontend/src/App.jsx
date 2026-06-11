@@ -544,11 +544,11 @@ function App() {
       body.set("model", "whisper-1");
       body.set("prompt", "AI Board 지식자료로 저장할 회의, 업무 메모, 자동화 지시 음성입니다.");
       const data = await api("/api/ai/transcribe", { method: "POST", body });
-      const nextTitle = knowledgeForm.title || file.name.replace(/\.[^.]+$/, "") || "음성 전사";
+      const audioTitle = file.name.replace(/\.[^.]+$/, "") || "음성 전사";
       const transcript = data.text || "";
       setKnowledgeForm((current) => ({
         ...current,
-        title: current.title || nextTitle,
+        title: !current.title || current.title === defaultKnowledge.title ? audioTitle : current.title,
         source_type: "audio",
         extracted_text: [current.extracted_text, transcript].filter(Boolean).join("\n\n"),
         tags: current.tags || "audio,transcription,openai",
