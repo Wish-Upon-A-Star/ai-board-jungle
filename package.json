@@ -44,6 +44,7 @@
     "verify:oauth-diagnostics-ui": "node scripts/verify-oauth-diagnostics-ui.mjs",
     "verify:profile-manual-editor-ui": "node scripts/verify-profile-manual-editor-ui.mjs",
     "verify:automation-form-ui": "node scripts/verify-automation-form-ui.mjs",
+    "verify:automation-list-ui": "node scripts/verify-automation-list-ui.mjs",
     "verify:user-token-ux": "node scripts/verify-user-token-ux.mjs",
     "verify:board-ui": "node scripts/verify-board-readable-ui.mjs",
     "verify:live-write-gates": "node scripts/verify-live-write-gates.mjs",

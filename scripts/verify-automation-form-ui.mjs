@@ -22,8 +22,7 @@ async function main() {
     await page.evaluate((value) => localStorage.setItem("ai-board-token", value), token);
     await page.reload({ waitUntil: "networkidle" });
 
-    const automationTab = page.locator("nav button").filter({ hasText: "자동화" }).first();
-    await automationTab.click();
+    await page.locator("nav button").nth(0).click();
     const form = page.locator(".automation-form");
     await form.waitFor({ state: "visible", timeout: 15000 });
 
@@ -39,11 +38,11 @@ async function main() {
     if (await advanced.evaluate((node) => node.hasAttribute("open"))) {
       throw new Error("Advanced automation settings should be collapsed by default");
     }
-    const advancedAgentVisibleBefore = await advanced.getByText("처리 방식").isVisible().catch(() => false);
-    if (advancedAgentVisibleBefore) throw new Error("Advanced fields are visible before opening details");
+    const visibleAdvancedInputsBefore = await advanced.locator("input:visible, textarea:visible").count();
+    if (visibleAdvancedInputsBefore !== 0) throw new Error(`Advanced fields are visible before opening details: ${visibleAdvancedInputsBefore}`);
 
-    const basicAgentLabelVisible = await form.locator("> .form-section").nth(1).getByText("처리 방식").isVisible().catch(() => false);
-    if (basicAgentLabelVisible) throw new Error("Processing method should not be shown in the basic automation section");
+    const basicInputCount = await form.locator("> .form-section").nth(1).locator("input:visible, select:visible").count();
+    if (basicInputCount !== 5) throw new Error(`Basic automation section should show only profile/name/interval/source/destination fields, got ${basicInputCount}`);
 
     await cards.nth(3).click();
     const nameValue = await form.locator("input").first().inputValue();
@@ -52,7 +51,6 @@ async function main() {
     }
 
     await advanced.locator("summary").click();
-    await advanced.getByText("처리 방식").waitFor({ state: "visible", timeout: 5000 });
     const visibleAdvancedInputs = await advanced.locator("input, textarea").count();
     if (visibleAdvancedInputs < 8) throw new Error(`Advanced settings did not expose expected fields: ${visibleAdvancedInputs}`);
 

@@ -583,6 +583,235 @@ pre {
   background: #fbfffd;
 }
 
+.automation-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.automation-list-header h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.automation-list-header p {
+  margin: 0;
+}
+
+.automation-empty {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 30px 18px;
+  text-align: center;
+}
+
+.automation-empty-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 20px;
+}
+
+.automation-empty h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.automation-empty p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.automation-empty-steps {
+  width: min(720px, 100%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.automation-empty-steps .step {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px;
+}
+
+.automation-empty-steps .step span {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.automation-empty-steps .step b {
+  color: var(--text);
+}
+
+.automation-empty-steps .step small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.task-card-v2 {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.task-card-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  cursor: pointer;
+}
+
+.task-card-main:hover {
+  background: #fbfffd;
+}
+
+.task-card-left {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.task-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.task-card-title-row h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.task-card-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.task-source,
+.task-dest {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-soft);
+  padding: 7px 9px;
+  overflow-wrap: anywhere;
+}
+
+.task-arrow {
+  color: var(--accent-strong);
+  font-weight: 900;
+}
+
+.task-card-right {
+  min-width: 132px;
+  display: grid;
+  justify-items: end;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.run-pill {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f4f5f2;
+  color: var(--muted);
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.run-pill.ok,
+.run-pill.changed {
+  border-color: #b8d9bd;
+  background: #eef9f0;
+  color: #237a32;
+}
+
+.run-pill.error,
+.run-pill.failed,
+.run-pill.blocked {
+  border-color: #f1b6b6;
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.run-pill.running {
+  border-color: #b7cce3;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.task-interval {
+  white-space: nowrap;
+}
+
+.task-card-detail {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding: 12px 14px 14px;
+  background: var(--surface-soft);
+}
+
+.task-detail-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.task-detail-meta span {
+  border: 1px solid #edf0eb;
+  border-radius: 7px;
+  background: var(--surface);
+  padding: 7px 9px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.task-detail-meta b {
+  color: var(--text);
+  margin-right: 5px;
+}
+
 .task-card { padding: 14px; }
 .task-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .task-head h2 { margin: 0; color: var(--text); font-size: 16px; font-weight: 850; line-height: 1.32; overflow-wrap: anywhere; }
@@ -627,10 +856,10 @@ pre {
 .run-history { display: grid; gap: 8px; margin-top: 12px; border-top: 1px solid #edf0eb; padding-top: 12px; }
 .run-history-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text); }
 .run-history-head span { color: var(--muted); font-size: 12px; }
-.run-row { border: 1px solid var(--line); border-radius: 7px; background: var(--surface-soft); padding: 8px; }
-.run-row-main { display: grid; grid-template-columns: 56px 168px 92px minmax(0, 1fr) auto auto; gap: 8px; align-items: start; }
+.run-row { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 10px; }
+.run-row-main { display: grid; grid-template-columns: 58px minmax(124px, 168px) auto minmax(220px, 1fr) auto auto; gap: 9px; align-items: start; }
 .run-row span { color: var(--blue); font-size: 12px; }
-.run-row p { margin: 0; color: var(--text); font-size: 12px; word-break: break-word; }
+.run-row p { margin: 0; color: var(--text); font-size: 12px; line-height: 1.45; word-break: break-word; }
 .inline-link {
   min-height: 28px;
   border: 0;
@@ -1976,6 +2205,10 @@ pre {
   .oauth-setup-grid,
   .taskory-status-card,
   .task-meta,
+  .automation-empty-steps,
+  .task-card-main,
+  .task-card-flow,
+  .task-detail-meta,
   .stats dl { grid-template-columns: 1fr; }
   .stats div { border-right: 0; border-bottom: 1px solid #edf0eb; padding-bottom: 7px; }
   .scheduler-bar,
@@ -1995,6 +2228,7 @@ pre {
   .next-steps button { border-right: 0; border-bottom: 1px solid var(--line); }
   .next-steps button:last-child { border-bottom: 0; }
   .task-meta div { grid-template-columns: 104px minmax(0, 1fr); }
+  .task-card-right { justify-items: start; min-width: 0; }
   .profile-card-header,
   .profile-card-title {
     grid-template-columns: 1fr;
@@ -2026,7 +2260,8 @@ pre {
   .post-list { border-right: 0; border-bottom: 1px solid var(--line); max-height: none; }
   .activity-head,
   .section-head,
-  .file-row { align-items: flex-start; flex-direction: column; }
+  .file-row,
+  .automation-list-header { align-items: flex-start; flex-direction: column; }
   .profile-actions,
   .activity-actions,
   .preset-actions,
