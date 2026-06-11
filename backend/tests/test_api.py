@@ -157,6 +157,88 @@ def test_audio_transcription_uses_user_openai_profile(monkeypatch):
     assert captured["file"][0] == "meeting.wav"
 
 
+def test_audio_transcription_splits_large_files_with_ffmpeg(monkeypatch):
+    calls = []
+
+    class FakeOpenAIResponse:
+        status_code = 200
+        text = '{"text":"chunk"}'
+
+        def __init__(self, value):
+            self.value = value
+            self.text = json.dumps({"text": value}, ensure_ascii=False)
+
+        def json(self):
+            return {"text": self.value}
+
+    class FakeAsyncClient:
+        def __init__(self, timeout=None):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, headers=None, data=None, files=None):
+            calls.append({"url": url, "headers": headers or {}, "data": data or {}, "file": files["file"]})
+            return FakeOpenAIResponse(f"전사 조각 {len(calls)}")
+
+    def fake_run(command, capture_output=True, text=True, timeout=180):
+        output_pattern = Path(command[-1])
+        (output_pattern.parent / "chunk-000.mp3").write_bytes(b"chunk-a")
+        (output_pattern.parent / "chunk-001.mp3").write_bytes(b"chunk-b")
+
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return Result()
+
+    monkeypatch.setattr(main_module.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(main_module.shutil, "which", lambda name: "ffmpeg")
+    monkeypatch.setattr(main_module.subprocess, "run", fake_run)
+
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "large-voice@example.com", "name": "Large Voice", "password": "password123"},
+        )
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+        client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "OpenAI API 키",
+                "source_kind": "custom",
+                "base_url": "https://api.openai.com/v1",
+                "api_provider": "OpenAI API",
+                "token_name": "OPENAI_API_KEY",
+                "token_value": "sk-user-openai",
+                "ai_provider": "OpenAI",
+                "ai_model": "gpt-4o-mini",
+                "ai_api_base": "https://api.openai.com/v1",
+                "rag_targets": ["ai"],
+            },
+        )
+        response = client.post(
+            "/api/ai/transcribe",
+            headers=headers,
+            data={"model": "whisper-1", "prompt": "긴 회의"},
+            files={"file": ("large.wav", b"0" * (main_module.OPENAI_AUDIO_DIRECT_LIMIT + 1), "audio/wav")},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["text"] == "전사 조각 1\n\n전사 조각 2"
+    assert response.json()["parts"] == 2
+    assert [call["file"][0] for call in calls] == ["chunk-000.mp3", "chunk-001.mp3"]
+    assert all(call["file"][2] == "audio/mpeg" for call in calls)
+    assert "1/2번째 조각" in calls[0]["data"]["prompt"]
+    assert "2/2번째 조각" in calls[1]["data"]["prompt"]
+
+
 def test_health_recovers_after_startup_database_error(monkeypatch):
     calls = {"init": 0}
 

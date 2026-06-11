@@ -6,6 +6,9 @@ import os
 import hashlib
 import hmac
 import re
+import shutil
+import subprocess
+import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -45,6 +48,7 @@ class ReportSource(dict):
 FRONTEND_ASSETS = FRONTEND_DIST / "assets"
 STARTUP_DB_ERROR = ""
 OAUTH_STATE_TTL_SECONDS = 10 * 60
+OPENAI_AUDIO_DIRECT_LIMIT = 24 * 1024 * 1024
 
 
 @app.on_event("startup")
@@ -164,14 +168,46 @@ def find_user_openai_credentials(db: Session, user: User) -> tuple[str, str]:
     raise HTTPException(status_code=400, detail="OpenAI API 키 프로필이 없습니다. 프로필 탭에서 OpenAI 키를 먼저 저장하세요.")
 
 
-async def transcribe_audio_with_openai(api_key: str, api_base: str, upload: UploadFile, model: str, prompt: str) -> dict:
-    raw = await upload.read()
-    if not raw:
-        raise HTTPException(status_code=400, detail="전사할 음성 파일이 비어 있습니다.")
-    if len(raw) > 26 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="음성 파일은 26MB 이하만 업로드할 수 있습니다. 큰 파일은 나눠서 업로드하세요.")
-    file_name = upload.filename or "audio"
-    mime_type = upload.content_type or "application/octet-stream"
+def split_audio_bytes(raw: bytes, file_name: str) -> tuple[tempfile.TemporaryDirectory | None, list[tuple[str, bytes, str]]]:
+    if len(raw) <= OPENAI_AUDIO_DIRECT_LIMIT:
+        return None, [(file_name, raw, "application/octet-stream")]
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise HTTPException(status_code=413, detail="24MB를 넘는 음성 파일은 ffmpeg가 필요합니다. ffmpeg를 설치하거나 더 작은 파일을 업로드하세요.")
+    temp_dir = tempfile.TemporaryDirectory(prefix="ai-board-audio-")
+    temp_path = Path(temp_dir.name)
+    suffix = Path(file_name).suffix or ".audio"
+    source_path = temp_path / f"source{suffix}"
+    source_path.write_bytes(raw)
+    output_pattern = temp_path / "chunk-%03d.mp3"
+    command = [
+        ffmpeg,
+        "-y",
+        "-i",
+        str(source_path),
+        "-f",
+        "segment",
+        "-segment_time",
+        "600",
+        "-vn",
+        "-acodec",
+        "libmp3lame",
+        "-b:a",
+        "64k",
+        str(output_pattern),
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=180)
+    if result.returncode != 0:
+        temp_dir.cleanup()
+        raise HTTPException(status_code=500, detail=f"ffmpeg 음성 분할 실패: {(result.stderr or result.stdout)[-800:]}")
+    parts = sorted(temp_path.glob("chunk-*.mp3"))
+    if not parts:
+        temp_dir.cleanup()
+        raise HTTPException(status_code=500, detail="ffmpeg가 음성 조각을 만들지 못했습니다.")
+    return temp_dir, [(part.name, part.read_bytes(), "audio/mpeg") for part in parts]
+
+
+async def post_openai_transcription(api_key: str, api_base: str, file_name: str, raw: bytes, mime_type: str, model: str, prompt: str) -> str:
     data = {"model": model or "whisper-1"}
     if prompt.strip():
         data["prompt"] = prompt.strip()
@@ -181,7 +217,7 @@ async def transcribe_audio_with_openai(api_key: str, api_base: str, upload: Uplo
                 f"{api_base}/audio/transcriptions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 data=data,
-                files={"file": (file_name, raw, mime_type)},
+                files={"file": (file_name, raw, mime_type or "application/octet-stream")},
             )
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"OpenAI 음성 전사 연결 실패: {exc}") from exc
@@ -192,7 +228,28 @@ async def transcribe_audio_with_openai(api_key: str, api_base: str, upload: Uplo
     transcript = str(payload.get("text") or "").strip()
     if not transcript:
         raise HTTPException(status_code=502, detail="OpenAI 전사 결과가 비어 있습니다.")
-    return {"text": transcript, "fileName": file_name, "mimeType": mime_type, "model": data["model"]}
+    return transcript
+
+
+async def transcribe_audio_with_openai(api_key: str, api_base: str, upload: UploadFile, model: str, prompt: str) -> dict:
+    raw = await upload.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="전사할 음성 파일이 비어 있습니다.")
+    file_name = upload.filename or "audio"
+    mime_type = upload.content_type or "application/octet-stream"
+    temp_dir = None
+    try:
+        temp_dir, parts = split_audio_bytes(raw, file_name)
+        if len(parts) == 1 and parts[0][0] == file_name:
+            parts[0] = (file_name, parts[0][1], mime_type)
+        transcripts = []
+        for index, (part_name, part_raw, part_mime) in enumerate(parts, start=1):
+            part_prompt = prompt if len(parts) == 1 else f"{prompt}\n\n이 파일은 {file_name}의 {index}/{len(parts)}번째 조각입니다.".strip()
+            transcripts.append(await post_openai_transcription(api_key, api_base, part_name, part_raw, part_mime, model, part_prompt))
+    finally:
+        if temp_dir is not None:
+            temp_dir.cleanup()
+    return {"text": "\n\n".join(transcripts).strip(), "fileName": file_name, "mimeType": mime_type, "model": model or "whisper-1", "parts": len(parts)}
 
 
 def serialize_activity(activity: IntegrationActivity) -> dict:
@@ -1522,7 +1579,7 @@ async def transcribe_audio(
         "openai",
         "completed",
         f"Transcribed {result['fileName']} with {result['model']}",
-        {"fileName": result["fileName"], "mimeType": result["mimeType"], "model": result["model"], "characters": len(result["text"])},
+        {"fileName": result["fileName"], "mimeType": result["mimeType"], "model": result["model"], "parts": result.get("parts", 1), "characters": len(result["text"])},
     )
     db.commit()
     return result
