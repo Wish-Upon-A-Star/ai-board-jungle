@@ -113,6 +113,17 @@ Taskory 연동 사용법:
 3. `taskory-ai-board.jsonl` 또는 원본 `task-explorer-state.json`을 첨부하고 저장합니다.
 4. 자동화 프로필의 `지식자료 대상`에 자료명이나 태그를 넣으면 GitHub/Notion/Figma/Calendar 자동화가 Taskory 작업 맥락을 RAG 근거로 사용합니다.
 
+Taskory 자동 업로드:
+
+```powershell
+$env:AI_BOARD_BASE_URL="https://your-domain.example"
+$env:AI_BOARD_EMAIL="user@example.com"
+$env:AI_BOARD_PASSWORD="your-password"
+python scripts/sync_taskory_to_ai_board.py --state task-explorer-state.json --watch --interval 300
+```
+
+`sync_taskory_to_ai_board.py`는 Taskory 저장 파일 해시가 바뀐 경우에만 AI Board `/api/knowledge/upload`로 새 자료를 업로드합니다. 따라서 Taskory가 변경되지 않았을 때는 AI/API 호출을 반복하지 않습니다.
+
 ### MCP
 
 MCP는 외부 시스템을 LLM 도구처럼 호출하기 위한 인터페이스입니다.
