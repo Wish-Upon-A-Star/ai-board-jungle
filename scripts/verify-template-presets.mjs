@@ -16,12 +16,12 @@ const liveWriters = read("backend/app/live_writers.py");
 const requiredServices = ["github", "notion", "figma", "google_calendar", "custom"];
 const requiredPresetKeys = ["github_notion", "team_notion_board_to_github", "team_notion_gantt_to_calendar", "figma_calendar", "custom"];
 const requiredAutomationButtons = [
-  "GitHub -&gt; Notion BOARD",
-  "Notion BOARD -&gt; GitHub Issue",
-  "Notion GANTT -&gt; Calendar",
-  "GitHub + Notion",
-  "Figma + Google Calendar",
-  "Custom API",
+  "GitHub → Notion",
+  "Notion → GitHub",
+  "GANTT → Calendar",
+  "Figma → Calendar",
+  "내 기본값 적용",
+  "직접 구성",
 ];
 const serviceLabels = {
   github: "GitHub",
@@ -71,7 +71,7 @@ for (const service of requiredServices) {
 assert.ok(appSource.includes("defaultAutomation"), "UI must import/use GitHub + Notion preset");
 assert.ok(appSource.includes("figmaCalendarPreset"), "UI must import/use Figma + Calendar preset");
 assert.ok(appSource.includes("customPreset"), "UI must import/use custom API preset");
-assert.ok(readme.includes("사용자 기본 자동화 설정"), "README must explain user default automation settings");
+assert.ok(readme.includes("사용자 기본값 적용"), "README must explain user default automation settings");
 assert.ok(readme.includes("자동화 연결 미리보기"), "README must explain automation connection preview");
 
 console.log(JSON.stringify({

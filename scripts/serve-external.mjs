@@ -11,10 +11,14 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const args = new Set(process.argv.slice(2));
 const skipBuild = args.has("--skip-build");
 const noTunnel = args.has("--no-tunnel");
+const namedTunnel = args.has("--named-tunnel");
 const once = args.has("--once");
 const port = process.env.AI_BOARD_EXTERNAL_PORT || "8130";
 const host = process.env.AI_BOARD_EXTERNAL_HOST || "127.0.0.1";
 const workers = process.env.AI_BOARD_EXTERNAL_WORKERS || "1";
+const tunnelName = process.env.AI_BOARD_CLOUDFLARE_TUNNEL_NAME || "ai-board";
+const tunnelConfig = process.env.AI_BOARD_CLOUDFLARE_CONFIG || join(root, "data", "cloudflare", "config.yml");
+const publicBaseUrl = process.env.AI_BOARD_PUBLIC_BASE_URL || "";
 const dbUrl = postgresDatabaseUrl();
 const localUrl = `http://127.0.0.1:${port}`;
 const cacheDir = join(root, "data", "bin");
@@ -92,7 +96,10 @@ function startApi() {
 }
 
 function startTunnel(executable) {
-  return spawn(executable, ["tunnel", "--url", localUrl, "--no-autoupdate"], {
+  const tunnelArgs = namedTunnel
+    ? ["tunnel", "--config", tunnelConfig, "run", tunnelName]
+    : ["tunnel", "--url", localUrl, "--no-autoupdate"];
+  return spawn(executable, tunnelArgs, {
     cwd: root,
     env: process.env,
     shell: false,
@@ -133,6 +140,11 @@ try {
   } else {
     const cloudflared = await downloadCloudflared();
     tunnel = startTunnel(cloudflared);
+    if (namedTunnel) {
+      console.log(`AI Board named Cloudflare tunnel: ${tunnelName}`);
+      console.log(`AI Board named tunnel config: ${tunnelConfig}`);
+      if (publicBaseUrl) console.log(`AI Board public URL: ${publicBaseUrl}`);
+    }
     const onChunk = (chunk) => {
       const text = chunk.toString();
       process.stdout.write(text);

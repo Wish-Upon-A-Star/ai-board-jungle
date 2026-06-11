@@ -31,7 +31,10 @@ assert.ok(readme.includes("/api/oauth/figma/callback"), "README must document Fi
 assert.ok(readme.includes("/api/oauth/google_calendar/callback"), "README must document Google Calendar OAuth callback");
 assert.equal(packageJson.scripts["serve:external"], "node scripts/serve-external.mjs", "package.json must expose serve:external");
 assert.equal(packageJson.scripts["verify:external-serve"], "node scripts/verify-external-serve.mjs", "package.json must expose verify:external-serve");
+assert.equal(packageJson.scripts["setup:cloudflare"], "node scripts/setup-cloudflare-named-tunnel.mjs", "package.json must expose setup:cloudflare");
+assert.equal(packageJson.scripts["verify:cloudflare-tunnel"], "node scripts/verify-cloudflare-named-tunnel.mjs", "package.json must expose verify:cloudflare-tunnel");
 assert.ok(serveExternal.includes("AI_BOARD_EXTERNAL_PORT"), "external serve must use a configurable non-dev port");
+assert.ok(serveExternal.includes("--named-tunnel"), "external serve must support named Cloudflare tunnels");
 assert.ok(devFastapi.includes("postgresEnv()"), "dev server must use PostgreSQL by default");
 assert.ok(serveExternal.includes("postgresDatabaseUrl()"), "external server must use PostgreSQL by default");
 assert.ok(postgresEnv.includes("postgresql://ai_board:ai_board@localhost:5432/ai_board"), "shared PostgreSQL default URL must be explicit");
@@ -51,6 +54,7 @@ console.log(JSON.stringify({
     ".env.example LAN variables",
     "README LAN instructions",
     "external tunnel serve script",
+    "Cloudflare named tunnel setup contract",
     "PostgreSQL-first runtime defaults",
     "non-destructive verification ports",
   ],

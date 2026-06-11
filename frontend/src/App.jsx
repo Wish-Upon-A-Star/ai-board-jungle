@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Bot, CalendarClock, CheckCircle2, ChevronDown, ChevronUp, Database, FileText, GitBranch, KeyRound, Link2, LogOut, Play, Plus, Search, Share2, Trash2, Upload, UserPlus, XCircle } from "lucide-react";
+import { Bot, CalendarClock, CheckCircle2, ChevronDown, ChevronUp, Copy, Database, FileText, GitBranch, KeyRound, Link2, LogOut, Play, Plus, Search, Share2, Trash2, Upload, UserPlus, XCircle } from "lucide-react";
 import { api, apiStatus } from "./api";
 import { customPreset, defaultAutomation, defaultIntegration, defaultKnowledge, figmaCalendarPreset, integrationConnectionPresets, mcpGithubToNotionPreset, mcpNotionToGithubPreset, teamNotionGanttToCalendarPreset } from "./presets";
 import { buildSystemReadinessCards, getHealthFailureMessage, getRunStatus, mergePostsById, parseRunResult, summarizeRunResult } from "./viewModel";
@@ -251,6 +251,10 @@ function App() {
       return provider.includes("openai") && profile.hasToken;
     }),
     [integrationProfiles],
+  );
+  const figmaOAuthProvider = useMemo(
+    () => oauthProviders.find((provider) => provider.provider === "figma") || null,
+    [oauthProviders],
   );
   const taskorySources = useMemo(
     () => knowledgeSources.filter((source) => String(source.sourceType || "").toLowerCase() === "taskory" || source.tags?.some((tag) => String(tag).toLowerCase() === "taskory")),
@@ -996,6 +1000,21 @@ function App() {
     }
   }
 
+  async function copyOAuthCallback(kind = "figma") {
+    const provider = oauthProviders.find((item) => item.provider === kind);
+    const callback = provider?.redirectUri || "";
+    if (!callback) {
+      setIntegrationSaveState({ status: "error", message: `${providerLabel(kind)} Callback URL을 아직 불러오지 못했습니다. 다시 확인을 누른 뒤 복사하세요.` });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(callback);
+      setIntegrationSaveState({ status: "saved", message: `${providerLabel(kind)} Callback URL을 복사했습니다. 개발자 콘솔의 Redirect URI에 그대로 붙여넣으세요.` });
+    } catch {
+      setIntegrationSaveState({ status: "error", message: `브라우저가 클립보드 복사를 막았습니다. 아래 Callback URL 입력칸을 클릭해서 직접 복사하세요.` });
+    }
+  }
+
   function applyMcpAutomationPreset(preset, primaryKind) {
     const githubProfiles = mcpProfilesFor("github");
     const notionProfiles = mcpProfilesFor("notion");
@@ -1537,6 +1556,22 @@ function App() {
                   <button type="button" onClick={() => openMcpProfileSetup("figma")}>수동 Figma 프로필</button>
                   <button type="button" onClick={() => openMcpProfileSetup("google_calendar")}>수동 Google Calendar 프로필</button>
                 </div>
+                <section className="oauth-quick-fix" aria-label="Figma Invalid redirect URI 해결">
+                  <div>
+                    <strong>Figma Invalid redirect URI 해결</strong>
+                    <span>Figma 개발자 콘솔의 OAuth App → Redirect URI에 아래 값을 그대로 등록해야 로그인됩니다.</span>
+                  </div>
+                  <label>
+                    Figma Callback URL
+                    <input readOnly value={figmaOAuthProvider?.redirectUri || ""} onFocus={(event) => event.currentTarget.select()} />
+                  </label>
+                  <button type="button" onClick={() => copyOAuthCallback("figma")} disabled={!figmaOAuthProvider?.redirectUri}>
+                    <Copy size={14} /> Callback URL 복사
+                  </button>
+                  <a href={figmaOAuthProvider?.setupUrl || "https://www.figma.com/developers/apps"} target="_blank" rel="noreferrer">
+                    Figma 개발자 설정 열기
+                  </a>
+                </section>
               </section>
               <section className={`profile-subsection ${profileSection === "diagnostics" ? "" : "tab-hidden"}`}>
                 <section className="oauth-diagnostics" aria-label="OAuth callback 진단">

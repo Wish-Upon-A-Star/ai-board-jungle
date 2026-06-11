@@ -44,6 +44,7 @@ npm run verify:full:quick
    npm run verify:frontend-helpers
    npm run verify:template-presets
    npm run verify:network-config
+   npm run verify:cloudflare-tunnel
    npm run verify:evaluation-reports
    npm run verify:readiness
    npm run verify:readiness:compact

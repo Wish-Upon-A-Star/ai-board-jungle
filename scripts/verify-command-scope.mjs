@@ -17,7 +17,7 @@ function extractList(afterHeading, beforeHeading = "\n## ") {
   assert.ok(start >= 0, `README missing heading text: ${afterHeading}`);
   const nextHeading = readme.indexOf(beforeHeading, start + afterHeading.length);
   const section = readme.slice(start, nextHeading === -1 ? undefined : nextHeading);
-  return [...section.matchAll(/`npm run ([^`]+)`/g)].map((match) => match[1]);
+  return [...section.matchAll(/`?npm run ([A-Za-z0-9:_-]+)`?/g)].map((match) => match[1]);
 }
 
 function assertSafeOrder(content, label) {
@@ -62,7 +62,10 @@ const serverless = extractList(
   "Serverless checks do not start FastAPI, Vite, or Chrome CDP:",
   "\nServer-required checks start or expect FastAPI, Vite, Chrome CDP, or live API credentials:"
 );
-const serverRequired = extractList("Server-required checks start or expect FastAPI, Vite, Chrome CDP, or live API credentials:");
+const serverRequired = extractList(
+  "Server-required checks start or expect FastAPI, Vite, Chrome CDP, or live API credentials:",
+  "\nSafe local verification order:"
+);
 const scriptNames = new Set(Object.keys(packageJson.scripts || {}));
 
 assert.deepEqual(serverless, serverlessCommands, "README serverless command list must match expected order");

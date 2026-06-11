@@ -23,6 +23,10 @@ async function main() {
     await page.reload({ waitUntil: "networkidle" });
     await page.locator("button").filter({ hasText: "프로필" }).first().waitFor({ state: "visible", timeout: 15000 });
     await page.locator("button").filter({ hasText: "프로필" }).first().click();
+    const quickFixCallback = await page.locator(".oauth-quick-fix input").inputValue();
+    if (quickFixCallback !== `${publicUrl}/api/oauth/figma/callback`) {
+      throw new Error(`Unexpected Figma quick-fix callback URL: ${quickFixCallback}`);
+    }
     const oauthRequest = page.waitForRequest((request) => {
       const url = new URL(request.url());
       return url.hostname === "www.figma.com" && url.pathname === "/oauth";
@@ -46,6 +50,7 @@ async function main() {
       checked: [
         "public_app_login",
         "account_connections_tab",
+        "figma_quick_fix_callback_visible",
         "figma_mcp_button_click",
         "figma_oauth_navigation",
         "client_id_sanitized",

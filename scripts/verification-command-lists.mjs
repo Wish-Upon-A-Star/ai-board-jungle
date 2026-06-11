@@ -5,6 +5,7 @@ export const serverlessCommands = [
   "verify:frontend-helpers",
   "verify:template-presets",
   "verify:network-config",
+  "verify:cloudflare-tunnel",
   "verify:evaluation-reports",
   "verify:readiness",
   "verify:readiness:compact",

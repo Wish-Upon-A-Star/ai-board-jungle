@@ -11,9 +11,14 @@ assert.equal(packageJson.scripts["verify:external-serve"], "node scripts/verify-
 assert.ok(serveExternal.includes("AI_BOARD_EXTERNAL_PORT"), "external serve must use a separate configurable port");
 assert.ok(serveExternal.includes('"8130"'), "external serve default port must avoid 3000/8000");
 assert.ok(serveExternal.includes("cloudflared"), "external serve must support a public tunnel");
+assert.ok(serveExternal.includes("--named-tunnel"), "external serve must support named Cloudflare tunnels");
 assert.ok(!serveExternal.includes("stopLocalServers"), "external serve must not stop the current dev server");
-assert.ok(readme.includes("## External Public Access"), "README must document external access");
+assert.ok(
+  readme.includes("## External Public Access") || readme.includes("외부 인터넷 접속"),
+  "README must document external access"
+);
 assert.ok(readme.includes("npm run serve:external"), "README must include the external serve command");
+assert.ok(readme.includes("npm run setup:cloudflare"), "README must include named tunnel setup command");
 assert.ok(readme.includes("6-10"), "README must document the expected small-team load");
 
 run("node", ["scripts/serve-external.mjs", "--skip-build", "--no-tunnel", "--once"], {
@@ -31,5 +36,6 @@ console.log(JSON.stringify({
     "no current server shutdown",
     "single-process external smoke",
     "README external instructions",
+    "named tunnel setup instructions",
   ],
 }, null, 2));
