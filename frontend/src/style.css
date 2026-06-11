@@ -462,6 +462,127 @@ pre {
   overflow-wrap: anywhere;
 }
 
+.form-section {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 14px;
+}
+
+.form-section-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.form-section-head strong {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.form-section-head small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.form-section-num {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #bad9d4;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.preset-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+  gap: 9px;
+}
+
+.preset-card {
+  min-height: 92px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: start;
+  justify-content: stretch;
+  gap: 3px 9px;
+  padding: 12px;
+  text-align: left;
+  border-color: var(--line);
+  background: #fbfffd;
+}
+
+.preset-card:hover,
+.preset-card:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.preset-icon {
+  grid-row: span 2;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #bad9d4;
+  border-radius: 7px;
+  background: var(--surface);
+  line-height: 1;
+}
+
+.preset-card-label {
+  min-width: 0;
+  color: var(--text);
+  font-weight: 900;
+  line-height: 1.25;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+.preset-card-desc {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.secondary-preset {
+  border-style: dashed;
+  background: var(--surface-soft);
+}
+
+.advanced-section {
+  background: var(--surface-soft);
+}
+
+.advanced-section > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.advanced-section > summary::-webkit-details-marker { display: none; }
+
+.advanced-section[open] {
+  background: #fbfffd;
+}
+
 .task-card { padding: 14px; }
 .task-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .task-head h2 { margin: 0; color: var(--text); font-size: 16px; font-weight: 850; line-height: 1.32; overflow-wrap: anywhere; }

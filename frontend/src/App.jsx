@@ -1332,10 +1332,9 @@ function App() {
                       )}
                     </div>
                   </section>
-                  <div className="grid3 wide">
+                  <div className="grid2">
                     <Field label="자동화 이름" hint="목록에 표시되는 이름입니다."><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="예: GitHub 이슈 → Notion 정리" required /></Field>
                     <Field label="실행 주기 (분)" hint="몇 분마다 실행할지. 최소 1분."><input type="number" min="1" max="1440" value={form.interval_minutes} onChange={(e) => setForm({ ...form, interval_minutes: Number(e.target.value) })} /></Field>
-                    <Field label="처리 방식" hint="템플릿 선택 시 자동 입력됩니다."><input value={form.ai_agent} onChange={(e) => setForm({ ...form, ai_agent: e.target.value })} placeholder="github_notion_agent" /></Field>
                   </div>
                   <div className="grid2">
                     <Field label="📥 읽어올 곳" hint="변경사항을 가져올 서비스/페이지입니다."><input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="예: GitHub 저장소, Notion BOARD" /></Field>
@@ -1354,6 +1353,7 @@ function App() {
                     <Field label="AI 모델"><input list="ai-model-options" value={form.ai_model} onChange={(e) => setForm({ ...form, ai_model: e.target.value })} placeholder="gpt-4o-mini" /></Field>
                     <Field label="AI API Base"><input list="ai-api-base-options" value={form.ai_api_base} onChange={(e) => setForm({ ...form, ai_api_base: e.target.value })} placeholder="https://api.openai.com/v1" /></Field>
                   </div>
+                  <Field label="처리 방식" hint="템플릿 선택 시 자동 입력됩니다. 직접 바꿔야 할 때만 수정하세요."><input value={form.ai_agent} onChange={(e) => setForm({ ...form, ai_agent: e.target.value })} placeholder="github_notion_agent" /></Field>
                   <div className="grid2">
                     <Field label="GitHub Repo URL"><input value={form.github_repo_url} onChange={(e) => setForm({ ...form, github_repo_url: e.target.value })} /></Field>
                     <Field label="Notion DB URL"><input value={form.notion_database_url} onChange={(e) => setForm({ ...form, notion_database_url: e.target.value })} /></Field>
