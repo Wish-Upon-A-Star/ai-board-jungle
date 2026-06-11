@@ -644,6 +644,32 @@ def test_google_calendar_oauth_start_requests_offline_calendar_access(monkeypatc
     assert data["redirectUri"].endswith("/api/oauth/google_calendar/callback")
 
 
+def test_google_calendar_oauth_start_uses_external_origin_and_sanitizes_labeled_credentials(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_PUBLIC_BASE_URL", "https://old-stale.trycloudflare.com")
+    monkeypatch.setenv("AI_BOARD_GOOGLE_OAUTH_CLIENT_ID", "클라이언트 ID:google-client-clean.apps.googleusercontent.com")
+    monkeypatch.setenv("AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET", "클라이언트 보안 비밀번호:google-secret-clean")
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "google-oauth-host@example.com", "name": "Google OAuth Host", "password": "password123"},
+        )
+        headers = {
+            "Authorization": f"Bearer {register.json()['token']}",
+            "x-ai-board-public-origin": "https://railway-mediterranean-snap-populations.trycloudflare.com",
+            "host": "127.0.0.1:8000",
+        }
+        response = client.get("/api/oauth/google_calendar/start", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    parsed = urlparse(data["authorizeUrl"])
+    params = parse_qs(parsed.query)
+    assert params["client_id"] == ["google-client-clean.apps.googleusercontent.com"]
+    assert params["redirect_uri"] == ["https://railway-mediterranean-snap-populations.trycloudflare.com/api/oauth/google_calendar/callback"]
+    assert data["redirectUri"] == "https://railway-mediterranean-snap-populations.trycloudflare.com/api/oauth/google_calendar/callback"
+    assert "old-stale" not in data["authorizeUrl"]
+    assert "클라이언트" not in data["authorizeUrl"]
+
+
 def test_notion_task_writer_uses_shared_id_parser_for_dashed_ids():
     profile = IntegrationProfile(
         owner_id=1,

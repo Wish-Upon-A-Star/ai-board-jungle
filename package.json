@@ -40,6 +40,7 @@
     "verify:taskory-ui": "node scripts/verify-taskory-knowledge-ui.mjs",
     "verify:figma-oauth": "node scripts/verify-figma-oauth-redirect.mjs",
     "verify:figma-oauth-ui": "node scripts/verify-figma-oauth-ui.mjs",
+    "verify:google-oauth-ui": "node scripts/verify-google-oauth-ui.mjs",
     "verify:user-token-ux": "node scripts/verify-user-token-ux.mjs",
     "verify:board-ui": "node scripts/verify-board-readable-ui.mjs",
     "verify:live-write-gates": "node scripts/verify-live-write-gates.mjs",
