@@ -25,6 +25,16 @@ function providerLabel(kind) {
   })[kind] || kind;
 }
 
+function providerCallbackTarget(kind) {
+  return ({
+    github: "GitHub OAuth App의 Authorization callback URL",
+    notion: "Notion OAuth Integration의 Redirect URI",
+    figma: "Figma OAuth App의 Redirect URI",
+    google_calendar: "Google Cloud OAuth Client의 Authorized redirect URI",
+    google: "Google Cloud OAuth Client의 Authorized redirect URI",
+  })[kind] || "해당 provider 개발자 콘솔의 redirect/callback URL";
+}
+
 function renderPostContent(content) {
   const text = String(content || "");
   if (!text.trim()) return <p className="post-paragraph">본문이 비어 있습니다.</p>;
@@ -1531,7 +1541,7 @@ function App() {
                 <div className="section-head flat">
                   <div>
                     <strong>OAuth callback 진단</strong>
-                    <span>Figma나 Google에서 Invalid redirect URI가 뜨면 아래 Callback URL을 개발자 콘솔에 그대로 등록합니다. 임시 터널 주소가 바뀌면 callback도 다시 등록해야 합니다.</span>
+                    <span>로그인 중 Invalid redirect URI, redirect_uri_mismatch가 뜨면 아래 Callback URL을 provider 개발자 콘솔에 글자 하나 바꾸지 말고 등록합니다.</span>
                   </div>
                   <button type="button" onClick={() => loadAll()}><Search size={13} /> 다시 확인</button>
                 </div>
@@ -1546,6 +1556,9 @@ function App() {
                         Callback URL
                         <input readOnly value={provider.redirectUri || ""} onFocus={(event) => event.currentTarget.select()} />
                       </label>
+                      <p className="oauth-callback-target">
+                        등록 위치: {providerCallbackTarget(provider.provider)}
+                      </p>
                       <div className="oauth-diagnostic-meta">
                         <span><b>MCP</b> {provider.mcpServerUrl}</span>
                         <span><b>권한</b> {provider.scope}</span>
@@ -1568,7 +1581,7 @@ function App() {
                   <ol>
                     <li>위 주소로 접속해 각자 계정을 만들거나 로그인합니다.</li>
                     <li>프로필 탭에서 GitHub, Notion, Figma, Calendar, AI API 키를 본인 계정으로 연결합니다.</li>
-                    <li>OAuth 오류가 나면 해당 provider의 Callback URL을 개발자 콘솔에 등록합니다.</li>
+                    <li>OAuth 오류가 나면 해당 provider 카드의 Callback URL을 복사해서 카드에 표시된 등록 위치에 붙여넣습니다.</li>
                     <li>터널 주소가 바뀌면 새 주소 기준 Callback URL을 다시 등록합니다.</li>
                   </ol>
                 </div>

@@ -383,14 +383,16 @@ Cloudflare quick tunnel 주의:
 - 6~10명이 계속 쓰는 팀 데모라면 Cloudflare named tunnel, ngrok reserved domain, Vercel/Render/Railway 같은 hosted deployment 중 하나로 고정 도메인을 쓰는 것이 낫습니다.
 - 고정 도메인을 쓰면 `.env` 또는 실행 환경의 `AI_BOARD_PUBLIC_BASE_URL`을 `https://your-domain.example`로 맞춥니다.
 
-OAuth callback 등록 예시:
+OAuth callback 등록 위치와 예시:
 
-| Provider | Callback URL |
-| --- | --- |
-| GitHub | `https://your-domain.example/api/oauth/github/callback` |
-| Notion | `https://your-domain.example/api/oauth/notion/callback` |
-| Figma | `https://your-domain.example/api/oauth/figma/callback` |
-| Google Calendar | `https://your-domain.example/api/oauth/google_calendar/callback` |
+| Provider | 개발자 콘솔 등록 위치 | Callback URL |
+| --- | --- | --- |
+| GitHub | OAuth App의 **Authorization callback URL** | `https://your-domain.example/api/oauth/github/callback` |
+| Notion | OAuth Integration의 **Redirect URI** | `https://your-domain.example/api/oauth/notion/callback` |
+| Figma | OAuth App의 **Redirect URI** | `https://your-domain.example/api/oauth/figma/callback` |
+| Google Calendar | Google Cloud OAuth Client의 **Authorized redirect URI** | `https://your-domain.example/api/oauth/google_calendar/callback` |
+
+Google에서 `redirect_uri_mismatch`, Figma에서 `Invalid redirect URI`가 뜨면 앱이 보낸 callback이 provider allowlist에 없다는 뜻입니다. `프로필 > 진단`에서 해당 provider 카드의 값을 복사해 위 등록 위치에 그대로 붙여넣습니다.
 
 현재 서버에서 정확한 값을 확인하려면 `프로필` 탭의 **OAuth callback 진단**을 봅니다. 앱은 브라우저가 접속한 public origin을 백엔드에 전달하므로 Cloudflare/Vite proxy 뒤에서도 현재 외부 URL 기준으로 callback을 계산합니다.
 

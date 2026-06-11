@@ -42,6 +42,15 @@ async function main() {
     }
     if (!text.includes("file_comments:write")) throw new Error("Figma scope is not visible in diagnostics");
     if (!text.includes("calendar.events")) throw new Error("Google Calendar scope is not visible in diagnostics");
+    if (!text.includes("redirect_uri_mismatch")) throw new Error("diagnostics must mention Google-style redirect_uri_mismatch");
+    for (const target of [
+      "GitHub OAuth App의 Authorization callback URL",
+      "Notion OAuth Integration의 Redirect URI",
+      "Figma OAuth App의 Redirect URI",
+      "Google Cloud OAuth Client의 Authorized redirect URI",
+    ]) {
+      if (!text.includes(target)) throw new Error(`missing provider callback target: ${target}`);
+    }
     const setupLinks = await panel.locator("a[target='_blank']").count();
     if (setupLinks < 4) throw new Error(`expected at least four provider setup links, got ${setupLinks}`);
     const checklist = panel.locator(".public-access-checklist");
