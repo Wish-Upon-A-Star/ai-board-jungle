@@ -120,6 +120,43 @@ const aiProviderOptions = ["OpenAI", "OpenAI-compatible", "Anthropic", "Google G
 const aiModelOptions = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "o4-mini", "claude-sonnet-4", "gemini-1.5-pro", "local-model"];
 const aiApiBaseOptions = ["https://api.openai.com/v1", "https://api.anthropic.com", "https://generativelanguage.googleapis.com/v1beta", "http://localhost:11434/v1"];
 const transcriptionModelOptions = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"];
+const manualProfileGuides = {
+  github: {
+    title: "GitHub 수동 연결",
+    baseUrl: "https://github.com/Wish-Upon-A-Star/ai-board-jungle 또는 Wish-Upon-A-Star/ai-board-jungle",
+    tokenName: "GITHUB_TOKEN",
+    tokenHint: "GitHub fine-grained token. 대상 저장소 Issues 읽기/쓰기 권한이 필요합니다.",
+    testHint: "저장 후 프로필을 열어 RAG 수집 또는 자동화 실행으로 확인합니다. 401이면 토큰 재발급, 403이면 저장소 권한을 확인하세요.",
+  },
+  notion: {
+    title: "Notion 수동 연결",
+    baseUrl: "Notion 페이지/데이터베이스 URL",
+    tokenName: "NOTION_TOKEN",
+    tokenHint: "Notion internal integration secret. 대상 페이지/DB를 해당 integration에 공유해야 합니다.",
+    testHint: "404이면 공유 누락, 401이면 secret 오류입니다. 자동화가 BOARD/GANTT에 쓰려면 Notion URL을 Base URL에 넣으세요.",
+  },
+  figma: {
+    title: "Figma 수동 연결",
+    baseUrl: "https://www.figma.com/design/파일키/파일명",
+    tokenName: "FIGMA_TOKEN",
+    tokenHint: "Figma personal access token. 댓글을 달 파일 접근 권한이 필요합니다.",
+    testHint: "저장 후 프로필 카드의 Dry-run으로 댓글 쓰기 준비 상태를 확인하세요.",
+  },
+  google_calendar: {
+    title: "Google Calendar 수동 연결",
+    baseUrl: "primary 또는 캘린더 ID",
+    tokenName: "GOOGLE_CALENDAR_TOKEN",
+    tokenHint: "OAuth access token 또는 refresh token JSON. 일반 사용자는 Google Calendar MCP 로그인을 먼저 쓰는 것이 낫습니다.",
+    testHint: "토큰 만료가 잦으면 OAuth 로그인 프로필을 사용하세요. 저장 후 Dry-run으로 일정 쓰기 준비 상태를 확인합니다.",
+  },
+  custom: {
+    title: "Custom API / AI API 키",
+    baseUrl: "https://api.openai.com/v1 같은 API 주소",
+    tokenName: "OPENAI_API_KEY 또는 AI_API_KEY",
+    tokenHint: "OpenAI/호환 API 키는 여기에 붙여 넣으면 사용자별 암호화 저장됩니다.",
+    testHint: "OpenAI 음성 전사는 이 프로필을 선택해서 사용합니다. 키는 응답/목록에 다시 노출되지 않습니다.",
+  },
+};
 
 function AiOptionDatalists() {
   return (
@@ -202,6 +239,7 @@ function App() {
   const systemCards = buildSystemReadinessCards({ providerReadiness, knowledgeSources, tasks, healthStatus });
   const healthFailureMessage = getHealthFailureMessage(healthStatus);
   const readyProviderCount = providerReadiness.filter((provider) => provider.ready).length;
+  const manualGuide = manualProfileGuides[integrationForm.source_kind] || manualProfileGuides.custom;
 
   useEffect(() => {
     loadHealth();
@@ -1413,6 +1451,17 @@ function App() {
                 </section>
               ) : null}
               <p className="inline-help">대부분은 위 로그인 버튼만 쓰면 됩니다. AI API 키는 위 AI 키 버튼을 누른 뒤 토큰/API Key 칸에 붙여 넣고 저장합니다.</p>
+              <section className="manual-profile-guide" aria-live="polite">
+                <div>
+                  <strong>{manualGuide.title}</strong>
+                  <p>{manualGuide.tokenHint}</p>
+                </div>
+                <dl>
+                  <div><dt>Base URL</dt><dd>{manualGuide.baseUrl}</dd></div>
+                  <div><dt>토큰 이름</dt><dd>{manualGuide.tokenName}</dd></div>
+                  <div><dt>확인 방법</dt><dd>{manualGuide.testHint}</dd></div>
+                </dl>
+              </section>
               <form id="profile-manual-form" className="knowledge-form" onSubmit={saveIntegrationProfile}>
                 <div className="grid3 wide">
                   <Field label="프로필명"><input value={integrationForm.name} onChange={(e) => setIntegrationForm({ ...integrationForm, name: e.target.value })} /></Field>
@@ -1428,9 +1477,9 @@ function App() {
                   <Field label="API"><input value={integrationForm.api_provider} onChange={(e) => setIntegrationForm({ ...integrationForm, api_provider: e.target.value })} /></Field>
                 </div>
                 <div className="grid3 wide">
-                  <Field label="Base URL"><input value={integrationForm.base_url} onChange={(e) => setIntegrationForm({ ...integrationForm, base_url: e.target.value })} /></Field>
-                  <Field label="토큰 이름"><input value={integrationForm.token_name} onChange={(e) => setIntegrationForm({ ...integrationForm, token_name: e.target.value })} /></Field>
-                  <Field label="토큰/API Key"><input type="password" autoComplete="off" value={integrationForm.token_value} onChange={(e) => setIntegrationForm({ ...integrationForm, token_value: e.target.value })} placeholder="서버 DB에 사용자별 저장" /></Field>
+                  <Field label="Base URL" hint={manualGuide.baseUrl}><input value={integrationForm.base_url} onChange={(e) => setIntegrationForm({ ...integrationForm, base_url: e.target.value })} /></Field>
+                  <Field label="토큰 이름" hint={manualGuide.tokenName}><input value={integrationForm.token_name} onChange={(e) => setIntegrationForm({ ...integrationForm, token_name: e.target.value })} /></Field>
+                  <Field label="토큰/API Key" hint="값은 사용자별로 암호화 저장되고 목록/응답에 다시 보이지 않습니다."><input type="password" autoComplete="off" value={integrationForm.token_value} onChange={(e) => setIntegrationForm({ ...integrationForm, token_value: e.target.value })} placeholder="여기에 본인 API 키 붙여넣기" /></Field>
                 </div>
                 <div className="grid3 wide">
                   <Field label="AI 제공자"><input list="ai-provider-options" value={integrationForm.ai_provider} onChange={(e) => setIntegrationForm({ ...integrationForm, ai_provider: e.target.value })} placeholder="OpenAI 또는 OpenAI-compatible" /></Field>
