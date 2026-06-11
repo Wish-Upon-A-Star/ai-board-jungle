@@ -524,6 +524,83 @@ pre {
   box-shadow: inset 3px 0 0 currentColor;
   padding-left: 9px;
 }
+.automation-provider-setup {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(16, 81, 57, 0.14);
+}
+.automation-provider-setup-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+.automation-provider-setup-head strong {
+  font-size: 14px;
+}
+.automation-provider-setup-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.provider-setup-row {
+  display: grid;
+  grid-template-columns: 150px minmax(260px, 1fr);
+  gap: 8px 12px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.provider-setup-row.ready {
+  border-color: #b7dfc3;
+  background: #fbfffc;
+}
+.provider-setup-row.missing {
+  border-color: #ead3a1;
+  background: #fffaf0;
+}
+.provider-setup-row > div {
+  display: grid;
+  gap: 4px;
+}
+.provider-setup-row > div strong {
+  font-size: 14px;
+}
+.provider-setup-row > div span,
+.provider-setup-row small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.provider-setup-row label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.provider-setup-row input {
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  background: #fffdf6;
+}
+.provider-setup-row p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #3f4c45;
+  font-size: 13px;
+}
+.provider-setup-row small {
+  grid-column: 1 / -1;
+}
+.provider-setup-row a {
+  grid-column: 1 / -1;
+  width: max-content;
+  font-weight: 800;
+}
 .automation-readiness-card button {
   width: auto;
   white-space: nowrap;
@@ -1874,6 +1951,27 @@ pre {
 .provider-card p,
 .provider-card small,
 .knowledge-item p { display: block; margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+.provider-template-deps {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.provider-template-deps b {
+  color: var(--muted);
+  font-size: 11px;
+}
+.provider-template-deps em {
+  border: 1px solid #dbe8d9;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: #fff;
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
 .activity-log { padding: 12px; display: grid; gap: 7px; }
 .activity-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .activity-head span { color: var(--muted); font-size: 12px; }
@@ -2671,6 +2769,8 @@ pre {
   .task-card-flow,
   .task-detail-meta,
   .automation-readiness-card,
+  .automation-provider-setup-head,
+  .provider-setup-row,
   .automation-route-preview,
   .stats dl { grid-template-columns: 1fr; }
   .stats div { border-right: 0; border-bottom: 1px solid #edf0eb; padding-bottom: 7px; }

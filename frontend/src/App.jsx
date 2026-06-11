@@ -74,6 +74,34 @@ function detectAutomationProviderKeys(form) {
   return keys;
 }
 
+const automationProviderTemplates = [
+  { key: "github_notion", label: "GitHub → Notion", providers: ["github", "notion"], setup: "GitHub repo webhook 또는 주기 수집 + Notion DB/page write 권한" },
+  { key: "team_notion_board_to_github", label: "Notion BOARD → GitHub Issue", providers: ["notion", "github"], setup: "Notion 변경 감지 + GitHub Issues write 권한" },
+  { key: "team_notion_gantt_to_calendar", label: "Notion GANTT → Google Calendar", providers: ["notion", "google_calendar"], setup: "Notion 날짜 속성 읽기 + Google Calendar events 권한" },
+  { key: "figma_calendar", label: "Figma → Google Calendar", providers: ["figma", "google_calendar"], setup: "Figma OAuth redirect 등록 + Calendar events 권한" },
+];
+
+function templatesForProvider(providerKey) {
+  return automationProviderTemplates.filter((template) => template.providers.includes(providerKey));
+}
+
+function templateForAutomation(form) {
+  return automationProviderTemplates.find((template) => template.key === form?.template_preset) || null;
+}
+
+function oauthProviderForKey(oauthProviders, key) {
+  return oauthProviders.find((provider) => provider.provider === key || (key === "google_calendar" && provider.provider === "google")) || null;
+}
+
+function providerSetupHint(key) {
+  return ({
+    github: "OAuth callback 등록 후 repo/issue 권한과 webhook secret을 확인합니다.",
+    notion: "OAuth redirect 등록 후 대상 page/database를 integration에 공유합니다.",
+    figma: "Figma Developers Apps의 OAuth credentials에 callback URL을 exact match로 등록합니다.",
+    google_calendar: "Google Cloud OAuth Client에 Authorized redirect URI를 등록하고 calendar.events scope를 승인합니다.",
+  })[key] || "provider 개발자 콘솔의 callback/webhook 설정을 확인합니다.";
+}
+
 function runOverviewItems(result) {
   const data = parseRunResult(result);
   const items = [];
@@ -330,6 +358,25 @@ function App() {
   const missingProviderReadiness = providerReadiness.filter((provider) => !provider.ready);
   const providerReadinessReady = providerReadiness.length > 0 && missingProviderReadiness.length === 0;
   const automationProviderKeys = useMemo(() => detectAutomationProviderKeys(form), [form]);
+  const selectedAutomationTemplate = useMemo(() => templateForAutomation(form), [form]);
+  const automationProviderSetupRows = useMemo(
+    () => automationProviderKeys.map((key) => {
+      const readiness = providerReadiness.find((provider) => provider.key === key);
+      const oauth = oauthProviderForKey(oauthProviders, key);
+      return {
+        key,
+        name: readiness?.name || providerLabel(key),
+        ready: Boolean(readiness?.ready),
+        status: readiness?.ready ? "ready" : readiness?.nextAction || "setup required",
+        callback: oauth?.redirectUri || "",
+        callbackSource: oauth?.redirectUriSource || "",
+        setupUrl: oauth?.setupUrl || "",
+        setupHint: selectedAutomationTemplate?.setup || providerSetupHint(key),
+        templates: templatesForProvider(key).map((template) => template.label),
+      };
+    }),
+    [automationProviderKeys, providerReadiness, oauthProviders, selectedAutomationTemplate],
+  );
   const routeProviderReadiness = useMemo(
     () => automationProviderKeys
       .map((key) => providerReadiness.find((provider) => provider.key === key))
@@ -1504,6 +1551,29 @@ function App() {
                         </span>
                       ))}
                     </div>
+                    {automationProviderSetupRows.length ? (
+                      <div className="automation-provider-setup" aria-label="선택한 자동화의 provider 설정 체크">
+                        <div className="automation-provider-setup-head">
+                          <strong>{selectedAutomationTemplate?.label || "직접 구성"} 설정 체크</strong>
+                          <span>callback, 권한, webhook 준비 상태를 provider별로 확인합니다.</span>
+                        </div>
+                        {automationProviderSetupRows.map((provider) => (
+                          <article key={provider.key} className={provider.ready ? "provider-setup-row ready" : "provider-setup-row missing"}>
+                            <div>
+                              <strong>{provider.name}</strong>
+                              <span>{provider.status}</span>
+                            </div>
+                            <label>
+                              Callback
+                              <input readOnly value={provider.callback || "OAuth callback 정보 없음"} onFocus={(event) => event.currentTarget.select()} />
+                            </label>
+                            <p>{provider.setupHint}</p>
+                            <small>출처: {provider.callbackSource || "profile/manual"} · 사용 템플릿: {provider.templates.join(", ") || "직접 구성"}</small>
+                            {provider.setupUrl ? <a href={provider.setupUrl} target="_blank" rel="noreferrer">개발자 설정 열기</a> : null}
+                          </article>
+                        ))}
+                      </div>
+                    ) : null}
                     <button type="button" className="secondary" onClick={() => setActiveMainTab("integrations")}>
                       <KeyRound size={14} /> 프로필/Callback 확인
                     </button>
@@ -2131,6 +2201,11 @@ function App() {
                         <span>{provider.ready ? "ready" : "setup required"} / {provider.readyCount}/{provider.profileCount}</span>
                         <p>{provider.requiredUrl} / {provider.requiredToken} / {provider.operation}</p>
                         <small>{provider.nextAction}</small>
+                        <div className="provider-template-deps">
+                          <b>사용 템플릿</b>
+                          {templatesForProvider(provider.key).map((template) => <em key={template.label}>{template.label}</em>)}
+                          {!templatesForProvider(provider.key).length ? <em>직접 구성</em> : null}
+                        </div>
                       </div>
                     ))}
                   </div>

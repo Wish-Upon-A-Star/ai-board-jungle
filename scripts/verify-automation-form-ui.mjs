@@ -58,6 +58,16 @@ async function main() {
     if (!initialRouteRequiredText.includes("GitHub") || !initialRouteRequiredText.includes("Notion")) {
       throw new Error(`Default GitHub -> Notion preset should highlight GitHub and Notion readiness: ${initialRouteRequiredText}`);
     }
+    const providerSetup = readinessCard.locator(".automation-provider-setup");
+    await providerSetup.waitFor({ state: "visible", timeout: 10000 });
+    const setupText = await providerSetup.innerText();
+    if (!setupText.includes("GitHub") || !setupText.includes("Notion") || !setupText.includes("Callback") || !setupText.includes("사용 템플릿")) {
+      throw new Error(`Provider setup checklist is incomplete for GitHub -> Notion: ${setupText}`);
+    }
+    const setupCallbackValues = await providerSetup.locator("input").evaluateAll((inputs) => inputs.map((input) => input.value));
+    if (!setupCallbackValues.some((value) => value.includes("/api/oauth/github/callback"))) {
+      throw new Error(`Provider setup checklist must expose GitHub callback: ${setupCallbackValues.join(" | ")}`);
+    }
     const routePreview = form.locator(".automation-route-preview");
     await routePreview.waitFor({ state: "visible", timeout: 10000 });
     const routePreviewText = await routePreview.innerText();
@@ -72,7 +82,7 @@ async function main() {
     if (visibleRouteInputsBefore !== 0) throw new Error(`Route edit fields are visible before opening details: ${visibleRouteInputsBefore}`);
 
     await cards.nth(3).click();
-    const nameValue = await form.locator("input").first().inputValue();
+    const nameValue = await basicSection.locator(":scope > .grid2 input").first().inputValue();
     if (!nameValue.includes("Figma") && !nameValue.includes("Calendar")) {
       throw new Error(`Preset did not populate automation name: ${nameValue}`);
     }
@@ -83,6 +93,14 @@ async function main() {
     const figmaCalendarRequiredText = (await readinessCard.locator(".route-required").allTextContents()).join("\n");
     if (!figmaCalendarRequiredText.includes("Figma") || !figmaCalendarRequiredText.includes("Google Calendar")) {
       throw new Error(`Figma -> Calendar preset should highlight Figma and Google Calendar readiness: ${figmaCalendarRequiredText}`);
+    }
+    const figmaSetupText = await providerSetup.innerText();
+    if (!figmaSetupText.includes("Figma") || !figmaSetupText.includes("Google Calendar") || !figmaSetupText.includes("Figma → Google Calendar")) {
+      throw new Error(`Provider setup checklist did not update for Figma -> Calendar: ${figmaSetupText}`);
+    }
+    const figmaSetupCallbackValues = await providerSetup.locator("input").evaluateAll((inputs) => inputs.map((input) => input.value));
+    if (!figmaSetupCallbackValues.some((value) => value.includes("/api/oauth/figma/callback"))) {
+      throw new Error(`Provider setup checklist must expose Figma callback: ${figmaSetupCallbackValues.join(" | ")}`);
     }
 
     await advanced.locator("summary").click();
@@ -101,6 +119,8 @@ async function main() {
         "basic_controls_reduced_to_profile_name_interval",
         "automation_readiness_card_visible",
         "automation_readiness_route_required_providers_visible",
+        "automation_provider_setup_checklist_visible",
+        "automation_provider_setup_callbacks_visible",
         "automation_readiness_action_opens_profiles",
         "route_preview_visible",
         "route_edit_collapsed_by_default",
