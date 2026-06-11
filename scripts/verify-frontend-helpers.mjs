@@ -22,6 +22,18 @@ assert.equal(parsed.agent, "SyncPlannerAgent");
 assert.equal(summarizeRunResult(parsed), "SyncPlannerAgent / GitHub -> Notion / 2 targets / 1 RAG sources");
 assert.equal(getRunStatus(parsed), "changed");
 
+const skipped = parseRunResult('{"status":"skipped","reason":"Watched automation input did not change since the previous run.","aiCallPolicy":"skipped: no watched input change, so no AI/model call or live write is allowed."}');
+assert.equal(
+  summarizeRunResult(skipped),
+  "skipped: Watched automation input did not change since the previous run. / skipped: no watched input change, so no AI/model call or live write is allowed.",
+);
+
+const noData = parseRunResult('{"status":"no-data","reason":"No GitHub/Notion source changes were collected, so no AI/model call or live write was performed.","aiCallPolicy":"skipped: no collected source items.","liveWrites":[]}');
+assert.equal(
+  summarizeRunResult(noData),
+  "no-data: No GitHub/Notion source changes were collected, so no AI/model call or live write was performed. / skipped: no collected source items.",
+);
+
 const invalid = parseRunResult("not json");
 assert.deepEqual(invalid, { raw: "not json" });
 assert.equal(getRunStatus("not json"), "not json");

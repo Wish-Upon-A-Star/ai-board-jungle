@@ -10,10 +10,17 @@ export function parseRunResult(result) {
 
 export function summarizeRunResult(result) {
   const data = parseRunResult(result);
+  const status = String(data.status || "").toLowerCase();
+  if (status === "skipped" || status === "no-data") {
+    const reason = data.reason || data.aiCallPolicy || "No watched input change.";
+    const policy = data.aiCallPolicy ? ` / ${data.aiCallPolicy}` : "";
+    return `${status}: ${reason}${policy}`;
+  }
   const parts = [data.agent || "agent"];
   if (data.route) parts.push(data.route);
   if (Array.isArray(data.targets)) parts.push(`${data.targets.length} targets`);
   if (Array.isArray(data.externalRagSources)) parts.push(`${data.externalRagSources.length} RAG sources`);
+  if (Array.isArray(data.liveWrites)) parts.push(`${data.liveWrites.length} live writes`);
   return parts.join(" / ");
 }
 
