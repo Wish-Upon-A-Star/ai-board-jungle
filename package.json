@@ -44,6 +44,7 @@
     "verify:figma-oauth-ui": "node scripts/verify-figma-oauth-ui.mjs",
     "verify:google-oauth-ui": "node scripts/verify-google-oauth-ui.mjs",
     "verify:oauth-diagnostics-ui": "node scripts/verify-oauth-diagnostics-ui.mjs",
+    "verify:system-settings-ui": "node scripts/verify-system-settings-ui.mjs",
     "verify:profile-manual-editor-ui": "node scripts/verify-profile-manual-editor-ui.mjs",
     "verify:automation-form-ui": "node scripts/verify-automation-form-ui.mjs",
     "verify:automation-list-ui": "node scripts/verify-automation-list-ui.mjs",

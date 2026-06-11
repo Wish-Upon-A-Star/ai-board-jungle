@@ -26,8 +26,8 @@ from sqlalchemy.orm import Session
 from .collectors import CollectedItem, collect_profile_items, extract_notion_id, parse_github_repo, save_collected_items
 from .db import check_db, database_reachable, get_db, init_db
 from .live_writers import execute_profile_write, google_calendar_access_token, parse_figma_file_key, profile_access_token, safe_calendar_id, write_calendar_event_at, write_notion_sources_report
-from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, User
-from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LiveWriteIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
+from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, SystemSetting, User
+from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LiveWriteIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn, SystemSettingsIn
 from .security import create_token, current_user, hash_password, protect_secret, reveal_secret, secret_preview, secret_storage_type, verify_password
 from .services import agent_review, automation_fingerprint, automation_plan, get_or_create_tags, instruction_hub, rag_answer, result_to_text, search_posts, summarize
 from .taskory_import import normalize_taskory_export
@@ -127,6 +127,31 @@ def serialize_profile_settings(user: User) -> dict:
         "customTemplate": user.profile_custom_template,
         "customConnections": parse_connections(user.profile_custom_connections),
     }
+
+
+def system_setting_value(db: Session | None, key: str) -> str:
+    if db is None:
+        return ""
+    setting = db.get(SystemSetting, key)
+    return (setting.value if setting else "").strip().rstrip("/")
+
+
+def serialize_system_settings(db: Session | None) -> dict:
+    public_base_url = system_setting_value(db, "public_base_url") or os.environ.get("AI_BOARD_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    return {
+        "publicBaseUrl": public_base_url,
+        "source": "database" if system_setting_value(db, "public_base_url") else ("environment" if public_base_url else "request"),
+    }
+
+
+def upsert_system_setting(db: Session, key: str, value: str) -> SystemSetting:
+    setting = db.get(SystemSetting, key)
+    if not setting:
+        setting = SystemSetting(key=key, value=value)
+        db.add(setting)
+    else:
+        setting.value = value
+    return setting
 
 
 def serialize_knowledge(source: KnowledgeSource) -> dict:
@@ -517,13 +542,21 @@ def validate_integration_profile_credentials(profile: IntegrationProfile) -> dic
     return validation_result(service, "blocked", f"{service} 프로필은 아직 자동 검증을 지원하지 않습니다.", reason="unsupported", checked=["token_present"])
 
 
-def public_base_url(request: Request) -> str:
-    configured = os.environ.get("AI_BOARD_PUBLIC_BASE_URL", "").strip().rstrip("/")
+def public_base_url(request: Request, db: Session | None = None) -> str:
+    configured = system_setting_value(db, "public_base_url") or os.environ.get("AI_BOARD_PUBLIC_BASE_URL", "").strip().rstrip("/")
     explicit_origin = request.headers.get("x-ai-board-public-origin", "").strip().rstrip("/")
     forwarded_host = request.headers.get("x-forwarded-host")
     host = forwarded_host or request.headers.get("host") or request.url.netloc
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme
     request_base = f"{proto}://{host}".rstrip("/")
+    if configured:
+        configured_host = urlparse(configured).netloc.lower()
+        if not (
+            "trycloudflare.com" in configured_host
+            or configured_host.endswith(".ngrok-free.app")
+            or configured_host.endswith(".ngrok.app")
+        ):
+            return configured
     if explicit_origin.startswith(("https://", "http://")):
         origin_host = urlparse(explicit_origin).netloc.lower()
         if (
@@ -542,9 +575,10 @@ def public_base_url(request: Request) -> str:
     return request_base or configured
 
 
-def public_origin_diagnostics(request: Request) -> dict:
-    origin = public_base_url(request)
+def public_origin_diagnostics(request: Request, db: Session | None = None) -> dict:
+    origin = public_base_url(request, db)
     host = urlparse(origin).netloc.lower()
+    setting_source = serialize_system_settings(db)
     temporary = (
         "trycloudflare.com" in host
         or host.endswith(".ngrok-free.app")
@@ -552,6 +586,8 @@ def public_origin_diagnostics(request: Request) -> dict:
     )
     return {
         "origin": origin,
+        "configuredPublicBaseUrl": setting_source["publicBaseUrl"],
+        "configuredPublicBaseUrlSource": setting_source["source"],
         "temporaryTunnel": temporary,
         "risk": "temporary_tunnel_callback_rotation" if temporary else "stable_public_origin",
         "message": (
@@ -567,8 +603,11 @@ def public_origin_diagnostics(request: Request) -> dict:
     }
 
 
-def oauth_redirect_uri(provider: str, request: Request) -> str:
+def oauth_redirect_uri(provider: str, request: Request, db: Session | None = None) -> str:
     normalized = provider.lower()
+    configured_public_base = system_setting_value(db, "public_base_url")
+    if configured_public_base:
+        return f"{configured_public_base}/api/oauth/{normalized}/callback"
     override_key = f"AI_BOARD_{normalized.upper()}_OAUTH_REDIRECT_URI"
     override = os.environ.get(override_key, "").strip().rstrip("/")
     if override.startswith(("https://", "http://")):
@@ -577,7 +616,7 @@ def oauth_redirect_uri(provider: str, request: Request) -> str:
         google_override = os.environ.get("AI_BOARD_GOOGLE_OAUTH_REDIRECT_URI", "").strip().rstrip("/")
         if google_override.startswith(("https://", "http://")):
             return google_override
-    return f"{public_base_url(request)}/api/oauth/{normalized}/callback"
+    return f"{public_base_url(request, db)}/api/oauth/{normalized}/callback"
 
 
 def clean_oauth_env_value(value: str) -> str:
@@ -625,9 +664,9 @@ def read_oauth_state(state: str) -> dict:
     return payload
 
 
-def oauth_provider_config(provider: str, request: Request) -> dict:
+def oauth_provider_config(provider: str, request: Request, db: Session | None = None) -> dict:
     normalized = provider.lower()
-    redirect_uri = oauth_redirect_uri(normalized, request)
+    redirect_uri = oauth_redirect_uri(normalized, request, db)
     if normalized == "github":
         client_id = clean_oauth_env_value(os.environ.get("AI_BOARD_GITHUB_OAUTH_CLIENT_ID", ""))
         client_secret = clean_oauth_env_value(os.environ.get("AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET", ""))
@@ -1378,6 +1417,20 @@ def update_profile_settings(data: ProfileSettingsIn, user: User = Depends(curren
     return {"profileSettings": serialize_profile_settings(user)}
 
 
+@app.get("/api/system/settings")
+def get_system_settings(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    return {"systemSettings": serialize_system_settings(db)}
+
+
+@app.put("/api/system/settings")
+def update_system_settings(data: SystemSettingsIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    if user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="관리자만 시스템 설정을 수정할 수 있습니다.")
+    upsert_system_setting(db, "public_base_url", data.public_base_url)
+    db.commit()
+    return {"systemSettings": serialize_system_settings(db)}
+
+
 @app.get("/api/integration-profiles")
 def list_integration_profiles(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     profiles = db.scalars(
@@ -1387,10 +1440,10 @@ def list_integration_profiles(user: User = Depends(current_user), db: Session = 
 
 
 @app.get("/api/oauth/status")
-def oauth_status(request: Request, user: User = Depends(current_user)) -> dict:
+def oauth_status(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     providers = []
     for provider in ("github", "notion", "figma", "google_calendar"):
-        config = oauth_provider_config(provider, request)
+        config = oauth_provider_config(provider, request, db)
         providers.append(
             {
                 "provider": provider,
@@ -1404,12 +1457,12 @@ def oauth_status(request: Request, user: User = Depends(current_user)) -> dict:
                 "apiProvider": config["apiProvider"],
             }
         )
-    return {"providers": providers, "publicOrigin": public_origin_diagnostics(request)}
+    return {"providers": providers, "publicOrigin": public_origin_diagnostics(request, db), "systemSettings": serialize_system_settings(db)}
 
 
 @app.get("/api/oauth/{provider}/start")
-def start_oauth_login(provider: str, request: Request, user: User = Depends(current_user)) -> dict:
-    config = oauth_provider_config(provider, request)
+def start_oauth_login(provider: str, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    config = oauth_provider_config(provider, request, db)
     if config["missing"]:
         return {
             "provider": config["provider"],
@@ -1454,7 +1507,7 @@ def oauth_callback(provider: str, request: Request, code: str = "", state: str =
     if not code:
         raise HTTPException(status_code=400, detail="OAuth callback code is missing.")
     payload = read_oauth_state(state)
-    config = oauth_provider_config(provider, request)
+    config = oauth_provider_config(provider, request, db)
     if payload.get("provider") != config["provider"]:
         raise HTTPException(status_code=400, detail="OAuth provider state mismatch.")
     if config["missing"]:

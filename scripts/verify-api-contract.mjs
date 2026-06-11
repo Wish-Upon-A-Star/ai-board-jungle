@@ -44,6 +44,10 @@ try {
   assertKeys(settings.profileSettings, ["aiProvider", "aiModel", "apiKeyStrategy", "templatePreset", "customConnections"], "profileSettings");
   assert(Array.isArray(settings.profileSettings.customConnections), "profileSettings.customConnections must be an array");
 
+  const systemSettings = await call("/api/system/settings", {}, token);
+  assertKeys(systemSettings, ["systemSettings"], "system settings response");
+  assertKeys(systemSettings.systemSettings, ["publicBaseUrl", "source"], "systemSettings");
+
   const readiness = await call("/api/provider-readiness", {}, token);
   assert(Array.isArray(readiness.providers), "provider-readiness.providers must be an array");
   for (const provider of readiness.providers) {

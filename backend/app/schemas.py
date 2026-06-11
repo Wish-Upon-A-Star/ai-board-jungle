@@ -101,6 +101,18 @@ class ProfileSettingsIn(BaseModel):
     custom_connections: list[CustomConnectionIn] = []
 
 
+class SystemSettingsIn(BaseModel):
+    public_base_url: str = Field(default="", max_length=300)
+
+    @model_validator(mode="after")
+    def validate_public_base_url(self) -> "SystemSettingsIn":
+        value = self.public_base_url.strip().rstrip("/")
+        if value and not value.startswith(("https://", "http://")):
+            raise ValueError("public_base_url must start with http:// or https://")
+        self.public_base_url = value
+        return self
+
+
 class AutomationIn(BaseModel):
     name: str = Field(min_length=2, max_length=160)
     integration_profile_id: int | None = None

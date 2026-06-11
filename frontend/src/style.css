@@ -583,6 +583,36 @@ pre {
   background: #fbfffd;
 }
 
+.system-settings-card {
+  margin: 0 0 14px;
+  border-color: #bad9d4;
+  background: #fbfffd;
+}
+.system-settings-form {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+.system-settings-readonly {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.system-settings-readonly span {
+  color: var(--muted);
+  font-weight: 800;
+}
+.system-settings-readonly code {
+  overflow-wrap: anywhere;
+  color: var(--accent-strong);
+}
+
 .automation-list-header {
   display: flex;
   align-items: center;
@@ -2312,6 +2342,8 @@ pre {
   .manual-profile-guide dl div,
   .taskory-status-card dl div,
   .callback-preview-item,
+  .system-settings-form,
+  .system-settings-readonly,
   .run-row-main { grid-template-columns: 1fr; }
   .transcription-settings {
     grid-template-columns: 1fr;

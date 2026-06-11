@@ -234,6 +234,8 @@ function App() {
   const [boardSubTab, setBoardSubTab] = useState("posts");
   const [expandedTasks, setExpandedTasks] = useState({});
   const [profileSettings, setProfileSettings] = useState(null);
+  const [systemSettings, setSystemSettings] = useState(null);
+  const [systemSettingsState, setSystemSettingsState] = useState({ status: "idle", message: "" });
   const [error, setError] = useState("");
   const [validationIssues, setValidationIssues] = useState([]);
   const [oauthSetup, setOauthSetup] = useState(null);
@@ -346,7 +348,7 @@ function App() {
       Object.entries(filters).forEach(([key, value]) => {
         if (value) activityParams.set(key, value);
       });
-      const [me, postData, shareData, taskData, knowledgeData, profileData, readinessData, oauthData, activityData] = await Promise.all([
+      const [me, postData, shareData, taskData, knowledgeData, profileData, readinessData, oauthData, systemData, activityData] = await Promise.all([
         api("/api/auth/me"),
         api(`/api/posts?q=${encodeURIComponent(search)}&kind=board&limit=8&offset=0`),
         api(`/api/posts?q=${encodeURIComponent(search)}&kind=automation&limit=8&offset=0`),
@@ -355,6 +357,7 @@ function App() {
         api("/api/integration-profiles"),
         api("/api/provider-readiness"),
         api("/api/oauth/status"),
+        api("/api/system/settings"),
         api(`/api/integration-activities?${activityParams.toString()}`),
       ]);
       setUser(me.user);
@@ -369,6 +372,7 @@ function App() {
       setProviderReadiness(readinessData.providers);
       setOauthProviders(oauthData.providers || []);
       setOauthPublicOrigin(oauthData.publicOrigin || null);
+      setSystemSettings(systemData.systemSettings || oauthData.systemSettings || null);
       setIntegrationActivities(activityData.activities);
       setActivityPage({ total: activityData.total, limit: activityData.limit, offset: activityData.offset, nextOffset: activityData.nextOffset, hasMore: activityData.hasMore });
       setSelected((current) => postData.posts.find((post) => post.id === current?.id) || postData.posts[0] || null);
@@ -760,6 +764,30 @@ function App() {
       showActionError(err);
     } finally {
       clearBusy("profile-settings");
+    }
+  }
+
+  async function saveSystemSettings(event) {
+    event.preventDefault();
+    clearErrorState();
+    setBusy("system-settings");
+    setSystemSettingsState({ status: "saving", message: "외부 접속 도메인 설정을 저장하는 중입니다." });
+    try {
+      const data = await api("/api/system/settings", {
+        method: "PUT",
+        body: JSON.stringify({ public_base_url: systemSettings?.publicBaseUrl || "" }),
+      });
+      const oauthData = await api("/api/oauth/status");
+      setSystemSettings(data.systemSettings || oauthData.systemSettings || null);
+      setOauthProviders(oauthData.providers || []);
+      setOauthPublicOrigin(oauthData.publicOrigin || null);
+      setApiResult({ called: "system-settings.save", response: { ...data, oauthStatus: oauthData } });
+      setSystemSettingsState({ status: "ok", message: "저장했습니다. OAuth callback 미리보기가 새 기준으로 갱신되었습니다." });
+    } catch (err) {
+      setSystemSettingsState({ status: "error", message: err.message || "시스템 설정 저장에 실패했습니다." });
+      showActionError(err);
+    } finally {
+      clearBusy("system-settings");
     }
   }
 
@@ -1415,6 +1443,29 @@ function App() {
                   <p>여기서 AI 모델과 출력 형식을 한 번 저장해두면, 자동화 등록 폼에서 <b>"내 기본값 적용"</b> 버튼 하나로 자동으로 채워집니다.</p>
                 </div>
               </div>
+
+              <section className="settings-group system-settings-card">
+                <div className="settings-group-label">🌐 외부 접속 도메인</div>
+                <p className="settings-group-desc">Figma, Google, GitHub, Notion OAuth callback 기준이 되는 public URL입니다. 팀원이 계속 쓸 주소가 정해지면 여기에 고정 도메인을 저장합니다.</p>
+                {user?.role === "ADMIN" ? (
+                  <form className="system-settings-form" onSubmit={saveSystemSettings}>
+                    <Field label="Public Base URL" hint="예: https://ai-board.your-domain.example">
+                      <input
+                        value={systemSettings?.publicBaseUrl || ""}
+                        onChange={(event) => setSystemSettings({ ...(systemSettings || {}), publicBaseUrl: event.target.value })}
+                        placeholder={currentPublicOrigin}
+                      />
+                    </Field>
+                    <button disabled={isBusy("system-settings")}><KeyRound size={14} /> {isBusy("system-settings") ? "저장 중…" : "외부 도메인 저장"}</button>
+                  </form>
+                ) : (
+                  <div className="system-settings-readonly">
+                    <span>현재 기준</span>
+                    <code>{systemSettings?.publicBaseUrl || oauthPublicOrigin?.origin || currentPublicOrigin}</code>
+                  </div>
+                )}
+                <div className={`form-status ${systemSettingsState.status}`}>{systemSettingsState.message || `현재 출처: ${systemSettings?.source || "request"}`}</div>
+              </section>
 
               <form className="knowledge-form" onSubmit={saveProfileSettings}>
                 {/* AI 설정 */}

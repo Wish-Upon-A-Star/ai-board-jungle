@@ -40,6 +40,14 @@ class User(Base):
     integration_activities: Mapped[list["IntegrationActivity"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
 
 
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(120), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class Post(Base):
     __tablename__ = "posts"
     __table_args__ = (

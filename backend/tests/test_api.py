@@ -21,7 +21,7 @@ from app.config import settings
 from app.db import SessionLocal, engine, init_db
 import app.main as main_module
 from app.main import app
-from app.models import AutomationRun, AutomationTask, IntegrationProfile, KnowledgeSource
+from app.models import AutomationRun, AutomationTask, IntegrationProfile, KnowledgeSource, User
 from app.live_writers import korean_summary_for_source, notion_sources_template_children, write_calendar_event, write_github_issue, write_notion_sources_report, write_notion_task
 from app.security import reveal_secret
 from app.taskory_import import normalize_taskory_export
@@ -1439,6 +1439,69 @@ def test_mcp_oauth_start_builds_provider_authorize_url(monkeypatch):
     assert params["redirect_uri"] == ["https://board.example.test/api/oauth/github/callback"]
     assert "repo read:user user:email" in params["scope"]
     assert params["state"][0].count(".") == 1
+
+
+def test_admin_system_public_base_url_overrides_oauth_origin(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_PUBLIC_BASE_URL", "https://env.example.test")
+    monkeypatch.setenv("AI_BOARD_GITHUB_OAUTH_CLIENT_ID", "github-client")
+    monkeypatch.setenv("AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET", "github-secret")
+    with TestClient(app) as client:
+        admin_register = client.post(
+            "/api/auth/register",
+            json={"email": "system-admin@example.com", "name": "System Admin", "password": "password123"},
+        )
+        assert admin_register.status_code == 200
+        with SessionLocal() as db:
+            admin_user = db.query(User).filter(User.email == "system-admin@example.com").first()
+            admin_user.role = "ADMIN"
+            db.commit()
+        admin_login = client.post("/api/auth/login", json={"email": "system-admin@example.com", "password": "password123"})
+        assert admin_login.status_code == 200
+        admin_headers = {"Authorization": f"Bearer {admin_login.json()['token']}"}
+        user_register = client.post(
+            "/api/auth/register",
+            json={"email": "system-setting-user@example.com", "name": "System User", "password": "password123"},
+        )
+        user_headers = {"Authorization": f"Bearer {user_register.json()['token']}"}
+
+        forbidden = client.put(
+            "/api/system/settings",
+            headers=user_headers,
+            json={"public_base_url": "https://user.example.test"},
+        )
+        assert forbidden.status_code == 403
+
+        saved = client.put(
+            "/api/system/settings",
+            headers=admin_headers,
+            json={"public_base_url": "https://stable.example.test/"},
+        )
+        assert saved.status_code == 200
+        assert saved.json()["systemSettings"]["publicBaseUrl"] == "https://stable.example.test"
+        assert saved.json()["systemSettings"]["source"] == "database"
+
+        status = client.get(
+            "/api/oauth/status",
+            headers={**admin_headers, "x-ai-board-public-origin": "https://temporary.trycloudflare.com"},
+        )
+        assert status.status_code == 200
+        assert status.json()["publicOrigin"]["origin"] == "https://stable.example.test"
+        assert status.json()["publicOrigin"]["configuredPublicBaseUrlSource"] == "database"
+
+        response = client.get(
+            "/api/oauth/github/start",
+            headers={**admin_headers, "x-ai-board-public-origin": "https://temporary.trycloudflare.com"},
+        )
+        assert response.status_code == 200
+        params = parse_qs(urlparse(response.json()["authorizeUrl"]).query)
+        assert params["redirect_uri"] == ["https://stable.example.test/api/oauth/github/callback"]
+
+        cleanup = client.put(
+            "/api/system/settings",
+            headers=admin_headers,
+            json={"public_base_url": ""},
+        )
+        assert cleanup.status_code == 200
 
 
 def test_full_fastapi_flow(monkeypatch):
