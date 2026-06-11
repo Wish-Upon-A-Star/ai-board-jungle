@@ -30,6 +30,7 @@ async function callStatus(path, options = {}, token = "") {
 let token = "";
 let profileId = null;
 let taskId = null;
+let originalSystemPublicBaseUrl = null;
 
 try {
   const login = await call("/api/auth/login", {
@@ -47,6 +48,30 @@ try {
   const systemSettings = await call("/api/system/settings", {}, token);
   assertKeys(systemSettings, ["systemSettings"], "system settings response");
   assertKeys(systemSettings.systemSettings, ["publicBaseUrl", "source"], "systemSettings");
+  originalSystemPublicBaseUrl = systemSettings.systemSettings.publicBaseUrl || "";
+
+  const contractPublicBaseUrl = "https://contract-public.example.test";
+  const savedSystemSettings = await call(
+    "/api/system/settings",
+    { method: "PUT", body: JSON.stringify({ public_base_url: `${contractPublicBaseUrl}/` }) },
+    token,
+  );
+  assert(savedSystemSettings.systemSettings.publicBaseUrl === contractPublicBaseUrl, "system settings must trim trailing slash");
+  assert(savedSystemSettings.systemSettings.source === "database", "system settings save must report database source");
+  const oauthStatusWithSavedOrigin = await call(
+    "/api/oauth/status",
+    { headers: { "x-ai-board-public-origin": "https://temporary-contract.trycloudflare.com" } },
+    token,
+  );
+  assert(oauthStatusWithSavedOrigin.publicOrigin.origin === contractPublicBaseUrl, "OAuth status must prefer saved public base URL");
+  for (const provider of oauthStatusWithSavedOrigin.providers) {
+    assert(
+      provider.redirectUri === `${contractPublicBaseUrl}/api/oauth/${provider.provider}/callback`,
+      `${provider.provider} redirectUri must use saved public base URL`,
+    );
+  }
+  await call("/api/system/settings", { method: "PUT", body: JSON.stringify({ public_base_url: originalSystemPublicBaseUrl }) }, token);
+  originalSystemPublicBaseUrl = null;
 
   const readiness = await call("/api/provider-readiness", {}, token);
   assert(Array.isArray(readiness.providers), "provider-readiness.providers must be an array");
@@ -278,6 +303,7 @@ try {
       "mcp_rpc",
       "token_redaction",
       "custom_connection_validation",
+      "system_settings_public_oauth_origin",
     ],
     profileId,
     taskId,
@@ -290,6 +316,10 @@ try {
   }
   if (token && profileId) {
     await call(`/api/integration-profiles/${profileId}`, { method: "DELETE" }, token).catch((error) => cleanupErrors.push(error.message));
+  }
+  if (token && originalSystemPublicBaseUrl !== null) {
+    await call("/api/system/settings", { method: "PUT", body: JSON.stringify({ public_base_url: originalSystemPublicBaseUrl }) }, token)
+      .catch((error) => cleanupErrors.push(error.message));
   }
   if (cleanupErrors.length) {
     throw new Error(`contract cleanup failed: ${cleanupErrors.join("; ")}`);
