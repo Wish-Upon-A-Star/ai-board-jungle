@@ -718,6 +718,91 @@ pre {
 }
 .oauth-setup-grid textarea { min-height: 74px; }
 
+.oauth-diagnostics {
+  margin: 14px;
+  padding: 14px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+}
+.oauth-diagnostics .section-head {
+  padding: 0;
+  border: 0;
+}
+.oauth-diagnostics-list {
+  display: grid;
+  gap: 10px;
+}
+.oauth-diagnostic-row {
+  display: grid;
+  grid-template-columns: 190px minmax(260px, 1fr);
+  gap: 10px 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.oauth-diagnostic-row.ok {
+  border-color: #bad9d4;
+  background: #fbfffd;
+}
+.oauth-diagnostic-row.missing {
+  border-color: #eadca8;
+  background: var(--yellow-soft);
+}
+.oauth-diagnostic-head {
+  display: grid;
+  gap: 4px;
+}
+.oauth-diagnostic-head strong {
+  color: var(--text);
+}
+.oauth-diagnostic-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.oauth-diagnostic-row label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.oauth-diagnostic-row input {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  background: #fff;
+}
+.oauth-diagnostic-meta {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.oauth-diagnostic-meta span {
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .62);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.oauth-diagnostic-meta b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text);
+}
+.oauth-diagnostic-row a {
+  width: max-content;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .provider-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .provider-card { padding: 12px; }
 .provider-card.ready { border-color: #bad9d4; background: #fbfffd; }
@@ -1483,6 +1568,8 @@ pre {
   .provider-grid,
   .ai-key-guide,
   .manual-profile-guide,
+  .oauth-diagnostic-row,
+  .oauth-diagnostic-meta,
   .grid2,
   .grid3,
   .grid3.wide,

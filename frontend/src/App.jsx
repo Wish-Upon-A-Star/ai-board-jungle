@@ -190,6 +190,7 @@ function App() {
   const [deleteConfirmTaskId, setDeleteConfirmTaskId] = useState(null);
   const [integrationProfiles, setIntegrationProfiles] = useState([]);
   const [providerReadiness, setProviderReadiness] = useState([]);
+  const [oauthProviders, setOauthProviders] = useState([]);
   const [healthStatus, setHealthStatus] = useState(null);
   const [integrationActivities, setIntegrationActivities] = useState([]);
   const [activityPage, setActivityPage] = useState({ total: 0, limit: 12, offset: 0, nextOffset: 0, hasMore: false });
@@ -327,7 +328,7 @@ function App() {
       Object.entries(filters).forEach(([key, value]) => {
         if (value) activityParams.set(key, value);
       });
-      const [me, postData, shareData, taskData, knowledgeData, profileData, readinessData, activityData] = await Promise.all([
+      const [me, postData, shareData, taskData, knowledgeData, profileData, readinessData, oauthData, activityData] = await Promise.all([
         api("/api/auth/me"),
         api(`/api/posts?q=${encodeURIComponent(search)}&kind=board&limit=8&offset=0`),
         api(`/api/posts?q=${encodeURIComponent(search)}&kind=automation&limit=8&offset=0`),
@@ -335,6 +336,7 @@ function App() {
         api("/api/knowledge"),
         api("/api/integration-profiles"),
         api("/api/provider-readiness"),
+        api("/api/oauth/status"),
         api(`/api/integration-activities?${activityParams.toString()}`),
       ]);
       setUser(me.user);
@@ -347,6 +349,7 @@ function App() {
       setKnowledgeSources(knowledgeData.sources);
       setIntegrationProfiles(profileData.profiles);
       setProviderReadiness(readinessData.providers);
+      setOauthProviders(oauthData.providers || []);
       setIntegrationActivities(activityData.activities);
       setActivityPage({ total: activityData.total, limit: activityData.limit, offset: activityData.offset, nextOffset: activityData.nextOffset, hasMore: activityData.hasMore });
       setSelected((current) => postData.posts.find((post) => post.id === current?.id) || postData.posts[0] || null);
@@ -1490,6 +1493,36 @@ function App() {
                 <button type="button" onClick={() => openMcpProfileSetup("figma")}>수동 Figma 프로필</button>
                 <button type="button" onClick={() => openMcpProfileSetup("google_calendar")}>수동 Google Calendar 프로필</button>
               </div>
+              <section className="oauth-diagnostics" aria-label="OAuth callback 진단">
+                <div className="section-head flat">
+                  <div>
+                    <strong>OAuth callback 진단</strong>
+                    <span>Figma나 Google에서 Invalid redirect URI가 뜨면 아래 Callback URL을 개발자 콘솔에 그대로 등록합니다.</span>
+                  </div>
+                  <button type="button" onClick={() => loadAll()}><Search size={13} /> 다시 확인</button>
+                </div>
+                <div className="oauth-diagnostics-list">
+                  {oauthProviders.map((provider) => (
+                    <article key={provider.provider} className={`oauth-diagnostic-row ${provider.configured ? "ok" : "missing"}`}>
+                      <div className="oauth-diagnostic-head">
+                        <strong>{providerLabel(provider.provider)}</strong>
+                        <span>{provider.configured ? "서버 OAuth 앱 설정됨" : "서버 OAuth 앱 설정 필요"}</span>
+                      </div>
+                      <label>
+                        Callback URL
+                        <input readOnly value={provider.redirectUri || ""} onFocus={(event) => event.currentTarget.select()} />
+                      </label>
+                      <div className="oauth-diagnostic-meta">
+                        <span><b>MCP</b> {provider.mcpServerUrl}</span>
+                        <span><b>권한</b> {provider.scope}</span>
+                        {provider.missing?.length ? <span><b>누락</b> {provider.missing.join(", ")}</span> : <span><b>누락</b> 없음</span>}
+                      </div>
+                      <a href={provider.setupUrl} target="_blank" rel="noreferrer">{providerLabel(provider.provider)} 개발자 설정 열기</a>
+                    </article>
+                  ))}
+                  {!oauthProviders.length ? <p className="empty-state">OAuth 진단 정보를 불러오지 못했습니다. 다시 확인을 눌러주세요.</p> : null}
+                </div>
+              </section>
               <section className="ai-key-guide">
                 <div>
                   <strong>AI API 키 저장</strong>

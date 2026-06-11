@@ -1361,6 +1361,10 @@ def oauth_status(request: Request, user: User = Depends(current_user)) -> dict:
                 "missing": config["missing"],
                 "redirectUri": config["redirectUri"],
                 "mcpServerUrl": config["mcpServerUrl"],
+                "setupUrl": config["setupUrl"],
+                "scope": config["scope"],
+                "baseUrl": config["baseUrl"],
+                "apiProvider": config["apiProvider"],
             }
         )
     return {"providers": providers}

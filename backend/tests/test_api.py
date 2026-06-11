@@ -559,6 +559,12 @@ def test_oauth_status_lists_all_login_providers(monkeypatch):
     providers = {item["provider"]: item for item in status.json()["providers"]}
     assert {"github", "notion", "figma", "google_calendar"} <= set(providers)
     assert providers["figma"]["missing"] == ["AI_BOARD_FIGMA_OAUTH_CLIENT_ID", "AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET"]
+    assert providers["figma"]["redirectUri"].endswith("/api/oauth/figma/callback")
+    assert providers["figma"]["setupUrl"] == "https://www.figma.com/developers/apps"
+    assert providers["figma"]["apiProvider"] == "Figma MCP OAuth"
+    assert "file_comments:write" in providers["figma"]["scope"]
+    assert providers["google_calendar"]["setupUrl"] == "https://console.cloud.google.com/apis/credentials"
+    assert providers["google_calendar"]["baseUrl"] == "primary"
 
 
 def test_figma_oauth_start_builds_authorize_url(monkeypatch):
