@@ -166,6 +166,7 @@ function App() {
   const [activeMainTab, setActiveMainTab] = useState("automations");
   const [form, setForm] = useState(defaultAutomation);
   const [knowledgeForm, setKnowledgeForm] = useState(defaultKnowledge);
+  const [transcriptionState, setTranscriptionState] = useState({ status: "idle", message: "" });
   const [integrationForm, setIntegrationForm] = useState(defaultIntegration);
   const [integrationSaveState, setIntegrationSaveState] = useState({ status: "idle", message: "프로필을 저장하면 자동화에서 선택할 수 있습니다." });
   const [liveWriteConfirmations, setLiveWriteConfirmations] = useState({});
@@ -530,6 +531,33 @@ function App() {
     } catch (err) {
       showActionError(err);
       setKnowledgeSaveState({ status: "error", message: err.message || "저장에 실패했습니다." });
+    }
+  }
+
+  async function transcribeKnowledgeAudio(file) {
+    if (!file) return;
+    clearErrorState();
+    setTranscriptionState({ status: "saving", message: "OpenAI로 음성을 전사하는 중입니다." });
+    try {
+      const body = new FormData();
+      body.set("file", file);
+      body.set("model", "whisper-1");
+      body.set("prompt", "AI Board 지식자료로 저장할 회의, 업무 메모, 자동화 지시 음성입니다.");
+      const data = await api("/api/ai/transcribe", { method: "POST", body });
+      const nextTitle = knowledgeForm.title || file.name.replace(/\.[^.]+$/, "") || "음성 전사";
+      const transcript = data.text || "";
+      setKnowledgeForm((current) => ({
+        ...current,
+        title: current.title || nextTitle,
+        source_type: "audio",
+        extracted_text: [current.extracted_text, transcript].filter(Boolean).join("\n\n"),
+        tags: current.tags || "audio,transcription,openai",
+      }));
+      setApiResult({ called: "ai.transcribe", response: { ...data, text: transcript.slice(0, 500) } });
+      setTranscriptionState({ status: "ok", message: `"${file.name}" 전사 완료. 내용을 확인한 뒤 자료 저장을 누르세요.` });
+    } catch (err) {
+      showActionError(err);
+      setTranscriptionState({ status: "error", message: err.message || "음성 전사에 실패했습니다." });
     }
   }
 
@@ -1600,10 +1628,12 @@ function App() {
                   <Field label="자료 내용" hint="AI가 검색할 실제 텍스트입니다. 문서를 붙여넣거나 파일을 첨부하세요."><textarea value={knowledgeForm.extracted_text} onChange={(e) => setKnowledgeForm({ ...knowledgeForm, extracted_text: e.target.value })} placeholder="문서 내용, 음성 녹취, 이미지 설명, 스프레드시트 데이터 등을 여기에 붙여넣으세요." /></Field>
                   <div className="file-row">
                     <label className="file-picker"><Upload size={14} /> 파일 첨부 (선택)<input type="file" accept=".txt,.md,.csv,.json,.jsonl,.log" onChange={(e) => setKnowledgeForm({ ...knowledgeForm, file: e.target.files?.[0] || null })} /></label>
+                    <label className="file-picker"><Upload size={14} /> 음성 전사<input type="file" accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg,.flac" onChange={(e) => { transcribeKnowledgeAudio(e.target.files?.[0]); e.target.value = ""; }} /></label>
                     {knowledgeForm.file && <span className="file-name">📎 {knowledgeForm.file.name}</span>}
-                    <span className="file-help">Taskory JSON/JSONL은 작업별 RAG 텍스트로 자동 정리됩니다.</span>
+                    <span className="file-help">문서는 바로 저장하고, 음성은 OpenAI 전사 후 자료 내용에 채워 넣습니다.</span>
                     <button disabled={knowledgeSaveState.status === "saving"}><FileText size={14} /> {knowledgeSaveState.status === "saving" ? "저장 중…" : "자료 저장"}</button>
                   </div>
+                  {transcriptionState.message ? <div className={`form-status ${transcriptionState.status}`}>{transcriptionState.message}</div> : null}
                   {knowledgeSaveState.message ? <div className={`form-status ${knowledgeSaveState.status}`}>{knowledgeSaveState.message}</div> : null}
                 </form>
               </div>

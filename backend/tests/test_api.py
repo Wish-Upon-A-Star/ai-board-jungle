@@ -88,6 +88,75 @@ def test_taskory_jsonl_export_normalizes_for_rag():
     assert "상태: 완료" in normalized
 
 
+def test_audio_transcription_uses_user_openai_profile(monkeypatch):
+    captured = {}
+
+    class FakeOpenAIResponse:
+        status_code = 200
+        text = '{"text":"회의 내용을 작업 카드로 정리합니다."}'
+
+        def json(self):
+            return {"text": "회의 내용을 작업 카드로 정리합니다."}
+
+    class FakeAsyncClient:
+        def __init__(self, timeout=None):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, headers=None, data=None, files=None):
+            captured["url"] = url
+            captured["headers"] = headers or {}
+            captured["data"] = data or {}
+            captured["file"] = files["file"]
+            return FakeOpenAIResponse()
+
+    monkeypatch.setattr(main_module.httpx, "AsyncClient", FakeAsyncClient)
+
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "voice@example.com", "name": "Voice User", "password": "password123"},
+        )
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+        profile = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "OpenAI API 키",
+                "source_kind": "custom",
+                "base_url": "https://api.openai.com/v1",
+                "api_provider": "OpenAI API",
+                "token_name": "OPENAI_API_KEY",
+                "token_value": "sk-user-openai",
+                "ai_provider": "OpenAI",
+                "ai_model": "gpt-4o-mini",
+                "ai_api_base": "https://api.openai.com/v1",
+                "rag_targets": ["ai"],
+            },
+        )
+        assert profile.status_code == 200
+
+        response = client.post(
+            "/api/ai/transcribe",
+            headers=headers,
+            data={"model": "whisper-1", "prompt": "업무 회의"},
+            files={"file": ("meeting.wav", b"RIFF0000WAVE", "audio/wav")},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["text"] == "회의 내용을 작업 카드로 정리합니다."
+    assert captured["url"] == "https://api.openai.com/v1/audio/transcriptions"
+    assert captured["headers"]["Authorization"] == "Bearer sk-user-openai"
+    assert captured["data"]["model"] == "whisper-1"
+    assert captured["data"]["prompt"] == "업무 회의"
+    assert captured["file"][0] == "meeting.wav"
+
+
 def test_health_recovers_after_startup_database_error(monkeypatch):
     calls = {"init": 0}
 

@@ -146,6 +146,55 @@ def parse_json_object(raw: str) -> dict:
         return {}
 
 
+def find_user_openai_credentials(db: Session, user: User) -> tuple[str, str]:
+    stmt = (
+        select(IntegrationProfile)
+        .where(IntegrationProfile.owner_id == user.id)
+        .order_by(IntegrationProfile.created_at.desc())
+    )
+    for profile in db.scalars(stmt).all():
+        provider = f"{profile.ai_provider} {profile.api_provider} {profile.name}".lower()
+        if "openai" not in provider:
+            continue
+        token = reveal_secret(profile.token_value).strip()
+        if token:
+            return token, (profile.ai_api_base or profile.base_url or "https://api.openai.com/v1").rstrip("/")
+    if settings.openai_api_key:
+        return settings.openai_api_key, "https://api.openai.com/v1"
+    raise HTTPException(status_code=400, detail="OpenAI API 키 프로필이 없습니다. 프로필 탭에서 OpenAI 키를 먼저 저장하세요.")
+
+
+async def transcribe_audio_with_openai(api_key: str, api_base: str, upload: UploadFile, model: str, prompt: str) -> dict:
+    raw = await upload.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="전사할 음성 파일이 비어 있습니다.")
+    if len(raw) > 26 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="음성 파일은 26MB 이하만 업로드할 수 있습니다. 큰 파일은 나눠서 업로드하세요.")
+    file_name = upload.filename or "audio"
+    mime_type = upload.content_type or "application/octet-stream"
+    data = {"model": model or "whisper-1"}
+    if prompt.strip():
+        data["prompt"] = prompt.strip()
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.post(
+                f"{api_base}/audio/transcriptions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                data=data,
+                files={"file": (file_name, raw, mime_type)},
+            )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"OpenAI 음성 전사 연결 실패: {exc}") from exc
+    if response.status_code >= 400:
+        detail = response.text[:500]
+        raise HTTPException(status_code=502, detail=f"OpenAI 음성 전사 실패: HTTP {response.status_code} {detail}")
+    payload = response.json()
+    transcript = str(payload.get("text") or "").strip()
+    if not transcript:
+        raise HTTPException(status_code=502, detail="OpenAI 전사 결과가 비어 있습니다.")
+    return {"text": transcript, "fileName": file_name, "mimeType": mime_type, "model": data["model"]}
+
+
 def serialize_activity(activity: IntegrationActivity) -> dict:
     return {
         "id": activity.id,
@@ -1454,6 +1503,29 @@ async def upload_knowledge(
     db.commit()
     db.refresh(source)
     return {"source": serialize_knowledge(source), "rag": rag_answer(db, f"{title}\n{instruction}\n{extracted}", user.id)}
+
+
+@app.post("/api/ai/transcribe")
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    model: str = Form("whisper-1"),
+    prompt: str = Form(""),
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    api_key, api_base = find_user_openai_credentials(db, user)
+    result = await transcribe_audio_with_openai(api_key, api_base, file, model, prompt)
+    log_activity(
+        db,
+        user,
+        "ai.transcription",
+        "openai",
+        "completed",
+        f"Transcribed {result['fileName']} with {result['model']}",
+        {"fileName": result["fileName"], "mimeType": result["mimeType"], "model": result["model"], "characters": len(result["text"])},
+    )
+    db.commit()
+    return result
 
 
 @app.delete("/api/knowledge/{source_id}")
