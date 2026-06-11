@@ -556,7 +556,8 @@ def test_oauth_status_lists_all_login_providers(monkeypatch):
         headers = {"Authorization": f"Bearer {register.json()['token']}"}
         status = client.get("/api/oauth/status", headers=headers)
     assert status.status_code == 200
-    providers = {item["provider"]: item for item in status.json()["providers"]}
+    payload = status.json()
+    providers = {item["provider"]: item for item in payload["providers"]}
     assert {"github", "notion", "figma", "google_calendar"} <= set(providers)
     assert providers["figma"]["missing"] == ["AI_BOARD_FIGMA_OAUTH_CLIENT_ID", "AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET"]
     assert providers["figma"]["redirectUri"].endswith("/api/oauth/figma/callback")
@@ -565,6 +566,27 @@ def test_oauth_status_lists_all_login_providers(monkeypatch):
     assert "file_comments:write" in providers["figma"]["scope"]
     assert providers["google_calendar"]["setupUrl"] == "https://console.cloud.google.com/apis/credentials"
     assert providers["google_calendar"]["baseUrl"] == "primary"
+    assert payload["publicOrigin"]["origin"].endswith("testserver")
+    assert payload["publicOrigin"]["temporaryTunnel"] is False
+
+
+def test_oauth_status_flags_temporary_tunnel_origin():
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "oauth-tunnel@example.com", "name": "OAuth Tunnel", "password": "password123"},
+        )
+        headers = {
+            "Authorization": f"Bearer {register.json()['token']}",
+            "x-ai-board-public-origin": "https://railway-mediterranean-snap-populations.trycloudflare.com",
+        }
+        status = client.get("/api/oauth/status", headers=headers)
+    assert status.status_code == 200
+    public_origin = status.json()["publicOrigin"]
+    assert public_origin["origin"] == "https://railway-mediterranean-snap-populations.trycloudflare.com"
+    assert public_origin["temporaryTunnel"] is True
+    assert public_origin["risk"] == "temporary_tunnel_callback_rotation"
+    assert "AI_BOARD_PUBLIC_BASE_URL" in public_origin["nextAction"]
 
 
 def test_figma_oauth_start_builds_authorize_url(monkeypatch):

@@ -542,6 +542,31 @@ def public_base_url(request: Request) -> str:
     return request_base or configured
 
 
+def public_origin_diagnostics(request: Request) -> dict:
+    origin = public_base_url(request)
+    host = urlparse(origin).netloc.lower()
+    temporary = (
+        "trycloudflare.com" in host
+        or host.endswith(".ngrok-free.app")
+        or host.endswith(".ngrok.app")
+    )
+    return {
+        "origin": origin,
+        "temporaryTunnel": temporary,
+        "risk": "temporary_tunnel_callback_rotation" if temporary else "stable_public_origin",
+        "message": (
+            "현재 접속 주소가 임시 터널입니다. 주소가 바뀌면 GitHub/Notion/Figma/Google OAuth callback을 모두 다시 등록해야 합니다."
+            if temporary
+            else "현재 접속 주소는 고정 public origin으로 보입니다. OAuth callback 등록이 안정적으로 유지됩니다."
+        ),
+        "nextAction": (
+            "Cloudflare named tunnel, 고정 도메인, 또는 호스팅 배포 URL을 AI_BOARD_PUBLIC_BASE_URL로 사용하세요."
+            if temporary
+            else "각 provider 개발자 콘솔에 표시된 callback URL이 등록되어 있는지만 확인하세요."
+        ),
+    }
+
+
 def oauth_redirect_uri(provider: str, request: Request) -> str:
     normalized = provider.lower()
     override_key = f"AI_BOARD_{normalized.upper()}_OAUTH_REDIRECT_URI"
@@ -1379,7 +1404,7 @@ def oauth_status(request: Request, user: User = Depends(current_user)) -> dict:
                 "apiProvider": config["apiProvider"],
             }
         )
-    return {"providers": providers}
+    return {"providers": providers, "publicOrigin": public_origin_diagnostics(request)}
 
 
 @app.get("/api/oauth/{provider}/start")

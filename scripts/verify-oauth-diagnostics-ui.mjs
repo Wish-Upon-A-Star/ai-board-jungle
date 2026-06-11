@@ -57,6 +57,9 @@ async function main() {
     await checklist.waitFor({ state: "visible", timeout: 15000 });
     const publicOriginValue = await checklist.locator("input").inputValue();
     if (publicOriginValue !== publicUrl) throw new Error(`public access origin mismatch: ${publicOriginValue}`);
+    const checklistText = await checklist.innerText();
+    if (!checklistText.includes("임시 터널 주소 사용 중")) throw new Error("temporary tunnel warning must be visible");
+    if (!checklistText.includes("AI_BOARD_PUBLIC_BASE_URL")) throw new Error("stable domain next action must mention AI_BOARD_PUBLIC_BASE_URL");
     const checklistItems = await checklist.locator("li").evaluateAll((items) => items.map((item) => item.innerText));
     if (checklistItems.length !== 4) throw new Error(`expected four public access checklist items, got ${checklistItems.length}`);
     if (!checklistItems.join(" ").includes("Callback URL")) throw new Error("checklist must mention Callback URL registration");

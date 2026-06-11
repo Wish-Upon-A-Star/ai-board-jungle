@@ -1421,6 +1421,25 @@ pre {
   font-size: 12px;
   background: #fff;
 }
+.public-origin-warning,
+.public-origin-ok {
+  grid-column: 1 / -1;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e3d08d;
+}
+.public-origin-warning {
+  background: #fff8df;
+}
+.public-origin-ok {
+  background: #ecf9f2;
+  border-color: #a9d9c2;
+}
+.public-origin-warning small,
+.public-origin-ok small {
+  color: var(--muted);
+  line-height: 1.45;
+}
 .public-access-checklist ol {
   grid-column: 1 / -1;
   padding-left: 20px;

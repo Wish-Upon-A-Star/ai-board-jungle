@@ -201,6 +201,7 @@ function App() {
   const [integrationProfiles, setIntegrationProfiles] = useState([]);
   const [providerReadiness, setProviderReadiness] = useState([]);
   const [oauthProviders, setOauthProviders] = useState([]);
+  const [oauthPublicOrigin, setOauthPublicOrigin] = useState(null);
   const [healthStatus, setHealthStatus] = useState(null);
   const [integrationActivities, setIntegrationActivities] = useState([]);
   const [activityPage, setActivityPage] = useState({ total: 0, limit: 12, offset: 0, nextOffset: 0, hasMore: false });
@@ -363,6 +364,7 @@ function App() {
       setIntegrationProfiles(profileData.profiles);
       setProviderReadiness(readinessData.providers);
       setOauthProviders(oauthData.providers || []);
+      setOauthPublicOrigin(oauthData.publicOrigin || null);
       setIntegrationActivities(activityData.activities);
       setActivityPage({ total: activityData.total, limit: activityData.limit, offset: activityData.offset, nextOffset: activityData.nextOffset, hasMore: activityData.hasMore });
       setSelected((current) => postData.posts.find((post) => post.id === current?.id) || postData.posts[0] || null);
@@ -1574,9 +1576,16 @@ function App() {
                     <strong>외부 접속 체크리스트</strong>
                     <span>팀원에게 안내할 때는 이 순서만 보내면 됩니다.</span>
                   </div>
+                  {oauthPublicOrigin ? (
+                    <div className={oauthPublicOrigin.temporaryTunnel ? "public-origin-warning" : "public-origin-ok"}>
+                      <strong>{oauthPublicOrigin.temporaryTunnel ? "임시 터널 주소 사용 중" : "고정 public origin 사용 중"}</strong>
+                      <span>{oauthPublicOrigin.message}</span>
+                      <small>{oauthPublicOrigin.nextAction}</small>
+                    </div>
+                  ) : null}
                   <label>
                     현재 접속 주소
-                    <input readOnly value={currentPublicOrigin} onFocus={(event) => event.currentTarget.select()} />
+                    <input readOnly value={oauthPublicOrigin?.origin || currentPublicOrigin} onFocus={(event) => event.currentTarget.select()} />
                   </label>
                   <ol>
                     <li>위 주소로 접속해 각자 계정을 만들거나 로그인합니다.</li>
