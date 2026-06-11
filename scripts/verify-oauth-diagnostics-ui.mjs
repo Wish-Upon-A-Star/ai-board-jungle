@@ -66,6 +66,16 @@ async function main() {
     for (const callback of expected) {
       if (!previewCallbacks.includes(callback)) throw new Error(`missing callback in stable domain preview: ${callback}`);
     }
+    const previewCopyButtons = await checklist.locator(".callback-preview-item button").evaluateAll((buttons) => buttons.map((button) => ({
+      text: button.innerText,
+      disabled: button.disabled,
+    })));
+    if (previewCopyButtons.length !== expected.length) {
+      throw new Error(`expected ${expected.length} stable callback copy buttons, got ${previewCopyButtons.length}`);
+    }
+    if (previewCopyButtons.some((button) => button.disabled || !button.text.includes("복사"))) {
+      throw new Error("stable callback copy buttons must be enabled and labeled");
+    }
     const checklistItems = await checklist.locator(":scope > ol > li").evaluateAll((items) => items.map((item) => item.innerText));
     if (checklistItems.length !== 4) throw new Error(`expected four public access checklist items, got ${checklistItems.length}`);
     if (!checklistItems.join(" ").includes("Callback URL")) throw new Error("checklist must mention Callback URL registration");
@@ -84,6 +94,7 @@ async function main() {
         "public_access_checklist_visible",
         "stable_domain_guide_visible",
         "stable_domain_callback_preview_visible",
+        "stable_domain_callback_copy_buttons_visible",
       ],
       publicUrl,
     }, null, 2));

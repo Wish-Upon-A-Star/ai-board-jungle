@@ -1510,8 +1510,18 @@ pre {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
-.callback-preview-grid label {
+.callback-preview-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+.callback-preview-item label {
   min-width: 0;
+}
+.callback-preview-item button {
+  min-height: 40px;
+  padding-inline: 12px;
 }
 
 .provider-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -2301,6 +2311,7 @@ pre {
   .activity-row,
   .manual-profile-guide dl div,
   .taskory-status-card dl div,
+  .callback-preview-item,
   .run-row-main { grid-template-columns: 1fr; }
   .transcription-settings {
     grid-template-columns: 1fr;

@@ -1637,10 +1637,15 @@ function App() {
                     </ol>
                     <div className="callback-preview-grid">
                       {oauthProviders.map((provider) => (
-                        <label key={`stable-${provider.provider}`}>
-                          {providerLabel(provider.provider)}
-                          <input readOnly value={provider.redirectUri || ""} onFocus={(event) => event.currentTarget.select()} />
-                        </label>
+                        <div className="callback-preview-item" key={`stable-${provider.provider}`}>
+                          <label>
+                            {providerLabel(provider.provider)}
+                            <input readOnly value={provider.redirectUri || ""} onFocus={(event) => event.currentTarget.select()} />
+                          </label>
+                          <button type="button" onClick={() => copyOAuthCallback(provider.provider)} disabled={!provider.redirectUri}>
+                            <Copy size={13} /> 복사
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </div>
