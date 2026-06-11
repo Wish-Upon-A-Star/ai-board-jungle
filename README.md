@@ -122,7 +122,7 @@ $env:AI_BOARD_PASSWORD="your-password"
 python scripts/sync_taskory_to_ai_board.py --state task-explorer-state.json --watch --interval 300
 ```
 
-`sync_taskory_to_ai_board.py`는 Taskory 저장 파일 해시가 바뀐 경우에만 AI Board `/api/knowledge/upload`로 새 자료를 업로드합니다. 따라서 Taskory가 변경되지 않았을 때는 AI/API 호출을 반복하지 않습니다.
+`sync_taskory_to_ai_board.py`는 Taskory 저장 파일 해시가 바뀐 경우에만 AI Board `/api/knowledge/upload`로 자료를 업로드합니다. 기본 동작은 같은 제목의 기존 `taskory` 지식자료를 교체하는 방식이라 watcher를 오래 돌려도 RAG 자료가 중복 누적되지 않습니다. 이전 스냅샷을 남기고 싶을 때만 `--append`를 사용합니다.
 
 ### MCP
 
