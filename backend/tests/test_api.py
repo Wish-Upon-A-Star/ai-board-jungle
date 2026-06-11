@@ -700,6 +700,30 @@ def test_google_calendar_oauth_start_uses_external_origin_and_sanitizes_labeled_
     assert "클라이언트" not in data["authorizeUrl"]
 
 
+def test_google_calendar_oauth_start_prefers_registered_redirect_override(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_PUBLIC_BASE_URL", "https://old-stale.trycloudflare.com")
+    monkeypatch.setenv("AI_BOARD_GOOGLE_OAUTH_REDIRECT_URI", "https://fixed.example.com/api/oauth/google_calendar/callback")
+    monkeypatch.setenv("AI_BOARD_GOOGLE_OAUTH_CLIENT_ID", "google-client.apps.googleusercontent.com")
+    monkeypatch.setenv("AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET", "google-secret")
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "google-oauth-override@example.com", "name": "Google OAuth Override", "password": "password123"},
+        )
+        headers = {
+            "Authorization": f"Bearer {register.json()['token']}",
+            "x-ai-board-public-origin": "https://railway-mediterranean-snap-populations.trycloudflare.com",
+            "host": "127.0.0.1:8000",
+        }
+        response = client.get("/api/oauth/google_calendar/start", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    parsed = urlparse(data["authorizeUrl"])
+    params = parse_qs(parsed.query)
+    assert params["redirect_uri"] == ["https://fixed.example.com/api/oauth/google_calendar/callback"]
+    assert data["redirectUri"] == "https://fixed.example.com/api/oauth/google_calendar/callback"
+
+
 def test_notion_task_writer_uses_shared_id_parser_for_dashed_ids():
     profile = IntegrationProfile(
         owner_id=1,
