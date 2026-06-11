@@ -35,6 +35,19 @@ function providerCallbackTarget(kind) {
   })[kind] || "해당 provider 개발자 콘솔의 redirect/callback URL";
 }
 
+function activityDetailBadges(activity) {
+  const details = activity?.details || {};
+  const badges = [];
+  if (activity?.automationTaskId) badges.push(`task #${activity.automationTaskId}`);
+  if (activity?.integrationProfileId) badges.push(`profile #${activity.integrationProfileId}`);
+  if (details.changeHash) badges.push(`hash ${String(details.changeHash).slice(0, 10)}`);
+  if (typeof details.scheduled === "boolean") badges.push(details.scheduled ? "scheduled" : "manual");
+  if (typeof details.dryRun === "boolean") badges.push(details.dryRun ? "dry-run" : "live");
+  if (details.write?.status) badges.push(`write ${details.write.status}`);
+  if (details.reason) badges.push(String(details.reason));
+  return badges;
+}
+
 function renderPostContent(content) {
   const text = String(content || "");
   if (!text.trim()) return <p className="post-paragraph">본문이 비어 있습니다.</p>;
@@ -1984,11 +1997,22 @@ function App() {
                       <strong>연동 활동 로그</strong>
                       <span>{integrationActivities.length} / {activityPage.total} shown</span>
                     </div>
-                    {integrationActivities.map((activity) => (
-                      <div key={activity.id} className={`activity-row ${activity.status}`}>
-                        <span>{activity.eventType}</span><span>{activity.provider || "board"}</span><span>{activity.status}</span><p>{activity.summary}</p>
-                      </div>
-                    ))}
+                    {integrationActivities.map((activity) => {
+                      const badges = activityDetailBadges(activity);
+                      return (
+                        <div key={activity.id} className={`activity-row ${activity.status}`}>
+                          <span>{activity.eventType}</span><span>{activity.provider || "board"}</span><span>{activity.status}</span>
+                          <div className="activity-summary">
+                            <p>{activity.summary}</p>
+                            {badges.length ? (
+                              <div className="activity-detail-badges">
+                                {badges.map((badge) => <small key={badge}>{badge}</small>)}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
                     {integrationActivities.length === 0 ? <p className="empty-state">아직 연동 활동이 없습니다.</p> : null}
                     {activityPage.hasMore ? <button type="button" className="load-more" onClick={() => loadActivities(activityFilters, activityPage.nextOffset, true)}>활동 더 보기</button> : null}
                   </div>

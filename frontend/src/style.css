@@ -1633,7 +1633,25 @@ pre {
 .activity-row.ok span:nth-child(3) { color: var(--accent-strong); }
 .activity-row.skipped span:nth-child(3),
 .activity-row.unchanged span:nth-child(3) { color: var(--yellow); }
+.activity-summary { display: grid; gap: 5px; min-width: 0; }
 .activity-row p { margin: 0; color: var(--muted); word-break: break-word; }
+.activity-detail-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.activity-detail-badges small {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--faint);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
 .knowledge-item { padding: 12px; }
 .knowledge-item button { margin-top: 9px; width: auto; min-width: 116px; }
 .empty-state { margin: 0; padding: 10px 0 2px; color: var(--faint); }
