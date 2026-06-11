@@ -298,6 +298,35 @@ def test_github_issue_writer_uses_shared_repo_parser_for_ssh_urls():
     assert "plain-token-for-dry-run" not in str(write)
 
 
+def test_github_issue_writer_preserves_notion_board_card_body():
+    profile = IntegrationProfile(
+        owner_id=1,
+        name="GitHub issue writer",
+        source_kind="github",
+        base_url="https://github.com/acme/project",
+        token_value="plain-github-token",
+    )
+    body = "\n".join(
+        [
+            "Notion BOARD 카드",
+            "- 상태: In progress",
+            "- 담당자: 정수현",
+            "- 요청: 로그인 화면 구현",
+            "- 원본: https://www.notion.so/card-123",
+        ]
+    )
+    write = write_github_issue(profile, "[AI Board] 로그인 화면 구현", body, dry_run=True)
+    payload = write["payload"]
+    assert write["status"] == "ready"
+    assert write["url"] == "https://api.github.com/repos/acme/project/issues"
+    assert payload["title"] == "[AI Board] 로그인 화면 구현"
+    assert payload["labels"] == ["ai-board", "automation"]
+    assert "Notion BOARD 카드" in payload["body"]
+    assert "상태: In progress" in payload["body"]
+    assert "담당자: 정수현" in payload["body"]
+    assert "plain-github-token" not in str(write)
+
+
 def test_github_issue_writer_comments_on_existing_automation_issue(monkeypatch):
     calls = []
 
@@ -886,6 +915,31 @@ def test_notion_sources_report_maps_table_values_by_header_name():
     assert values[4] == "BOARD/PAGES/GANTT"
     assert values[5] == "요청 템플릿 기준으로 검토"
     assert values[4] != "보통"
+
+
+def test_notion_sources_report_preserves_board_pages_gantt_template_columns():
+    blocks = notion_sources_template_children(
+        "GitHub -> Notion BOARD/GANTT 보고",
+        [
+            {
+                "title": "[GitHub MCP OAuth profile] Commit 45c0582d24cf: Verify scheduler skips unchanged live writes",
+                "sourceType": "github_commit",
+                "url": "https://github.com/Wish-Upon-A-Star/ai-board-jungle/commit/45c0582d24cf",
+                "summary": "Verify scheduler skips unchanged live writes sha: 45c0582d24cf author: Wish-Upon-A-Star",
+            }
+        ],
+        "| 번호 | 유형 | 제목 | 한국어 요약 | 영향 영역 | 다음 조치 | 링크 |\n|---|---|---|---|---|---|---|",
+    )
+    text = collect_block_text(blocks)
+    table = find_first_block(blocks, "table")
+    row = table["table"]["children"][1]["table_row"]["cells"]
+    values = [cell[0]["text"]["content"] for cell in row]
+    assert "BOARD / PAGES / GANTT CHART" in text
+    assert values[1] == "github_commit"
+    assert "Verify scheduler skips unchanged live writes" in values[2]
+    assert values[4] == "BOARD/PAGES/GANTT"
+    assert values[5] == "요청 템플릿 기준으로 검토"
+    assert values[6].endswith("/45c0582d24cf")
 
 
 def test_notion_sources_report_describes_demo_template_page_change():
