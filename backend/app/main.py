@@ -12,6 +12,7 @@ import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 import httpx
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
@@ -24,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from .collectors import CollectedItem, collect_profile_items, extract_notion_id, parse_github_repo, save_collected_items
 from .db import check_db, database_reachable, get_db, init_db
-from .live_writers import execute_profile_write, write_calendar_event_at, write_notion_sources_report
+from .live_writers import execute_profile_write, google_calendar_access_token, parse_figma_file_key, profile_access_token, safe_calendar_id, write_calendar_event_at, write_notion_sources_report
 from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, User
 from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LiveWriteIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn
 from .security import create_token, current_user, hash_password, protect_secret, reveal_secret, secret_preview, secret_storage_type, verify_password
@@ -382,6 +383,138 @@ def serialize_integration_profile(profile: IntegrationProfile) -> dict:
         },
         "createdAt": str(profile.created_at),
     }
+
+
+def provider_validation_hint(service: str, status_code: int | None, reason: str = "") -> str:
+    if reason == "missing_token":
+        return "프로필에 API 키 또는 OAuth 토큰을 저장하세요."
+    if reason == "missing_target":
+        return "Base URL 또는 대상 ID/URL을 입력하세요."
+    if service == "github":
+        if status_code == 401:
+            return "GitHub 토큰이 만료되었거나 잘못되었습니다. repo 읽기 권한이 있는 토큰으로 다시 연결하세요."
+        if status_code == 403:
+            return "GitHub 토큰 권한이 부족합니다. 저장소 읽기/이슈 권한을 확인하세요."
+        if status_code == 404:
+            return "저장소 URL이 틀렸거나 이 계정/토큰이 저장소에 접근할 수 없습니다."
+    if service == "notion":
+        if status_code == 401:
+            return "Notion integration secret이 잘못되었거나 만료되었습니다."
+        if status_code == 403:
+            return "Notion 페이지/DB가 integration에 공유되지 않았습니다."
+        if status_code == 404:
+            return "Notion 대상 ID가 틀렸거나 integration에 공유되지 않았습니다."
+    if service == "figma":
+        if status_code in {401, 403}:
+            return "Figma 토큰이 잘못되었거나 해당 파일 접근 권한이 없습니다."
+        if status_code == 404:
+            return "Figma 파일 URL 또는 key를 확인하세요."
+    if service == "google_calendar":
+        if status_code in {401, 403}:
+            return "Google OAuth 토큰이 만료되었거나 캘린더 접근 권한이 없습니다. 다시 로그인하세요."
+        if status_code == 404:
+            return "Calendar ID가 틀렸거나 접근 권한이 없습니다."
+    if service == "openai":
+        if status_code == 401:
+            return "OpenAI API 키가 잘못되었거나 만료되었습니다."
+        if status_code == 403:
+            return "OpenAI API 키 권한 또는 프로젝트 접근 권한을 확인하세요."
+        if status_code == 404:
+            return "OpenAI API Base URL이 올바른지 확인하세요."
+    return "대상 서비스의 토큰, URL, 권한을 확인하세요."
+
+
+def validation_result(service: str, status: str, message: str, *, target: str = "", status_code: int | None = None, reason: str = "", checked: list[str] | None = None) -> dict:
+    return {
+        "service": service,
+        "status": status,
+        "message": message,
+        "target": target,
+        "statusCode": status_code,
+        "reason": reason,
+        "checked": checked or [],
+        "hint": provider_validation_hint(service, status_code, reason) if status != "ok" else "읽기 전용 인증 검증이 통과했습니다.",
+    }
+
+
+def validate_integration_profile_credentials(profile: IntegrationProfile) -> dict:
+    service = (profile.source_kind or "custom").lower()
+    provider_text = f"{profile.ai_provider} {profile.api_provider} {profile.name}".lower()
+    if "openai" in provider_text and service == "custom":
+        service = "openai"
+
+    token = google_calendar_access_token(profile) if service == "google_calendar" else profile_access_token(profile)
+    if not token:
+        return validation_result(service, "blocked", "저장된 토큰이 없어 검증할 수 없습니다.", reason="missing_token", checked=["token_missing"])
+
+    try:
+        if service == "github":
+            repo = parse_github_repo(profile.base_url)
+            if not repo:
+                return validation_result(service, "blocked", "GitHub 저장소 URL을 확인할 수 없습니다.", reason="missing_target", checked=["token_present", "repo_missing"])
+            owner, name = repo
+            url = f"https://api.github.com/repos/{owner}/{name}"
+            response = httpx.get(
+                url,
+                headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"},
+                timeout=15.0,
+            )
+            if response.is_success:
+                payload = response.json()
+                return validation_result(service, "ok", f"{payload.get('full_name', f'{owner}/{name}')} 저장소 읽기 인증이 정상입니다.", target=url, status_code=response.status_code, checked=["token_present", "repo_read"])
+            return validation_result(service, "failed", f"GitHub 저장소 읽기 검증 실패: HTTP {response.status_code}", target=url, status_code=response.status_code, checked=["token_present", "repo_read_failed"])
+
+        if service == "notion":
+            target_id = extract_notion_id(profile.base_url)
+            if not target_id:
+                return validation_result(service, "blocked", "Notion 페이지 또는 데이터베이스 ID를 찾을 수 없습니다.", reason="missing_target", checked=["token_present", "target_missing"])
+            headers = {"Authorization": f"Bearer {token}", "Notion-Version": "2022-06-28", "Accept": "application/json"}
+            database_url = f"https://api.notion.com/v1/databases/{target_id}"
+            response = httpx.get(database_url, headers=headers, timeout=15.0)
+            target_url = database_url
+            target_type = "database"
+            if response.status_code in {400, 404}:
+                block_url = f"https://api.notion.com/v1/blocks/{target_id}"
+                block_response = httpx.get(block_url, headers=headers, timeout=15.0)
+                if block_response.status_code != 404 or response.status_code == 404:
+                    response = block_response
+                    target_url = block_url
+                    target_type = "block"
+            if response.is_success:
+                return validation_result(service, "ok", f"Notion {target_type} 읽기 인증이 정상입니다.", target=target_url, status_code=response.status_code, checked=["token_present", f"{target_type}_read"])
+            return validation_result(service, "failed", f"Notion 읽기 검증 실패: HTTP {response.status_code}", target=target_url, status_code=response.status_code, checked=["token_present", "notion_read_failed"])
+
+        if service == "figma":
+            file_key = parse_figma_file_key(profile.base_url)
+            if not file_key:
+                return validation_result(service, "blocked", "Figma 파일 URL 또는 key를 찾을 수 없습니다.", reason="missing_target", checked=["token_present", "file_missing"])
+            url = f"https://api.figma.com/v1/files/{file_key}"
+            response = httpx.get(url, headers={"X-Figma-Token": token}, timeout=15.0)
+            if response.is_success:
+                payload = response.json()
+                return validation_result(service, "ok", f"Figma 파일 '{payload.get('name', file_key)}' 읽기 인증이 정상입니다.", target=url, status_code=response.status_code, checked=["token_present", "file_read"])
+            return validation_result(service, "failed", f"Figma 파일 읽기 검증 실패: HTTP {response.status_code}", target=url, status_code=response.status_code, checked=["token_present", "file_read_failed"])
+
+        if service == "google_calendar":
+            calendar_id = safe_calendar_id(profile.base_url)
+            url = f"https://www.googleapis.com/calendar/v3/calendars/{quote(calendar_id, safe='')}"
+            response = httpx.get(url, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"}, timeout=15.0)
+            if response.is_success:
+                payload = response.json()
+                return validation_result(service, "ok", f"Google Calendar '{payload.get('summary', calendar_id)}' 읽기 인증이 정상입니다.", target=url, status_code=response.status_code, checked=["token_present", "calendar_read"])
+            return validation_result(service, "failed", f"Google Calendar 읽기 검증 실패: HTTP {response.status_code}", target=url, status_code=response.status_code, checked=["token_present", "calendar_read_failed"])
+
+        if service == "openai":
+            api_base = (profile.ai_api_base or profile.base_url or "https://api.openai.com/v1").rstrip("/")
+            url = f"{api_base}/models"
+            response = httpx.get(url, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"}, timeout=15.0)
+            if response.is_success:
+                return validation_result(service, "ok", "OpenAI API 키로 모델 목록 읽기 인증이 정상입니다.", target=url, status_code=response.status_code, checked=["token_present", "models_read"])
+            return validation_result(service, "failed", f"OpenAI 모델 목록 읽기 검증 실패: HTTP {response.status_code}", target=url, status_code=response.status_code, checked=["token_present", "models_read_failed"])
+    except httpx.HTTPError as exc:
+        return validation_result(service, "failed", f"연결 검증 중 네트워크 오류가 발생했습니다: {exc}", reason="network_error", checked=["token_present"])
+
+    return validation_result(service, "blocked", f"{service} 프로필은 아직 자동 검증을 지원하지 않습니다.", reason="unsupported", checked=["token_present"])
 
 
 def public_base_url(request: Request) -> str:
@@ -1431,6 +1564,28 @@ def collect_integration_profile(profile_id: int, limit: int | None = None, pages
         "status": status,
         "request": {"limit": safe_limit, "pages": safe_pages},
     }
+
+
+@app.post("/api/integration-profiles/{profile_id}/validate")
+def validate_integration_profile(profile_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    profile = db.get(IntegrationProfile, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="연동 프로필을 찾을 수 없습니다.")
+    if profile.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 검증할 수 없습니다.")
+    result = validate_integration_profile_credentials(profile)
+    log_activity(
+        db,
+        user,
+        "integration_profile.validate",
+        result.get("service") or profile.source_kind,
+        result.get("status", "unknown"),
+        f"{profile.name} credential validation {result.get('status', 'unknown')}: {result.get('message', '')}",
+        {key: value for key, value in result.items() if key not in {"target"}},
+        profile_id=profile.id,
+    )
+    db.commit()
+    return {"profile": serialize_integration_profile(profile), "validation": result}
 
 
 @app.post("/api/integration-profiles/{profile_id}/write")

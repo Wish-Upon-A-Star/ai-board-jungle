@@ -213,6 +213,7 @@ function App() {
   const [integrationForm, setIntegrationForm] = useState(defaultIntegration);
   const [integrationSaveState, setIntegrationSaveState] = useState({ status: "idle", message: "프로필을 저장하면 자동화에서 선택할 수 있습니다." });
   const [liveWriteConfirmations, setLiveWriteConfirmations] = useState({});
+  const [profileValidationState, setProfileValidationState] = useState({});
   const [expandedProfiles, setExpandedProfiles] = useState({});
   const [showWriteForm, setShowWriteForm] = useState(false);
   const [boardSubTab, setBoardSubTab] = useState("posts");
@@ -727,6 +728,28 @@ function App() {
       showActionError(err);
     } finally {
       clearBusy(`collect:${profile.id}`);
+    }
+  }
+
+  async function validateIntegrationProfile(profile) {
+    setBusy(`validate:${profile.id}`);
+    setProfileValidationState((current) => ({
+      ...current,
+      [profile.id]: { status: "checking", message: "저장된 토큰과 대상 URL을 읽기 전용으로 검증하는 중입니다." },
+    }));
+    try {
+      const data = await api(`/api/integration-profiles/${profile.id}/validate`, { method: "POST" });
+      setApiResult({ called: "integration-profile.validate", response: data });
+      setProfileValidationState((current) => ({ ...current, [profile.id]: data.validation }));
+      await loadActivities(activityFilters);
+    } catch (err) {
+      setProfileValidationState((current) => ({
+        ...current,
+        [profile.id]: { status: "error", message: err.message || "연결 검증에 실패했습니다.", hint: "토큰, URL, 권한을 확인하세요." },
+      }));
+      showActionError(err);
+    } finally {
+      clearBusy(`validate:${profile.id}`);
     }
   }
 
@@ -1576,6 +1599,7 @@ function App() {
                   };
                   const meta = kindMeta[profile.sourceKind] || kindMeta.custom;
                   const isExpanded = expandedProfiles?.[profile.id];
+                  const validation = profileValidationState[profile.id];
                   return (
                     <div key={profile.id} className="profile-card" style={{ "--profile-color": meta.color }}>
                       <div className="profile-card-header" onClick={() => setExpandedProfiles((prev) => ({ ...prev, [profile.id]: !prev?.[profile.id] }))}>
@@ -1613,8 +1637,18 @@ function App() {
                             </div>
                           )}
                           {profile.lastCollect?.warnings?.length ? <p className="warning-line">{profile.lastCollect.warnings.join(" / ")}</p> : null}
+                          {validation ? (
+                            <div className={`profile-validation ${validation.status}`}>
+                              <strong>{validation.status === "ok" ? "연결 정상" : validation.status === "checking" ? "검증 중" : "확인 필요"}</strong>
+                              <span>{validation.message}</span>
+                              {validation.hint ? <small>{validation.hint}</small> : null}
+                            </div>
+                          ) : null}
 
                           <div className="profile-item-actions">
+                            <button type="button" className="secondary" onClick={() => validateIntegrationProfile(profile)} disabled={isBusy(`validate:${profile.id}`)}>
+                              <CheckCircle2 size={14} /> {isBusy(`validate:${profile.id}`) ? "검증 중…" : "연결 검증"}
+                            </button>
                             <button type="button" onClick={() => collectIntegrationProfile(profile)} disabled={isBusy(`collect:${profile.id}`)}>
                               <Search size={14} /> {isBusy(`collect:${profile.id}`) ? "수집 중…" : "RAG 수집"}
                             </button>

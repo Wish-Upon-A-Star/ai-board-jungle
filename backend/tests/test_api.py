@@ -242,6 +242,96 @@ def test_audio_transcription_splits_large_files_with_ffmpeg(monkeypatch):
     assert "2/2번째 조각" in calls[1]["data"]["prompt"]
 
 
+def test_integration_profile_validate_github_success(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        status_code = 200
+        is_success = True
+
+        def json(self):
+            return {"full_name": "Wish-Upon-A-Star/ai-board-jungle"}
+
+    def fake_get(url, headers=None, timeout=None):
+        captured["url"] = url
+        captured["headers"] = headers or {}
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(main_module.httpx, "get", fake_get)
+
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "validate-github@example.com", "name": "Validate GitHub", "password": "password123"},
+        )
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+        profile = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "GitHub 검증",
+                "source_kind": "github",
+                "base_url": "https://github.com/Wish-Upon-A-Star/ai-board-jungle",
+                "api_provider": "GitHub REST",
+                "token_name": "GITHUB_TOKEN",
+                "token_value": "ghp-test-token",
+                "rag_targets": ["commits"],
+            },
+        ).json()["profile"]
+        response = client.post(f"/api/integration-profiles/{profile['id']}/validate", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["validation"]["status"] == "ok"
+    assert response.json()["validation"]["service"] == "github"
+    assert "repo_read" in response.json()["validation"]["checked"]
+    assert captured["url"] == "https://api.github.com/repos/Wish-Upon-A-Star/ai-board-jungle"
+    assert captured["headers"]["Authorization"] == "Bearer ghp-test-token"
+
+
+def test_integration_profile_validate_reports_auth_failure(monkeypatch):
+    class FakeResponse:
+        status_code = 401
+        is_success = False
+        text = '{"message":"Bad credentials"}'
+
+        def json(self):
+            return {"message": "Bad credentials"}
+
+    monkeypatch.setattr(main_module.httpx, "get", lambda *args, **kwargs: FakeResponse())
+
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "validate-openai@example.com", "name": "Validate OpenAI", "password": "password123"},
+        )
+        headers = {"Authorization": f"Bearer {register.json()['token']}"}
+        profile = client.post(
+            "/api/integration-profiles",
+            headers=headers,
+            json={
+                "name": "OpenAI 검증",
+                "source_kind": "custom",
+                "base_url": "https://api.openai.com/v1",
+                "api_provider": "OpenAI API",
+                "token_name": "OPENAI_API_KEY",
+                "token_value": "sk-bad",
+                "ai_provider": "OpenAI",
+                "ai_api_base": "https://api.openai.com/v1",
+                "rag_targets": ["ai"],
+            },
+        ).json()["profile"]
+        response = client.post(f"/api/integration-profiles/{profile['id']}/validate", headers=headers)
+
+    validation = response.json()["validation"]
+    assert response.status_code == 200
+    assert validation["status"] == "failed"
+    assert validation["service"] == "openai"
+    assert validation["statusCode"] == 401
+    assert "OpenAI API 키" in validation["hint"]
+    assert "sk-bad" not in json.dumps(response.json(), ensure_ascii=False)
+
+
 def test_health_recovers_after_startup_database_error(monkeypatch):
     calls = {"init": 0}
 
