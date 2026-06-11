@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
 const loadedConfigSources = [];
+const configDiagnostics = [];
 const checkConfigOnly = process.argv.includes("--check-config");
 const skipMissing = process.argv.includes("--skip-missing");
 
@@ -17,7 +18,19 @@ function looksLikeToken(value) {
 }
 
 function loadEnvFile(path, rawTokenKey = "") {
-  if (!existsSync(path)) return false;
+  const diagnostic = {
+    path,
+    exists: existsSync(path),
+    keyValueKeys: [],
+    rawLines: 0,
+    acceptedRawCandidates: 0,
+    ignoredRawLines: 0,
+    loadedKeys: [],
+  };
+  if (!diagnostic.exists) {
+    configDiagnostics.push(diagnostic);
+    return false;
+  }
   const text = readFileSync(path, "utf8");
   let loaded = false;
   const rawCandidates = [];
@@ -26,18 +39,29 @@ function loadEnvFile(path, rawTokenKey = "") {
     if (!trimmed || trimmed.startsWith("#")) continue;
     if (!trimmed.includes("=")) {
       const raw = trimmed.replace(/^["']|["']$/g, "");
+      diagnostic.rawLines += 1;
       if (rawTokenKey && looksLikeToken(raw)) rawCandidates.push(raw);
+      else diagnostic.ignoredRawLines += 1;
       continue;
     }
     const index = trimmed.indexOf("=");
     const key = trimmed.slice(0, index).trim();
     const raw = trimmed.slice(index + 1).trim();
-    loaded = assignEnv(key, raw.replace(/^["']|["']$/g, "")) || loaded;
+    diagnostic.keyValueKeys.push(key);
+    if (assignEnv(key, raw.replace(/^["']|["']$/g, ""))) {
+      diagnostic.loadedKeys.push(key);
+      loaded = true;
+    }
   }
   if (rawTokenKey && !process.env[rawTokenKey] && rawCandidates.length) {
-    loaded = assignEnv(rawTokenKey, rawCandidates[0]) || loaded;
+    diagnostic.acceptedRawCandidates = rawCandidates.length;
+    if (assignEnv(rawTokenKey, rawCandidates[0])) {
+      diagnostic.loadedKeys.push(rawTokenKey);
+      loaded = true;
+    }
   }
   if (loaded) loadedConfigSources.push(path);
+  configDiagnostics.push(diagnostic);
   return loaded;
 }
 
@@ -91,8 +115,36 @@ function configStatus() {
   };
   return Object.entries(requirements).map(([service, names]) => {
     const missing = names.filter((name) => !process.env[name]);
-    return { service, ready: missing.length === 0, missing };
+    return {
+      service,
+      ready: missing.length === 0,
+      missing,
+      nextAction: missing.length ? expectedConfigHint(service, missing) : "",
+    };
   });
+}
+
+function expectedConfigHint(service, missing) {
+  const examples = {
+    github: "Desktop/ai-board-demo-github-api-token.txt: GITHUB_TOKEN=... and GITHUB_REPOSITORY=Wish-Upon-A-Star/ai-board-jungle",
+    notion: "Desktop/ai-board-demo-notion-api-token.txt: NOTION_TOKEN=... and NOTION_DEMO_PAGE_URL=https://app.notion.com/...",
+    google_calendar: "Desktop/google.txt: GOOGLE_ACCESS_TOKEN=... or AI_BOARD_GOOGLE_ACCESS_TOKEN=...",
+    figma: "Desktop/figma.txt: FIGMA_TOKEN=... and FIGMA_FILE_URL=https://www.figma.com/design/...",
+  };
+  return `${missing.join(", ")} missing. Add ${examples[service] || "the missing key=value pairs"}.`;
+}
+
+function publicConfigDiagnostics() {
+  return configDiagnostics
+    .filter((item) => item.exists)
+    .map((item) => ({
+      source: item.path.replace(homedir(), "~"),
+      keyValueKeys: item.keyValueKeys,
+      rawLines: item.rawLines,
+      acceptedRawCandidates: item.acceptedRawCandidates,
+      ignoredRawLines: item.ignoredRawLines,
+      loadedKeys: item.loadedKeys,
+    }));
 }
 
 function parseGithubRepo(url) {
@@ -261,6 +313,29 @@ async function testFigma() {
   return { service: "figma", ok: true, url: `https://www.figma.com/file/${fileKey}?comment-id=${comment.id}`, id: comment.id };
 }
 
+function failureHint(service, message) {
+  const text = String(message || "");
+  if (service === "github" && /401|Bad credentials/i.test(text)) {
+    return "GitHub token was loaded but rejected. Regenerate a fine-grained token for the target repository with Issues read/write access, then set GITHUB_TOKEN=... in Desktop/ai-board-demo-github-api-token.txt.";
+  }
+  if (service === "github" && /403|Resource not accessible|permission/i.test(text)) {
+    return "GitHub token is valid but lacks permission. Grant repository Issues write access or use a token owned by an account with access to the repository.";
+  }
+  if (service === "notion" && /401|invalid|unauthorized/i.test(text)) {
+    return "Notion token was loaded but rejected. Create a new Notion internal integration secret, share the target page/database with that integration, then set NOTION_TOKEN=... in Desktop/ai-board-demo-notion-api-token.txt.";
+  }
+  if (service === "notion" && /404|not found/i.test(text)) {
+    return "Notion token may be valid but the target page/database is not shared with the integration. Share the page/database with the integration and keep NOTION_DEMO_PAGE_URL=... updated.";
+  }
+  if (service === "google_calendar" && /401|invalid|expired/i.test(text)) {
+    return "Google access token was rejected or expired. Use OAuth login/refresh flow or set a fresh GOOGLE_ACCESS_TOKEN=... in Desktop/google.txt.";
+  }
+  if (service === "figma" && /401|403|token/i.test(text)) {
+    return "Figma token was rejected or lacks file access. Set FIGMA_TOKEN=... and FIGMA_FILE_URL=... for a file the token can comment on.";
+  }
+  return "";
+}
+
 const tests = [
   ["github", testGithub],
   ["notion", testNotion],
@@ -275,6 +350,7 @@ if (checkConfigOnly) {
     ok: failed.length === 0,
     mode: "check-config",
     loadedConfigSources: loadedConfigSources.map((source) => source.replace(homedir(), "~")),
+    diagnostics: publicConfigDiagnostics(),
     results,
   }, null, 2));
   process.exit(failed.length ? 1 : 0);
@@ -290,7 +366,7 @@ for (const [service, test] of tests) {
     }
     results.push(await test());
   } catch (error) {
-    results.push({ service, ok: false, error: error.message });
+    results.push({ service, ok: false, error: error.message, hint: failureHint(service, error.message) });
   }
 }
 
