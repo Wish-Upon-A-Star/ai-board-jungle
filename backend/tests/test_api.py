@@ -2926,6 +2926,125 @@ def test_notion_webhook_signature_triggers_matching_automation(monkeypatch):
         settings.cache_clear()
 
 
+def test_repeated_notion_webhook_payload_skips_duplicate_github_issue_write(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_NOTION_WEBHOOK_SECRET", "notion-hook-secret")
+    settings.cache_clear()
+    writes = []
+    notion_database_id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    notion_database_uuid = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+    def fake_collect(profile, limit=20, pages=2):
+        return [
+            CollectedItem(
+                title="반복 Notion 카드",
+                source_type="notion_database_page",
+                url="https://www.notion.so/workspace/repeat-card",
+                text="같은 Notion 변경 이벤트는 GitHub 이슈를 한 번만 만들어야 합니다.",
+                tags=["notion", "board"],
+            )
+        ], []
+
+    def fail_notion_write(*args, **kwargs):
+        raise AssertionError("Notion source -> GitHub issue automation must not write back to Notion")
+
+    def fake_execute_profile_write(profile, title, body, dry_run=True, start_minutes_from_now=15, duration_minutes=30):
+        writes.append({"service": profile.source_kind, "title": title, "body": body, "dryRun": dry_run})
+        return {"service": profile.source_kind, "status": "written", "url": "https://github.test/issues/99", "dryRun": dry_run}
+
+    monkeypatch.setattr("app.main.collect_profile_items", fake_collect)
+    monkeypatch.setattr("app.main.write_notion_sources_report", fail_notion_write)
+    monkeypatch.setattr("app.main.execute_profile_write", fake_execute_profile_write)
+    try:
+        with TestClient(app) as client:
+            register = client.post(
+                "/api/auth/register",
+                json={"email": "notion-repeat-webhook@example.com", "name": "Notion Repeat Webhook", "password": "password123"},
+            )
+            headers = {"Authorization": f"Bearer {register.json()['token']}"}
+            notion = client.post(
+                "/api/integration-profiles",
+                headers=headers,
+                json={
+                    "name": "Repeat Notion BOARD",
+                    "source_kind": "notion",
+                    "base_url": notion_database_id,
+                    "api_provider": "Notion API",
+                    "token_name": "NOTION_TOKEN",
+                    "token_value": "notion-repeat-token",
+                    "rag_targets": ["notion_database"],
+                },
+            ).json()["profile"]
+            client.post(
+                "/api/integration-profiles",
+                headers=headers,
+                json={
+                    "name": "Repeat GitHub Target",
+                    "source_kind": "github",
+                    "base_url": "https://github.com/Wish-Upon-A-Star/ai-board-jungle",
+                    "api_provider": "GitHub REST API",
+                    "token_name": "GITHUB_TOKEN",
+                    "token_value": "github-repeat-token",
+                    "rag_targets": [],
+                },
+            )
+            task = client.post(
+                "/api/automations",
+                headers=headers,
+                json={
+                    "name": "Repeat Notion webhook to GitHub",
+                    "integration_profile_id": notion["id"],
+                    "source": "Notion BOARD",
+                    "destination": "GitHub Issues",
+                    "interval_minutes": 10,
+                    "instruction": "Create or update GitHub issues from Notion BOARD cards only when Notion changes.",
+                    "template": "Notion 카드: {title}\n요약: {summary}",
+                    "api_provider": "Notion webhook + GitHub API",
+                    "ai_agent": "NotionIssueAgent",
+                    "notion_database_url": notion_database_id,
+                    "template_preset": "team_notion_board_to_github",
+                    "custom_connections": [
+                        {
+                            "label": "Notion BOARD read",
+                            "service": "notion",
+                            "url": notion_database_id,
+                            "api": "Notion API",
+                            "auth_key_name": "NOTION_TOKEN",
+                            "operation": "read_board_cards_since_last_run",
+                            "template": "카드 제목: {title}",
+                        },
+                        {
+                            "label": "GitHub issue",
+                            "service": "github",
+                            "url": "https://github.com/Wish-Upon-A-Star/ai-board-jungle",
+                            "api": "GitHub REST API",
+                            "auth_key_name": "GITHUB_TOKEN",
+                            "operation": "issue_create_or_update",
+                            "template": "제목: [Notion] {title}\n본문: {summary}\n원본: {source_url}",
+                        },
+                    ],
+                },
+            ).json()["task"]
+            payload = json.dumps({"data": {"parent": {"id": notion_database_uuid}}}).encode()
+            signature = "sha256=" + hmac.new(b"notion-hook-secret", payload, hashlib.sha256).hexdigest()
+            first = client.post("/api/webhooks/notion", content=payload, headers={"X-AI-Board-Signature": signature})
+            second = client.post("/api/webhooks/notion", content=payload, headers={"X-AI-Board-Signature": signature})
+
+            assert first.status_code == 200
+            assert second.status_code == 200
+            first_result = next(item for item in first.json()["triggered"] if item["taskId"] == task["id"])
+            second_result = next(item for item in second.json()["triggered"] if item["taskId"] == task["id"])
+            assert first_result["status"] == "changed"
+            assert second_result["status"] == "skipped"
+            assert len(writes) == 1
+            assert writes[0]["service"] == "github"
+            assert "Repeat Notion webhook to GitHub" in writes[0]["title"]
+            activities = client.get("/api/integration-activities?event_type=automation.live_write", headers=headers).json()["activities"]
+            assert len([item for item in activities if item["automationTaskId"] == task["id"] and item["provider"] == "github"]) == 1
+    finally:
+        monkeypatch.delenv("AI_BOARD_NOTION_WEBHOOK_SECRET", raising=False)
+        settings.cache_clear()
+
+
 def test_high_volume_query_indexes_exist():
     init_db()
     indexes = {
