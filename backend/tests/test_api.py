@@ -2694,6 +2694,130 @@ def test_github_webhook_commits_are_written_to_notion_without_collector(monkeypa
         settings.cache_clear()
 
 
+def test_repeated_github_webhook_payload_skips_duplicate_notion_write(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_GITHUB_WEBHOOK_SECRET", "hook-secret")
+    settings.cache_clear()
+    notion_tables = []
+
+    def no_live_collect(profile, limit=20, pages=2):
+        return [], ["webhook payload should be enough"]
+
+    def fake_write_notion_sources_report(profile, title, sources, template, dry_run=True, target_url=None):
+        notion_tables.append({
+            "service": profile.source_kind,
+            "title": title,
+            "sources": [{"title": source.title, "text": source.extracted_text, "url": source.file_name} for source in sources],
+            "template": template,
+            "dryRun": dry_run,
+            "targetUrl": target_url,
+        })
+        return {"service": "notion", "status": "written", "url": "https://example.test/notion", "dryRun": dry_run, "format": "template-rendered-blocks", "count": len(sources)}
+
+    monkeypatch.setattr("app.main.collect_profile_items", no_live_collect)
+    monkeypatch.setattr("app.main.write_notion_sources_report", fake_write_notion_sources_report)
+    try:
+        with TestClient(app) as client:
+            register = client.post(
+                "/api/auth/register",
+                json={"email": "webhook-repeat@example.com", "name": "Webhook Repeat User", "password": "password123"},
+            )
+            headers = {"Authorization": f"Bearer {register.json()['token']}"}
+            github = client.post(
+                "/api/integration-profiles",
+                headers=headers,
+                json={
+                    "name": "Repeat Webhook GitHub",
+                    "source_kind": "github",
+                    "base_url": "https://github.com/Wish-Upon-A-Star/repeat-hook",
+                    "api_provider": "GitHub REST API",
+                    "token_name": "GITHUB_TOKEN",
+                    "token_value": "github_repeat_token",
+                    "rag_targets": ["commits"],
+                },
+            ).json()["profile"]
+            client.post(
+                "/api/integration-profiles",
+                headers=headers,
+                json={
+                    "name": "Repeat Webhook Notion",
+                    "source_kind": "notion",
+                    "base_url": "https://app.notion.com/p/3797051c2f9981b4bad3fe6545622eb8",
+                    "api_provider": "Notion API",
+                    "token_name": "NOTION_TOKEN",
+                    "token_value": "notion_repeat_token",
+                    "rag_targets": ["notion_pages"],
+                },
+            )
+            task = client.post(
+                "/api/automations",
+                headers=headers,
+                json={
+                    "name": "Repeat GitHub webhook to Notion",
+                    "integration_profile_id": github["id"],
+                    "source": "GitHub Push",
+                    "destination": "Small Notion Page",
+                    "interval_minutes": 5,
+                    "instruction": "Append GitHub push commit summaries to Notion only when input changes.",
+                    "template": "commit / author / link / next action",
+                    "api_provider": "GitHub webhook + Notion API",
+                    "ai_agent": "WebhookCommitAgent",
+                    "template_preset": "github_notion",
+                    "custom_connections": [
+                        {
+                            "label": "Small Notion demo page",
+                            "service": "notion",
+                            "url": "https://app.notion.com/p/3797051c2f9981b4bad3fe6545622eb8",
+                            "api": "Notion API",
+                            "auth_key_name": "NOTION_TOKEN",
+                            "operation": "append_page_update",
+                            "template": "commit: {title}\nsummary: {summary}\nlink: {url}",
+                        }
+                    ],
+                },
+            ).json()["task"]
+            payload = json.dumps(
+                {
+                    "repository": {
+                        "full_name": "Wish-Upon-A-Star/repeat-hook",
+                        "html_url": "https://github.com/Wish-Upon-A-Star/repeat-hook",
+                    },
+                    "commits": [
+                        {
+                            "id": "1111111111111111111111111111111111111111",
+                            "message": "Repeat webhook should write once",
+                            "url": "https://github.com/Wish-Upon-A-Star/repeat-hook/commit/1111111",
+                            "author": {"name": "Codex"},
+                        }
+                    ],
+                }
+            ).encode()
+            signature = "sha256=" + hmac.new(b"hook-secret", payload, hashlib.sha256).hexdigest()
+            first = client.post(
+                "/api/webhooks/github",
+                content=payload,
+                headers={"X-Hub-Signature-256": signature, "X-GitHub-Event": "push"},
+            )
+            second = client.post(
+                "/api/webhooks/github",
+                content=payload,
+                headers={"X-Hub-Signature-256": signature, "X-GitHub-Event": "push"},
+            )
+
+            assert first.status_code == 200
+            assert second.status_code == 200
+            assert first.json()["triggered"][0]["taskId"] == task["id"]
+            assert first.json()["triggered"][0]["status"] == "changed"
+            assert second.json()["triggered"][0]["taskId"] == task["id"]
+            assert second.json()["triggered"][0]["status"] == "skipped"
+            assert len(notion_tables) == 1
+            assert notion_tables[0]["sources"][0]["title"].startswith("[Repeat Webhook GitHub] Webhook commit 111111111111")
+            activities = client.get("/api/integration-activities?event_type=automation.live_write", headers=headers).json()["activities"]
+            assert len([item for item in activities if item["automationTaskId"] == task["id"]]) == 1
+    finally:
+        monkeypatch.delenv("AI_BOARD_GITHUB_WEBHOOK_SECRET", raising=False)
+        settings.cache_clear()
+
+
 def test_notion_webhook_signature_triggers_matching_automation(monkeypatch):
     monkeypatch.setenv("AI_BOARD_NOTION_WEBHOOK_SECRET", "notion-hook-secret")
     settings.cache_clear()
