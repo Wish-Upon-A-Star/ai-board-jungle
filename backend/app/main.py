@@ -542,6 +542,19 @@ def public_base_url(request: Request) -> str:
     return request_base or configured
 
 
+def oauth_redirect_uri(provider: str, request: Request) -> str:
+    normalized = provider.lower()
+    override_key = f"AI_BOARD_{normalized.upper()}_OAUTH_REDIRECT_URI"
+    override = os.environ.get(override_key, "").strip().rstrip("/")
+    if override.startswith(("https://", "http://")):
+        return override
+    if normalized == "google_calendar":
+        google_override = os.environ.get("AI_BOARD_GOOGLE_OAUTH_REDIRECT_URI", "").strip().rstrip("/")
+        if google_override.startswith(("https://", "http://")):
+            return google_override
+    return f"{public_base_url(request)}/api/oauth/{normalized}/callback"
+
+
 def clean_oauth_env_value(value: str) -> str:
     cleaned = str(value or "").strip().lstrip("\ufeff").strip().strip("\"'")
     if not cleaned:
@@ -589,8 +602,7 @@ def read_oauth_state(state: str) -> dict:
 
 def oauth_provider_config(provider: str, request: Request) -> dict:
     normalized = provider.lower()
-    base_url = public_base_url(request)
-    redirect_uri = f"{base_url}/api/oauth/{normalized}/callback"
+    redirect_uri = oauth_redirect_uri(normalized, request)
     if normalized == "github":
         client_id = clean_oauth_env_value(os.environ.get("AI_BOARD_GITHUB_OAUTH_CLIENT_ID", ""))
         client_secret = clean_oauth_env_value(os.environ.get("AI_BOARD_GITHUB_OAUTH_CLIENT_SECRET", ""))

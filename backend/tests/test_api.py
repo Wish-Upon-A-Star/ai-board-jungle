@@ -625,6 +625,30 @@ def test_figma_oauth_start_uses_external_host_and_sanitizes_labeled_credentials(
     assert "클라이언트" not in data["authorizeUrl"]
 
 
+def test_figma_oauth_start_prefers_registered_redirect_override(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_PUBLIC_BASE_URL", "https://old-stale.trycloudflare.com")
+    monkeypatch.setenv("AI_BOARD_FIGMA_OAUTH_REDIRECT_URI", "https://fixed.example.com/api/oauth/figma/callback")
+    monkeypatch.setenv("AI_BOARD_FIGMA_OAUTH_CLIENT_ID", "figma-client")
+    monkeypatch.setenv("AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET", "figma-secret")
+    with TestClient(app) as client:
+        register = client.post(
+            "/api/auth/register",
+            json={"email": "figma-oauth-override@example.com", "name": "Figma OAuth Override", "password": "password123"},
+        )
+        headers = {
+            "Authorization": f"Bearer {register.json()['token']}",
+            "x-ai-board-public-origin": "https://railway-mediterranean-snap-populations.trycloudflare.com",
+            "host": "127.0.0.1:8000",
+        }
+        response = client.get("/api/oauth/figma/start", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    parsed = urlparse(data["authorizeUrl"])
+    params = parse_qs(parsed.query)
+    assert params["redirect_uri"] == ["https://fixed.example.com/api/oauth/figma/callback"]
+    assert data["redirectUri"] == "https://fixed.example.com/api/oauth/figma/callback"
+
+
 def test_google_calendar_oauth_start_requests_offline_calendar_access(monkeypatch):
     monkeypatch.setenv("AI_BOARD_GOOGLE_OAUTH_CLIENT_ID", "google-client")
     monkeypatch.setenv("AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET", "google-secret")

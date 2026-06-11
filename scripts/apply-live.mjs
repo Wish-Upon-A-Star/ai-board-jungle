@@ -58,8 +58,12 @@ function desktopOAuthEnv() {
     AI_BOARD_NOTION_OAUTH_CLIENT_SECRET: notion.SECRET_KEY || process.env.AI_BOARD_NOTION_OAUTH_CLIENT_SECRET || "",
     AI_BOARD_FIGMA_OAUTH_CLIENT_ID: figma[0] || process.env.AI_BOARD_FIGMA_OAUTH_CLIENT_ID || "",
     AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET: figma[1] || process.env.AI_BOARD_FIGMA_OAUTH_CLIENT_SECRET || "",
+    AI_BOARD_FIGMA_OAUTH_REDIRECT_URI:
+      process.env.AI_BOARD_FIGMA_OAUTH_REDIRECT_URI || (publicBaseUrl ? `${publicBaseUrl}/api/oauth/figma/callback` : ""),
     AI_BOARD_GOOGLE_OAUTH_CLIENT_ID: google[0] || process.env.AI_BOARD_GOOGLE_OAUTH_CLIENT_ID || "",
     AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET: google[1] || process.env.AI_BOARD_GOOGLE_OAUTH_CLIENT_SECRET || "",
+    AI_BOARD_GOOGLE_OAUTH_REDIRECT_URI:
+      process.env.AI_BOARD_GOOGLE_OAUTH_REDIRECT_URI || (publicBaseUrl ? `${publicBaseUrl}/api/oauth/google_calendar/callback` : ""),
     AI_BOARD_PUBLIC_BASE_URL: publicBaseUrl,
   };
 }
@@ -117,6 +121,24 @@ function startDetached(command, args, env, logName, cwd = root) {
   return child.pid;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function assertListening(port, expectedPid, label) {
+  const listeners = pidsForPorts([Number(port)]);
+  if (!listeners.length) {
+    throw new Error(`${label} is not listening on port ${port} after startup.`);
+  }
+  if (expectedPid && !listeners.includes(Number(expectedPid))) {
+    throw new Error(
+      `${label} started as pid ${expectedPid}, but port ${port} is owned by ${listeners.join(", ")}. ` +
+      "Refusing to report live apply success for a mismatched process."
+    );
+  }
+  return listeners;
+}
+
 async function main() {
   assertPostgresUrl(dbUrl);
   const target = parsedPostgresTarget(dbUrl);
@@ -135,7 +157,7 @@ async function main() {
   const apiPid = startDetached(
     "python",
     ["-m", "uvicorn", "app.main:app", "--app-dir", "backend", "--host", host, "--port", apiPort],
-    { ...postgresEnv(), ...desktopOAuthEnv() },
+    { ...postgresEnv(), ...desktopOAuthEnv(), PYTHONPATH: "backend" },
     "live-api",
   );
   const webPid = startDetached(
@@ -148,11 +170,16 @@ async function main() {
 
   await waitFor(`http://127.0.0.1:${apiPort}/api/health`, 45000);
   await waitFor(`http://127.0.0.1:${webPort}`, 45000);
+  await sleep(3000);
+  const apiListeners = assertListening(apiPort, apiPid, "Live API");
+  const webListeners = assertListening(webPort, webPid, "Live web");
 
   console.log(JSON.stringify({
     ok: true,
     apiPid,
     webPid,
+    apiListeners,
+    webListeners,
     api: `http://${publicHost}:${apiPort}`,
     web: webUrl,
     database: `${target.host}:${target.port}`,
