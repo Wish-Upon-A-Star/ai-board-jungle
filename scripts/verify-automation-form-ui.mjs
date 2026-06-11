@@ -46,6 +46,14 @@ async function main() {
       (await basicSection.locator(":scope > .grid2 input:visible").count()) +
       (await basicSection.locator(".integration-profile-box select:visible").count());
     if (basicInputCount !== 3) throw new Error(`Basic automation section should show only profile/name/interval controls, got ${basicInputCount}`);
+    const readinessCard = form.locator(".automation-readiness-card");
+    await readinessCard.waitFor({ state: "visible", timeout: 10000 });
+    const readinessText = await readinessCard.innerText();
+    if (!readinessText.includes("provider") || !readinessText.includes("프로필/Callback 확인")) {
+      throw new Error(`Automation readiness card is not actionable: ${readinessText}`);
+    }
+    const readinessChipCount = await readinessCard.locator(".automation-readiness-list span").count();
+    if (readinessChipCount < 1) throw new Error("Automation readiness card should list provider status chips");
     const routePreview = form.locator(".automation-route-preview");
     await routePreview.waitFor({ state: "visible", timeout: 10000 });
     const routePreviewText = await routePreview.innerText();
@@ -72,6 +80,8 @@ async function main() {
     await advanced.locator("summary").click();
     const visibleAdvancedInputs = await advanced.locator("input, textarea").count();
     if (visibleAdvancedInputs < 8) throw new Error(`Advanced settings did not expose expected fields: ${visibleAdvancedInputs}`);
+    await readinessCard.getByRole("button", { name: /프로필\/Callback 확인/ }).click();
+    await page.locator("#integrations-panel").waitFor({ state: "visible", timeout: 10000 });
 
     console.log(JSON.stringify({
       ok: true,
@@ -81,6 +91,8 @@ async function main() {
         "preset_cards_sized",
         "advanced_collapsed_by_default",
         "basic_controls_reduced_to_profile_name_interval",
+        "automation_readiness_card_visible",
+        "automation_readiness_action_opens_profiles",
         "route_preview_visible",
         "route_edit_collapsed_by_default",
         "processing_method_moved_to_advanced",

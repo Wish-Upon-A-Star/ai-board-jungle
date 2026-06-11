@@ -301,6 +301,8 @@ function App() {
   const systemCards = buildSystemReadinessCards({ providerReadiness, knowledgeSources, tasks, healthStatus });
   const healthFailureMessage = getHealthFailureMessage(healthStatus);
   const readyProviderCount = providerReadiness.filter((provider) => provider.ready).length;
+  const missingProviderReadiness = providerReadiness.filter((provider) => !provider.ready);
+  const providerReadinessReady = providerReadiness.length > 0 && missingProviderReadiness.length === 0;
   const manualGuide = manualProfileGuides[integrationForm.source_kind] || manualProfileGuides.custom;
   const currentPublicOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const savedPublicBaseUrl = (systemSettings?.publicBaseUrl || "").replace(/\/$/, "");
@@ -1448,6 +1450,24 @@ function App() {
                         </>
                       )}
                     </div>
+                  </section>
+                  <section className={providerReadinessReady ? "automation-readiness-card ok" : "automation-readiness-card warn"} aria-label="자동화 연동 준비 상태">
+                    <div className="automation-readiness-main">
+                      <strong>{providerReadinessReady ? "연동 준비 상태가 좋습니다" : "연동 준비 확인이 필요합니다"}</strong>
+                      <span>{readyProviderCount}/{providerReadiness.length || 4}개 provider 준비됨 · 자동화 저장 전에 토큰, Base URL, OAuth callback을 확인하세요.</span>
+                    </div>
+                    <div className="automation-readiness-list">
+                      {providerReadiness.length === 0 ? (
+                        <span className="missing">provider 상태를 불러오는 중입니다. 프로필/Callback 탭에서 다시 확인하세요.</span>
+                      ) : (missingProviderReadiness.length ? missingProviderReadiness : providerReadiness).slice(0, 4).map((provider) => (
+                        <span key={provider.key} className={provider.ready ? "ready" : "missing"}>
+                          {provider.name}: {provider.ready ? "ready" : provider.nextAction || "setup required"}
+                        </span>
+                      ))}
+                    </div>
+                    <button type="button" className="secondary" onClick={() => setActiveMainTab("integrations")}>
+                      <KeyRound size={14} /> 프로필/Callback 확인
+                    </button>
                   </section>
                   <div className="grid2">
                     <Field label="자동화 이름" hint="목록에 표시되는 이름입니다."><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="예: GitHub 이슈 → Notion 정리" required /></Field>
