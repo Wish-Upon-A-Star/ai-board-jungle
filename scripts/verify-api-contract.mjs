@@ -159,7 +159,7 @@ try {
         base_url: "https://github.com/example/example",
         api_provider: "GitHub REST API",
         token_name: "GITHUB_TOKEN",
-        token_value: "",
+        token_value: "contract-fake-github-token",
         ai_provider: "OpenAI",
         ai_model: "gpt-4o-mini",
         ai_api_base: "https://api.openai.com/v1",
@@ -220,6 +220,17 @@ try {
   const profileList = await call("/api/integration-profiles", {}, token);
   assert(Array.isArray(profileList.profiles), "integration profile list must contain profiles array");
   assert(profileList.profiles.some((item) => item.id === profileId), "created integration profile missing from list");
+
+  const webhookDryRun = await call(
+    `/api/integration-profiles/${profileId}/github-webhook`,
+    { method: "POST", body: JSON.stringify({ dry_run: true, events: ["push"] }) },
+    token,
+  );
+  assertKeys(webhookDryRun, ["profile", "registration"], "github webhook dry-run response");
+  assert(webhookDryRun.registration.status === "ready", "github webhook dry-run must be ready for a GitHub profile with token");
+  assert(webhookDryRun.registration.endpoint.includes("/api/webhooks/github"), "github webhook dry-run must expose endpoint");
+  assert(!JSON.stringify(webhookDryRun).includes("contract-fake-github-token"), "github webhook dry-run must not expose profile token");
+  assert(!JSON.stringify(webhookDryRun).includes("AI_BOARD_GITHUB_WEBHOOK_SECRET="), "github webhook dry-run must not expose webhook secret");
 
   const collect = await call(`/api/integration-profiles/${profileId}/collect?limit=1&pages=1`, { method: "POST" }, token);
   assertKeys(collect, ["profile", "collected", "saved", "skippedDuplicates", "warnings", "status"], "collect response");
@@ -311,6 +322,7 @@ try {
       "profile_settings",
       "provider_readiness",
       "webhook_readiness",
+      "github_webhook_registration_dry_run",
       "integration_profile_create_list_collect_write",
       "automation_create_run_history_tick",
       "integration_activities",

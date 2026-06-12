@@ -90,6 +90,16 @@ async function main() {
     await sectionTabs.nth(1).click();
     await page.locator(".knowledge-list").waitFor({ state: "visible", timeout: 15000 });
     if (await page.locator(".oauth-diagnostics").isVisible()) throw new Error("OAuth diagnostics should not be visible in saved profiles section");
+    const githubProfile = page.locator(".profile-card").filter({ hasText: "GitHub" }).first();
+    await githubProfile.waitFor({ state: "visible", timeout: 15000 });
+    const githubProfileTextBefore = await githubProfile.innerText();
+    if (!githubProfileTextBefore.includes("Webhook dry-run")) {
+      await githubProfile.locator(".profile-card-header").click();
+    }
+    const githubProfileText = await githubProfile.innerText();
+    if (!githubProfileText.includes("Webhook dry-run") || !githubProfileText.includes("실제 GitHub hook 등록")) {
+      throw new Error(`GitHub profile card must expose webhook registration controls: ${githubProfileText}`);
+    }
 
     await openApp(page, token);
     if (await form.isVisible()) throw new Error("manual profile form should collapse again on a fresh load");
@@ -118,6 +128,7 @@ async function main() {
         "ai_key_action_prefills_custom_profile",
         "diagnostics_section_isolated",
         "saved_profiles_section_isolated",
+        "github_profile_webhook_controls_visible",
         "manual_figma_action_opens_manual_editor",
         "manual_figma_action_prefills_figma_profile",
       ],

@@ -1579,6 +1579,142 @@ def test_webhook_readiness_lists_public_endpoints_without_secret_values(monkeypa
     assert "Notion BOARD → GitHub Issue" in webhooks["notion"]["usedByTemplates"]
 
 
+def test_github_webhook_registration_dry_run_redacts_secret_and_does_not_call_github(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_GITHUB_WEBHOOK_SECRET", "github-hook-secret")
+    settings.cache_clear()
+    calls = []
+
+    def fail_http(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise AssertionError("dry-run webhook registration must not call GitHub")
+
+    monkeypatch.setattr(main_module.httpx, "get", fail_http)
+    monkeypatch.setattr(main_module.httpx, "post", fail_http)
+
+    with TestClient(app) as client:
+        try:
+            register = client.post(
+                "/api/auth/register",
+                json={"email": "github-webhook-dry@example.com", "name": "GitHub Hook Dry", "password": "password123"},
+            )
+            headers = {
+                "Authorization": f"Bearer {register.json()['token']}",
+                "x-forwarded-proto": "https",
+                "x-forwarded-host": "hooks.example.test",
+                "host": "hooks.example.test",
+            }
+            profile = client.post(
+                "/api/integration-profiles",
+                headers=headers,
+                json={
+                    "name": "Hook GitHub",
+                    "source_kind": "github",
+                    "base_url": "https://github.com/acme/hooked",
+                    "api_provider": "GitHub API",
+                    "token_name": "GITHUB_TOKEN",
+                    "token_value": "ghp_hook_token",
+                    "rag_targets": ["commits"],
+                },
+            ).json()["profile"]
+            response = client.post(
+                f"/api/integration-profiles/{profile['id']}/github-webhook",
+                headers=headers,
+                json={"dry_run": True, "events": ["push"]},
+            )
+        finally:
+            settings.cache_clear()
+
+    assert response.status_code == 200
+    data = response.json()["registration"]
+    assert data["status"] == "ready"
+    assert data["url"] == "https://api.github.com/repos/acme/hooked/hooks"
+    assert data["endpoint"] == "https://hooks.example.test/api/webhooks/github"
+    assert data["secretConfigured"] is True
+    assert "github-hook-secret" not in json.dumps(data)
+    assert data["payload"]["config"]["url"] == "https://hooks.example.test/api/webhooks/github"
+    assert "secret" not in data["payload"]["config"]
+    assert calls == []
+
+
+def test_github_webhook_registration_live_reuses_existing_hook(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_GITHUB_WEBHOOK_SECRET", "github-hook-secret")
+    settings.cache_clear()
+    calls = {"get": [], "post": []}
+
+    class FakeResponse:
+        def __init__(self, payload, status_code=200):
+            self._payload = payload
+            self.status_code = status_code
+            self.headers = {"content-type": "application/json"}
+            self.text = json.dumps(payload)
+
+        @property
+        def is_success(self):
+            return 200 <= self.status_code < 300
+
+        def json(self):
+            return self._payload
+
+    def fake_get(url, **kwargs):
+        calls["get"].append((url, kwargs))
+        return FakeResponse([{"id": 99, "url": url + "/99", "config": {"url": "https://hooks.example.test/api/webhooks/github"}}])
+
+    def fake_post(url, **kwargs):
+        calls["post"].append((url, kwargs))
+        return FakeResponse({"id": 100, "url": url + "/100"}, 201)
+
+    monkeypatch.setattr(main_module.httpx, "get", fake_get)
+    monkeypatch.setattr(main_module.httpx, "post", fake_post)
+
+    with TestClient(app) as client:
+        try:
+            register = client.post(
+                "/api/auth/register",
+                json={"email": "github-webhook-live@example.com", "name": "GitHub Hook Live", "password": "password123"},
+            )
+            headers = {
+                "Authorization": f"Bearer {register.json()['token']}",
+                "x-forwarded-proto": "https",
+                "x-forwarded-host": "hooks.example.test",
+                "host": "hooks.example.test",
+            }
+            profile = client.post(
+                "/api/integration-profiles",
+                headers=headers,
+                json={
+                    "name": "Live Hook GitHub",
+                    "source_kind": "github",
+                    "base_url": "git@github.com:acme/hooked.git",
+                    "api_provider": "GitHub API",
+                    "token_name": "GITHUB_TOKEN",
+                    "token_value": "ghp_hook_token",
+                    "rag_targets": ["commits"],
+                },
+            ).json()["profile"]
+            blocked = client.post(
+                f"/api/integration-profiles/{profile['id']}/github-webhook",
+                headers=headers,
+                json={"dry_run": False, "events": ["push"]},
+            )
+            response = client.post(
+                f"/api/integration-profiles/{profile['id']}/github-webhook",
+                headers=headers,
+                json={"dry_run": False, "confirmation": "WRITE LIVE", "events": ["push"]},
+            )
+        finally:
+            settings.cache_clear()
+
+    assert blocked.status_code == 400
+    assert response.status_code == 200
+    registration = response.json()["registration"]
+    assert registration["status"] == "exists"
+    assert registration["id"] == 99
+    assert registration["endpoint"] == "https://hooks.example.test/api/webhooks/github"
+    assert len(calls["get"]) == 1
+    assert calls["get"][0][0] == "https://api.github.com/repos/acme/hooked/hooks"
+    assert calls["post"] == []
+
+
 def test_full_fastapi_flow(monkeypatch):
     def fake_collect(profile, limit=20, pages=2):
         assert limit == 12

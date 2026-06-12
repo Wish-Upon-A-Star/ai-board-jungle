@@ -987,6 +987,23 @@ function App() {
     }
   }
 
+  async function registerGithubWebhook(profile, dryRun = true) {
+    setBusy(`github-webhook:${profile.id}:${dryRun}`);
+    try {
+      const confirmation = liveWriteConfirmations[profile.id] || "";
+      const data = await api(`/api/integration-profiles/${profile.id}/github-webhook`, {
+        method: "POST",
+        body: JSON.stringify({ dry_run: dryRun, confirmation, events: ["push"] }),
+      });
+      setApiResult({ called: "integration-profile.github-webhook", response: data });
+      await loadActivities(activityFilters);
+    } catch (err) {
+      showActionError(err);
+    } finally {
+      clearBusy(`github-webhook:${profile.id}:${dryRun}`);
+    }
+  }
+
   function applyIntegrationProfile(profileId) {
     const selectedProfile = integrationProfiles.find((profile) => String(profile.id) === String(profileId));
     if (!selectedProfile) {
@@ -2199,6 +2216,23 @@ function App() {
                                 disabled={(liveWriteConfirmations[profile.id] || "").trim() !== "WRITE LIVE" || isBusy(`write:${profile.id}:false`)}
                                 onClick={() => writeIntegrationProfile(profile, false)}>
                                 <Play size={14} /> {isBusy(`write:${profile.id}:false`) ? "쓰는 중…" : "실제 쓰기"}
+                              </button>
+                            </div>
+                          )}
+                          {profile.sourceKind === "github" && (
+                            <div className="live-write-controls github-webhook-controls">
+                              <button type="button" onClick={() => registerGithubWebhook(profile, true)} disabled={isBusy(`github-webhook:${profile.id}:true`)}>
+                                <GitBranch size={14} /> {isBusy(`github-webhook:${profile.id}:true`) ? "확인 중…" : "Webhook dry-run"}
+                              </button>
+                              <input
+                                value={liveWriteConfirmations[profile.id] || ""}
+                                onChange={(e) => setLiveWriteConfirmations({ ...liveWriteConfirmations, [profile.id]: e.target.value })}
+                                placeholder="WRITE LIVE 입력 시 실제 GitHub hook 등록"
+                              />
+                              <button type="button" className="danger-action"
+                                disabled={(liveWriteConfirmations[profile.id] || "").trim() !== "WRITE LIVE" || isBusy(`github-webhook:${profile.id}:false`)}
+                                onClick={() => registerGithubWebhook(profile, false)}>
+                                <GitBranch size={14} /> {isBusy(`github-webhook:${profile.id}:false`) ? "등록 중…" : "실제 GitHub hook 등록"}
                               </button>
                             </div>
                           )}

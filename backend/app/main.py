@@ -27,7 +27,7 @@ from .collectors import CollectedItem, collect_profile_items, extract_notion_id,
 from .db import check_db, database_reachable, get_db, init_db
 from .live_writers import execute_profile_write, google_calendar_access_token, parse_figma_file_key, profile_access_token, safe_calendar_id, write_calendar_event_at, write_notion_sources_report
 from .models import AutomationRun, AutomationTask, Comment, IntegrationActivity, IntegrationProfile, KnowledgeSource, Post, SystemSetting, User
-from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LiveWriteIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn, SystemSettingsIn
+from .schemas import AutomationIn, CommentIn, IntegrationProfileIn, InstructionIn, KnowledgeIn, LiveWriteIn, LoginIn, PostIn, ProfileSettingsIn, QuestionIn, RegisterIn, SystemSettingsIn, WebhookRegistrationIn
 from .security import create_token, current_user, hash_password, protect_secret, reveal_secret, secret_preview, secret_storage_type, verify_password
 from .services import agent_review, automation_fingerprint, automation_plan, get_or_create_tags, instruction_hub, rag_answer, result_to_text, search_posts, summarize
 from .taskory_import import normalize_taskory_export
@@ -668,6 +668,93 @@ def webhook_readiness(request: Request, db: Session | None = None) -> list[dict]
             "nextAction": "Notion integration에서 변경 이벤트를 받을 대상 page/database를 공유하고, 외부 webhook sender가 이 endpoint로 변경 payload를 전송하게 설정합니다.",
         },
     ]
+
+
+def github_webhook_registration_payload(endpoint: str, events: list[str]) -> dict:
+    config = {"url": endpoint, "content_type": "json", "insecure_ssl": "0"}
+    if settings().github_webhook_secret:
+        config["secret"] = settings().github_webhook_secret
+    return {
+        "name": "web",
+        "active": True,
+        "events": events or ["push"],
+        "config": config,
+    }
+
+
+def redact_github_webhook_payload(payload: dict) -> dict:
+    safe_payload = json.loads(json.dumps(payload))
+    safe_payload.get("config", {}).pop("secret", None)
+    return safe_payload
+
+
+def register_github_webhook_for_profile(profile: IntegrationProfile, endpoint: str, events: list[str], dry_run: bool = True) -> dict:
+    token = profile_access_token(profile)
+    repo = parse_github_repo(profile.base_url)
+    if profile.source_kind.lower() != "github" or not repo:
+        return {"provider": "github", "status": "blocked", "reason": "GitHub profile with https://github.com/<owner>/<repo> base URL is required.", "dryRun": dry_run}
+    if not token:
+        return {"provider": "github", "status": "blocked", "reason": "GitHub token is required to inspect or register repository webhooks.", "dryRun": dry_run}
+    owner, name = repo
+    hook_url = f"https://api.github.com/repos/{owner}/{name}/hooks"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    payload = github_webhook_registration_payload(endpoint, events)
+    safe_payload = redact_github_webhook_payload(payload)
+    if dry_run:
+        return {
+            "provider": "github",
+            "status": "ready",
+            "method": "POST",
+            "url": hook_url,
+            "endpoint": endpoint,
+            "payload": safe_payload,
+            "secretConfigured": bool(settings().github_webhook_secret),
+            "dryRun": True,
+        }
+    try:
+        existing_response = httpx.get(hook_url, headers=headers, timeout=20.0)
+        if existing_response.is_success:
+            existing_hooks = existing_response.json()
+            existing = next((hook for hook in existing_hooks if hook.get("config", {}).get("url") == endpoint), None)
+            if existing:
+                return {
+                    "provider": "github",
+                    "status": "exists",
+                    "id": existing.get("id"),
+                    "endpoint": endpoint,
+                    "url": existing.get("url", hook_url),
+                    "htmlUrl": f"https://github.com/{owner}/{name}/settings/hooks",
+                    "secretConfigured": bool(settings().github_webhook_secret),
+                    "dryRun": False,
+                }
+        create_response = httpx.post(hook_url, headers=headers, json=payload, timeout=20.0)
+        response_data = create_response.json() if create_response.headers.get("content-type", "").startswith("application/json") else {"raw": create_response.text}
+        if not create_response.is_success:
+            return {
+                "provider": "github",
+                "status": "failed",
+                "code": create_response.status_code,
+                "response": response_data,
+                "endpoint": endpoint,
+                "payload": safe_payload,
+                "dryRun": False,
+            }
+        return {
+            "provider": "github",
+            "status": "registered",
+            "id": response_data.get("id"),
+            "endpoint": endpoint,
+            "url": response_data.get("url", hook_url),
+            "htmlUrl": f"https://github.com/{owner}/{name}/settings/hooks",
+            "secretConfigured": bool(settings().github_webhook_secret),
+            "dryRun": False,
+        }
+    except httpx.HTTPError as exc:
+        return {"provider": "github", "status": "failed", "reason": str(exc), "endpoint": endpoint, "dryRun": False}
 
 
 def clean_oauth_env_value(value: str) -> str:
@@ -1805,6 +1892,31 @@ def write_integration_profile(profile_id: int, data: LiveWriteIn, user: User = D
     )
     db.commit()
     return {"profile": serialize_integration_profile(profile), "write": result}
+
+
+@app.post("/api/integration-profiles/{profile_id}/github-webhook")
+def register_github_profile_webhook(profile_id: int, data: WebhookRegistrationIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    profile = db.get(IntegrationProfile, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="연동 프로필을 찾을 수 없습니다.")
+    if profile.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="다른 사용자의 연동 프로필은 실행할 수 없습니다.")
+    if not data.dry_run and data.confirmation.strip() != "WRITE LIVE":
+        raise HTTPException(status_code=400, detail="Actual GitHub webhook registration requires confirmation text WRITE LIVE.")
+    endpoint = f"{public_base_url(request, db)}/api/webhooks/github"
+    result = register_github_webhook_for_profile(profile, endpoint, data.events or ["push"], data.dry_run)
+    log_activity(
+        db,
+        user,
+        "integration_profile.github_webhook",
+        "github",
+        result.get("status", "unknown"),
+        f"GitHub webhook registration {result.get('status', 'unknown')} for {profile.name}",
+        {key: value for key, value in result.items() if key != "payload"},
+        profile_id=profile.id,
+    )
+    db.commit()
+    return {"profile": serialize_integration_profile(profile), "registration": result}
 
 
 @app.get("/api/posts")

@@ -41,6 +41,12 @@ class LiveWriteIn(BaseModel):
     duration_minutes: int = Field(default=30, ge=5, le=1440)
 
 
+class WebhookRegistrationIn(BaseModel):
+    dry_run: bool = True
+    confirmation: str = Field(default="", max_length=80)
+    events: list[str] = Field(default_factory=lambda: ["push"])
+
+
 class KnowledgeIn(BaseModel):
     title: str = Field(min_length=2, max_length=180)
     source_type: str = Field(default="document", max_length=40)
