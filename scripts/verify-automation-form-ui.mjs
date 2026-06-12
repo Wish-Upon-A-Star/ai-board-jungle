@@ -68,6 +68,12 @@ async function main() {
     if (!setupCallbackValues.some((value) => value.includes("/api/oauth/github/callback"))) {
       throw new Error(`Provider setup checklist must expose GitHub callback: ${setupCallbackValues.join(" | ")}`);
     }
+    if (!setupCallbackValues.some((value) => value.includes("/api/webhooks/github"))) {
+      throw new Error(`Provider setup checklist must expose GitHub webhook endpoint: ${setupCallbackValues.join(" | ")}`);
+    }
+    if (!setupText.includes("Webhook secret") || !setupText.includes("X-Hub-Signature-256")) {
+      throw new Error(`Provider setup checklist must expose webhook secret/header state: ${setupText}`);
+    }
     const routePreview = form.locator(".automation-route-preview");
     await routePreview.waitFor({ state: "visible", timeout: 10000 });
     const routePreviewText = await routePreview.innerText();
@@ -121,6 +127,7 @@ async function main() {
         "automation_readiness_route_required_providers_visible",
         "automation_provider_setup_checklist_visible",
         "automation_provider_setup_callbacks_visible",
+        "automation_provider_setup_webhooks_visible",
         "automation_readiness_action_opens_profiles",
         "route_preview_visible",
         "route_edit_collapsed_by_default",

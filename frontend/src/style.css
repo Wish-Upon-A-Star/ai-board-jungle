@@ -546,7 +546,7 @@ pre {
 }
 .provider-setup-row {
   display: grid;
-  grid-template-columns: 150px minmax(260px, 1fr);
+  grid-template-columns: 150px minmax(220px, 1fr) minmax(220px, 1fr);
   gap: 8px 12px;
   align-items: start;
   padding: 10px;

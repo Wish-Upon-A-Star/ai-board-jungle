@@ -638,6 +638,38 @@ def oauth_redirect_uri(provider: str, request: Request, db: Session | None = Non
     return f"{public_base_url(request, db)}/api/oauth/{normalized}/callback"
 
 
+def webhook_readiness(request: Request, db: Session | None = None) -> list[dict]:
+    base_url = public_base_url(request, db)
+    return [
+        {
+            "provider": "github",
+            "name": "GitHub",
+            "endpoint": f"{base_url}/api/webhooks/github",
+            "events": ["push"],
+            "signatureHeader": "X-Hub-Signature-256",
+            "secretEnv": "AI_BOARD_GITHUB_WEBHOOK_SECRET",
+            "secretConfigured": bool(settings().github_webhook_secret),
+            "setupUrl": "https://github.com/<owner>/<repo>/settings/hooks",
+            "usedByTemplates": ["GitHub → Notion"],
+            "matchingRule": "repository.full_name 또는 repository.html_url이 자동화 GitHub repo URL/Profile Base URL과 일치해야 합니다.",
+            "nextAction": "GitHub repository Settings > Webhooks에 endpoint를 Payload URL로 등록하고 Content type은 application/json으로 둡니다.",
+        },
+        {
+            "provider": "notion",
+            "name": "Notion",
+            "endpoint": f"{base_url}/api/webhooks/notion",
+            "events": ["page.updated", "database.updated"],
+            "signatureHeader": "X-AI-Board-Signature",
+            "secretEnv": "AI_BOARD_NOTION_WEBHOOK_SECRET",
+            "secretConfigured": bool(settings().notion_webhook_secret),
+            "setupUrl": "https://www.notion.so/profile/integrations",
+            "usedByTemplates": ["Notion BOARD → GitHub Issue", "Notion GANTT → Google Calendar"],
+            "matchingRule": "payload page/database URL 또는 ID가 자동화 Notion URL/Profile Base URL과 일치해야 합니다.",
+            "nextAction": "Notion integration에서 변경 이벤트를 받을 대상 page/database를 공유하고, 외부 webhook sender가 이 endpoint로 변경 payload를 전송하게 설정합니다.",
+        },
+    ]
+
+
 def clean_oauth_env_value(value: str) -> str:
     cleaned = str(value or "").strip().lstrip("\ufeff").strip().strip("\"'")
     if not cleaned:
@@ -1569,6 +1601,14 @@ def oauth_callback(provider: str, request: Request, code: str = "", state: str =
 @app.get("/api/provider-readiness")
 def list_provider_readiness(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     return {"providers": provider_readiness(user, db)}
+
+
+@app.get("/api/webhook-readiness")
+def list_webhook_readiness(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    return {
+        "webhooks": webhook_readiness(request, db),
+        "publicOrigin": public_origin_diagnostics(request, db),
+    }
 
 
 @app.get("/api/integration-activities")

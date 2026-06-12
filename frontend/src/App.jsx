@@ -280,6 +280,7 @@ function App() {
   const [deleteConfirmTaskId, setDeleteConfirmTaskId] = useState(null);
   const [integrationProfiles, setIntegrationProfiles] = useState([]);
   const [providerReadiness, setProviderReadiness] = useState([]);
+  const [webhookReadiness, setWebhookReadiness] = useState([]);
   const [oauthProviders, setOauthProviders] = useState([]);
   const [oauthPublicOrigin, setOauthPublicOrigin] = useState(null);
   const [healthStatus, setHealthStatus] = useState(null);
@@ -363,6 +364,7 @@ function App() {
     () => automationProviderKeys.map((key) => {
       const readiness = providerReadiness.find((provider) => provider.key === key);
       const oauth = oauthProviderForKey(oauthProviders, key);
+      const webhook = webhookReadiness.find((item) => item.provider === key);
       return {
         key,
         name: readiness?.name || providerLabel(key),
@@ -370,12 +372,15 @@ function App() {
         status: readiness?.ready ? "ready" : readiness?.nextAction || "setup required",
         callback: oauth?.redirectUri || "",
         callbackSource: oauth?.redirectUriSource || "",
+        webhookEndpoint: webhook?.endpoint || "",
+        webhookSecretConfigured: webhook?.secretConfigured,
+        webhookSignatureHeader: webhook?.signatureHeader || "",
         setupUrl: oauth?.setupUrl || "",
         setupHint: selectedAutomationTemplate?.setup || providerSetupHint(key),
         templates: templatesForProvider(key).map((template) => template.label),
       };
     }),
-    [automationProviderKeys, providerReadiness, oauthProviders, selectedAutomationTemplate],
+    [automationProviderKeys, providerReadiness, oauthProviders, webhookReadiness, selectedAutomationTemplate],
   );
   const routeProviderReadiness = useMemo(
     () => automationProviderKeys
@@ -472,7 +477,7 @@ function App() {
       Object.entries(filters).forEach(([key, value]) => {
         if (value) activityParams.set(key, value);
       });
-      const [me, postData, shareData, taskData, knowledgeData, profileData, readinessData, oauthData, systemData, activityData] = await Promise.all([
+      const [me, postData, shareData, taskData, knowledgeData, profileData, readinessData, webhookData, oauthData, systemData, activityData] = await Promise.all([
         api("/api/auth/me"),
         api(`/api/posts?q=${encodeURIComponent(search)}&kind=board&limit=8&offset=0`),
         api(`/api/posts?q=${encodeURIComponent(search)}&kind=automation&limit=8&offset=0`),
@@ -480,6 +485,7 @@ function App() {
         api("/api/knowledge"),
         api("/api/integration-profiles"),
         api("/api/provider-readiness"),
+        api("/api/webhook-readiness"),
         api("/api/oauth/status"),
         api("/api/system/settings"),
         api(`/api/integration-activities?${activityParams.toString()}`),
@@ -494,6 +500,7 @@ function App() {
       setKnowledgeSources(knowledgeData.sources);
       setIntegrationProfiles(profileData.profiles);
       setProviderReadiness(readinessData.providers);
+      setWebhookReadiness(webhookData.webhooks || []);
       setOauthProviders(oauthData.providers || []);
       setOauthPublicOrigin(oauthData.publicOrigin || null);
       setSystemSettings(systemData.systemSettings || oauthData.systemSettings || null);
@@ -1567,8 +1574,17 @@ function App() {
                               Callback
                               <input readOnly value={provider.callback || "OAuth callback 정보 없음"} onFocus={(event) => event.currentTarget.select()} />
                             </label>
+                            <label>
+                              Webhook
+                              <input readOnly value={provider.webhookEndpoint || "Webhook endpoint 없음"} onFocus={(event) => event.currentTarget.select()} />
+                            </label>
                             <p>{provider.setupHint}</p>
-                            <small>출처: {provider.callbackSource || "profile/manual"} · 사용 템플릿: {provider.templates.join(", ") || "직접 구성"}</small>
+                            <small>
+                              출처: {provider.callbackSource || "profile/manual"} ·
+                              Webhook secret: {provider.webhookEndpoint ? (provider.webhookSecretConfigured ? "설정됨" : "미설정") : "해당 없음"} ·
+                              Header: {provider.webhookSignatureHeader || "해당 없음"} ·
+                              사용 템플릿: {provider.templates.join(", ") || "직접 구성"}
+                            </small>
                             {provider.setupUrl ? <a href={provider.setupUrl} target="_blank" rel="noreferrer">개발자 설정 열기</a> : null}
                           </article>
                         ))}

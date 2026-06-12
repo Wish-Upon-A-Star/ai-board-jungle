@@ -82,6 +82,17 @@ try {
     assert(Array.isArray(provider.profiles), "provider readiness profiles must be an array");
   }
 
+  const webhookReadiness = await call("/api/webhook-readiness", {}, token);
+  assert(Array.isArray(webhookReadiness.webhooks), "webhook-readiness.webhooks must be an array");
+  const webhookProviders = new Set(webhookReadiness.webhooks.map((item) => item.provider));
+  assert(webhookProviders.has("github") && webhookProviders.has("notion"), "webhook readiness must list GitHub and Notion");
+  for (const webhook of webhookReadiness.webhooks) {
+    assertKeys(webhook, ["provider", "name", "endpoint", "events", "signatureHeader", "secretEnv", "secretConfigured", "setupUrl", "usedByTemplates", "matchingRule", "nextAction"], "webhook readiness item");
+    assert(webhook.endpoint.includes(`/api/webhooks/${webhook.provider}`), `${webhook.provider} webhook endpoint must point at provider webhook route`);
+    assert(Array.isArray(webhook.usedByTemplates), `${webhook.provider} usedByTemplates must be an array`);
+    assert(!JSON.stringify(webhook).includes("secret-value"), `${webhook.provider} webhook readiness must not expose secret values`);
+  }
+
   const invalidConnection = {
     label: "Broken target",
     service: "notion",
@@ -299,6 +310,7 @@ try {
     checked: [
       "profile_settings",
       "provider_readiness",
+      "webhook_readiness",
       "integration_profile_create_list_collect_write",
       "automation_create_run_history_tick",
       "integration_activities",

@@ -1545,6 +1545,40 @@ def test_admin_system_public_base_url_overrides_oauth_origin(monkeypatch):
         assert cleanup.status_code == 200
 
 
+def test_webhook_readiness_lists_public_endpoints_without_secret_values(monkeypatch):
+    monkeypatch.setenv("AI_BOARD_GITHUB_WEBHOOK_SECRET", "github-secret-value")
+    monkeypatch.setenv("AI_BOARD_NOTION_WEBHOOK_SECRET", "")
+    settings.cache_clear()
+    with TestClient(app) as client:
+        try:
+            register = client.post(
+                "/api/auth/register",
+                json={"email": "webhook-readiness@example.com", "name": "Webhook Readiness", "password": "password123"},
+            )
+            headers = {
+                "Authorization": f"Bearer {register.json()['token']}",
+                "x-forwarded-proto": "https",
+                "x-forwarded-host": "hooks.example.test",
+                "host": "hooks.example.test",
+            }
+            response = client.get("/api/webhook-readiness", headers=headers)
+        finally:
+            settings.cache_clear()
+    assert response.status_code == 200
+    data = response.json()
+    webhooks = {item["provider"]: item for item in data["webhooks"]}
+    assert webhooks["github"]["endpoint"] == "https://hooks.example.test/api/webhooks/github"
+    assert webhooks["github"]["signatureHeader"] == "X-Hub-Signature-256"
+    assert webhooks["github"]["secretEnv"] == "AI_BOARD_GITHUB_WEBHOOK_SECRET"
+    assert webhooks["github"]["secretConfigured"] is True
+    assert "github-secret-value" not in json.dumps(data)
+    assert webhooks["notion"]["endpoint"] == "https://hooks.example.test/api/webhooks/notion"
+    assert webhooks["notion"]["signatureHeader"] == "X-AI-Board-Signature"
+    assert webhooks["notion"]["secretConfigured"] is False
+    assert "GitHub → Notion" in webhooks["github"]["usedByTemplates"]
+    assert "Notion BOARD → GitHub Issue" in webhooks["notion"]["usedByTemplates"]
+
+
 def test_full_fastapi_flow(monkeypatch):
     def fake_collect(profile, limit=20, pages=2):
         assert limit == 12
